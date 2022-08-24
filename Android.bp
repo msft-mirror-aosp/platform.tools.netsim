@@ -14,7 +14,8 @@
 
 package {
     default_visibility: [
-        "//tools/netsim:__subpackages__"
+        "//tools/netsim:__subpackages__",
+        "//device/google/cuttlefish/build:__subpackages__"
     ],
 }
 
