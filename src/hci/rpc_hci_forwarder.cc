@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rpc_hci_forwarder.h"
+#include "hci/rpc_hci_forwarder.h"
 
 #include <grpcpp/grpcpp.h>
 

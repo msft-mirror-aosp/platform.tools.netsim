@@ -19,6 +19,20 @@ package {
     ],
 }
 
+cc_library_host_static {
+    name: "netsim_util_lib",
+    srcs: [
+        "src/util/os_utils.cc",
+        "src/util/log.cc",
+        "src/util/ranging.cc",
+        "src/util/string_utils.cc",
+        "src/util/ini_file.cc"
+    ],
+    local_include_dirs:[
+        "src",
+    ]
+}
+
 // TODO: Add cc_library_host_static and cc_test_host.
 cc_binary_host {
     name: "netsim",

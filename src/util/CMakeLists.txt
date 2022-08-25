@@ -25,3 +25,9 @@ add_library(util-lib STATIC
   string_utils.cc
   ini_file.h
   ini_file.cc)
+
+target_include_directories(
+  util-lib
+  PRIVATE
+  ${CMAKE_SOURCE_DIR}/src
+  )
