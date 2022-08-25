@@ -28,11 +28,8 @@ target_link_libraries(controller-lib
   libbt-rootcanal
   grpc++)
 
-# depends on util/
 target_include_directories(
   controller-lib
-  PUBLIC
-  libbt-rootcanal
-  hci-lib
-  ${CMAKE_SOURCE_DIR}
+  PRIVATE
+  ${CMAKE_SOURCE_DIR}/src
   )

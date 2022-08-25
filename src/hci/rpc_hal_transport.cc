@@ -15,7 +15,7 @@
 /// Transport of virtual controller messages (hci, uci, netlink) from
 /// desktop emulator (emu) to simulator.
 
-#include "rpc_hal_transport.h"
+#include "hci/rpc_hal_transport.h"
 
 #include <chrono>
 #include <filesystem>
