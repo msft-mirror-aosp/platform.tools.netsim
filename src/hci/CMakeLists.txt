@@ -28,16 +28,12 @@ add_library(hci-lib STATIC
   hci_chip_emulator.cc
 )
 
-target_include_directories(hci-lib
-  PUBLIC
-  vhci-lib
-  protobuf::libprotobuf
-  protobuf/src
-  libbt-rootcanal
-  grpc++
+target_include_directories(
+  hci-lib
+  PRIVATE
   ${PROTOBUF_INCLUDE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_SOURCE_DIR}/src
+  )
 
 target_link_libraries(hci-lib
   PRIVATE
@@ -45,5 +41,6 @@ target_link_libraries(hci-lib
   libbt-rootcanal
   grpc++
   vhci-lib
+  frontend-lib
 )
 

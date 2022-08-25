@@ -29,11 +29,10 @@ target_link_libraries(vhci-lib PRIVATE
 
 target_include_directories(
   vhci-lib
-  PUBLIC
-  protobuf::libprotobuf
-  protobuf/src
+  PRIVATE
   ${PROTOBUF_INCLUDE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
+  PUBLIC
   ${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(util)

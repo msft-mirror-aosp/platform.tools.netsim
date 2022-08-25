@@ -17,6 +17,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -29,7 +30,8 @@ class IniFile {
  public:
   // Note that the constructor _does not_ read data from the backing file.
   // Call |Read| to read the data.
-  explicit IniFile(std::filesystem::path filepath = {}) : filepath(std::move(filepath)) {}
+  explicit IniFile(std::filesystem::path filepath = {})
+      : filepath(std::move(filepath)) {}
 
   // Reads data into IniFile from the backing file, overwriting any
   // existing data.
