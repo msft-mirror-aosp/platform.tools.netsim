@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Unit tests for IniFile class.
-#include "ini_file.h"
+#include "util/ini_file.h"
 
 #include <cstdio>
 #include <fstream>
