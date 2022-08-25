@@ -33,9 +33,9 @@ target_link_libraries(frontend-grpc-lib PRIVATE
 
 target_include_directories(
   frontend-grpc-lib
-  PUBLIC
-  protobuf::libprotobuf
-  protobuf/src
+  PRIVATE
   ${PROTOBUF_INCLUDE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_SOURCE_DIR}/src
+  PUBLIC
+  ${CMAKE_BINARY_DIR}/src/proto
+  )

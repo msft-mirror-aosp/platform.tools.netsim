@@ -94,7 +94,6 @@ target_compile_definitions(netsim PUBLIC NETSIM_ANDROID_EMULATOR)
 
 target_link_libraries(netsim
   PRIVATE
-  libbt-rootcanal
   netsim-lib)
 
 target_link_options(netsim PRIVATE -static-libstdc++)
@@ -123,5 +122,11 @@ target_link_libraries(netsim-test
   frontend-lib
   controller-lib
   core-lib)
+
+target_include_directories(
+  netsim-test
+  PRIVATE
+  ${CMAKE_SOURCE_DIR}/src
+  )
 
 add_test(NAME netsim-test COMMAND netsim-test)
