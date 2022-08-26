@@ -20,3 +20,9 @@ add_library(core-lib STATIC
 
 target_link_libraries(core-lib
   frontend-lib)
+
+target_include_directories(
+  core-lib
+  PRIVATE
+  ${CMAKE_SOURCE_DIR}/src
+  )
