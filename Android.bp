@@ -15,8 +15,36 @@
 package {
     default_visibility: [
         "//tools/netsim:__subpackages__",
-        "//device/google/cuttlefish/build:__subpackages__"
+        "//device/google/cuttlefish/build:__subpackages__",
     ],
+    default_applicable_licenses: ["tools_netsim_license"],
+}
+
+// Added automatically by a large-scale-change
+// See: http://go/android-license-faq
+license {
+    name: "tools_netsim_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "LICENSE",
+    ],
+}
+
+cc_library_host_static {
+    name: "netsim_util_lib",
+    srcs: [
+        "src/util/os_utils.cc",
+        "src/util/log.cc",
+        "src/util/ranging.cc",
+        "src/util/string_utils.cc",
+        "src/util/ini_file.cc"
+    ],
+    local_include_dirs:[
+        "src",
+    ]
 }
 
 // TODO: Add cc_library_host_static and cc_test_host.
