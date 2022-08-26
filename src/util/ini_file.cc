@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ini_file.h"
+#include "util/ini_file.h"
 
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <string_view>
 
-#include "string_utils.h"
+#include "util/string_utils.h"
 
 namespace netsim {
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "hci_chip_emulator.h"
+#include "hci/hci_chip_emulator.h"
 
 #include <cassert>
 #include <iostream>

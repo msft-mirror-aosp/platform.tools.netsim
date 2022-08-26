@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "hci_debug.h"
+#include "hci/hci_debug.h"
 
 #include <cstdint>
 #include <map>
