@@ -22,7 +22,7 @@ namespace testing {
 namespace {
 
 TEST(SceneTest, GetTest) {
-  const auto &scene = netsim::controller::SceneController::Singleton().Get();
+  const auto &scene = netsim::controller::SceneController::Singleton().Copy();
   EXPECT_EQ(scene.devices_size(), 0);
 }
 
@@ -31,7 +31,7 @@ TEST(SceneTest, AddDevicesAndGetTest) {
   device.set_visible(true);
   netsim::controller::SceneController::Singleton().Add(device);
 
-  const auto &scene = netsim::controller::SceneController::Singleton().Get();
+  const auto &scene = netsim::controller::SceneController::Singleton().Copy();
   EXPECT_EQ(scene.devices_size(), 1);
   EXPECT_EQ(scene.devices(0).visible(), true);
 }
