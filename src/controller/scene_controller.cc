@@ -17,6 +17,7 @@
 #include <cmath>
 
 #include "hci/hci_chip_emulator.h"
+#include "util/log.h"
 
 namespace netsim {
 namespace controller {
@@ -31,14 +32,10 @@ void SceneController::Add(netsim::model::Device &device) {
   std::unique_lock<std::mutex> lock(this->mutex_);
   scene_.add_devices()->CopyFrom(device);
 }
-const netsim::model::Scene SceneController::Copy() {
-  std::unique_lock<std::mutex> lock(this->mutex_);
-  return scene_;
-}
+const netsim::model::Scene &SceneController::Get() const { return scene_; }
 
 bool SceneController::SetPosition(const std::string &device_serial,
                                   const netsim::model::Position &position) {
-  std::unique_lock<std::mutex> lock(this->mutex_);
   for (auto &device : *scene_.mutable_devices()) {
     if (device.device_serial() == device_serial) {
       device.mutable_position()->CopyFrom(position);

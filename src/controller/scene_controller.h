@@ -31,7 +31,7 @@ class SceneController {
   static SceneController &Singleton();
 
   void Add(netsim::model::Device &device);
-  const netsim::model::Scene Copy();
+  const netsim::model::Scene &Get() const;
   bool SetPosition(const std::string &device_serial,
                    const netsim::model::Position &position);
 
