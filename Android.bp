@@ -66,7 +66,6 @@ cc_library_host_static {
         "src/core/server.cc",
         "src/fe/cli.cc",
         "src/fe/frontend_server.cc",
-        "src/fe/http_server.cc",
         "src/hci/fd_startup.cc",
         "src/hci/hci_chip_emulator.cc",
         "src/hci/hci_debug.cc",
@@ -78,16 +77,12 @@ cc_library_host_static {
     ],
     shared_libs: [
         "libgrpc++",
-        "libcap",
-        "libcrypto",
-        "libssl",
     ],
     static_libs: [
         "libc++fs",
         "libjsoncpp",
         "libprotobuf-cpp-full",
         "libscriptedbeaconpayload-protos-lite",
-        "libwebsockets",
         "netsim-proto",
     ],
     whole_static_libs: [
@@ -103,16 +98,12 @@ cc_binary_host {
     ],
     shared_libs: [
         "libgrpc++",
-        "libcap",
-        "libcrypto",
-        "libssl",
     ],
     static_libs: [
         "libc++fs",
         "libjsoncpp",
         "libprotobuf-cpp-full",
         "libscriptedbeaconpayload-protos-lite",
-        "libwebsockets",
         "netsim-proto",
         "lib-netsim",
     ],
