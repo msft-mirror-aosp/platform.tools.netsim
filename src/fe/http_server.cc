@@ -163,10 +163,10 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
                 &p, end))
           return 1;
 
-        if (lws_add_http_header_by_name(wsi, kCorsHeaderKey,
-
-                                        kCorsHeaderValue,
-                                        sizeof(kCorsHeaderValue), &p, end))
+        if (lws_add_http_header_by_name(
+                wsi, kCorsHeaderKey, kCorsHeaderValue,
+                sizeof(kCorsHeaderValue) - 1,  // Exclude the null character.
+                &p, end))
           return 1;
         if (lws_finalize_write_http_header(wsi, start, &p, end)) return 1;
 
