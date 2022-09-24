@@ -58,7 +58,7 @@ TEST_F(FrontendServerTest, SetPositionDevice) {
   request.mutable_position()->set_z(3.3);
   grpc::Status status = service_.SetPosition(&context_, &request, &response);
   ASSERT_TRUE(status.ok());
-  const auto &scene = netsim::controller::SceneController::Singleton().Get();
+  const auto &scene = netsim::controller::SceneController::Singleton().Copy();
   // NOTE: Singleton won't be reset between tests. Need to either deprecate
   // Singleton pattern or provide reset().
   bool found = false;
