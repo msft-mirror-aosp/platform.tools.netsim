@@ -28,6 +28,9 @@ model::Device CreateDevice(std::string_view device_serial) {
   model::Device device;
   device.set_device_serial(stringutils::AsString(device_serial));
   device.set_visible(true);
+  // required sub-messages to simplify ui
+  device.mutable_position();
+  device.mutable_orientation();
   return device;
 }
 
