@@ -163,24 +163,24 @@ class ChipEmulatorImpl : public ChipEmulator {
 
   // Enable or disable a single phy for a device
   void UpdatePhy(const ConnectedDevice &cd, rootcanal::Phy::Type phy_type,
-                 size_t phy_index, netsim::model::RadioState new_state) {
+                 size_t phy_index, netsim::model::PhyState new_state) {
     auto current = cd.device->HasPhy(phy_type);
-    using RadioState = netsim::model::RadioState;
-    if (current && new_state == RadioState::DOWN) {
+    using RadioStateType = netsim::model::PhyState;
+    if (current && new_state == RadioStateType::DOWN) {
       mTestModel.DelDeviceFromPhy(cd.device_id, phy_index);
-    } else if (!current && new_state == RadioState::UP) {
+    } else if (!current && new_state == RadioStateType::UP) {
       mTestModel.AddDeviceToPhy(cd.device_id, phy_index);
     }
   }
 
   // Enable or disable the radios for a device
-  void SetDeviceRadio(const std::string &serial, netsim::model::Radio radio,
-                      netsim::model::RadioState state) override {
+  void SetDeviceRadio(const std::string &serial, netsim::model::PhyKind radio,
+                      netsim::model::PhyState state) override {
     if (auto cd = GetConnectedDevice(serial); cd != nullptr) {
-      if (radio == netsim::model::Radio::BLUETOOTH_LOW_ENERGY) {
+      if (radio == netsim::model::PhyKind::BLUETOOTH_LOW_ENERGY) {
         UpdatePhy(*cd, rootcanal::Phy::Type::LOW_ENERGY, phy_low_energy_index_,
                   state);
-      } else if (radio == netsim::model::Radio::BLUETOOTH_CLASSIC) {
+      } else if (radio == netsim::model::PhyKind::BLUETOOTH_CLASSIC) {
         UpdatePhy(*cd, rootcanal::Phy::Type::BR_EDR, phy_classic_index_, state);
       }
     }
@@ -228,14 +228,14 @@ class ChipEmulatorImpl : public ChipEmulator {
     // update the scene controller with the radio state for this device
 
     controller::SceneController::Singleton().UpdateRadio(
-        serial, netsim::model::Radio::BLUETOOTH_LOW_ENERGY,
+        serial, netsim::model::PhyKind ::BLUETOOTH_LOW_ENERGY,
         device->HasPhy(rootcanal::Phy::Type::LOW_ENERGY)
-            ? model::RadioState::UP
-            : model::RadioState::DOWN);
+            ? model::PhyState::UP
+            : model::PhyState::DOWN);
     controller::SceneController::Singleton().UpdateRadio(
-        serial, netsim::model::Radio::BLUETOOTH_CLASSIC,
-        device->HasPhy(rootcanal::Phy::Type::BR_EDR) ? model::RadioState::UP
-                                                     : model::RadioState::DOWN);
+        serial, netsim::model::PhyKind ::BLUETOOTH_CLASSIC,
+        device->HasPhy(rootcanal::Phy::Type::BR_EDR) ? model::PhyState::UP
+                                                     : model::PhyState::DOWN);
 
     auto sniffer = std::static_pointer_cast<rootcanal::HciSniffer>(transport);
     devices_.emplace(std::make_pair(
