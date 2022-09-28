@@ -44,6 +44,16 @@ TEST_F(FrontendServerTest, VerifyVersion) {
   EXPECT_EQ(response.version(), "123b");
 }
 
+std::optional<netsim::model::Device> GetDevice(const std::string &serial) {
+  const auto scene = netsim::controller::SceneController::Singleton().Copy();
+  for (const auto &device : scene.devices()) {
+    if (device.device_serial() == serial) {
+      return {device};
+    }
+  }
+  return {};
+}
+
 TEST_F(FrontendServerTest, SetPositionDevice) {
   netsim::model::Device device_to_add;
   device_to_add.set_device_serial("test-device-serial-for-set-position");
@@ -72,6 +82,37 @@ TEST_F(FrontendServerTest, SetPositionDevice) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+TEST_F(FrontendServerTest, UpdateDevice) {
+  auto serial = std::string("serial-for-update");
+  auto name = std::string("name-for-update");
+  netsim::model::Device device_to_add;
+  device_to_add.set_device_serial(serial);
+  netsim::model::ChipPhyState cps;
+  cps.set_radio(netsim::model::PhyKind::BLUETOOTH_CLASSIC);
+  cps.set_state(netsim::model::PhyState::UP);
+  device_to_add.mutable_radio_states()->Add()->CopyFrom(cps);
+  netsim::controller::SceneController::Singleton().Add(device_to_add);
+
+  frontend::UpdateDeviceRequest request;
+  google::protobuf::Empty response;
+  request.mutable_device()->set_device_serial(serial);
+  request.mutable_device()->set_name(name);
+  auto radio = request.mutable_device()->mutable_radio_states()->Add();
+  radio->set_radio(netsim::model::PhyKind::BLUETOOTH_CLASSIC);
+  radio->set_state(netsim::model::PhyState::UP);
+
+  grpc::Status status = service_.UpdateDevice(&context_, &request, &response);
+  ASSERT_TRUE(status.ok());
+  auto optional_device = GetDevice(serial);
+  ASSERT_TRUE(optional_device);
+  auto d = optional_device.value();
+  ASSERT_TRUE(d.name() == name);
+  ASSERT_TRUE(d.radio_states().size() == 1);
+  ASSERT_TRUE(d.radio_states().Get(0).radio() ==
+              netsim::model::PhyKind::BLUETOOTH_CLASSIC);
+  ASSERT_TRUE(d.radio_states().Get(0).state() == netsim::model::PhyState::UP);
 }
 
 TEST_F(FrontendServerTest, SetPositionDeviceNotFound) {
