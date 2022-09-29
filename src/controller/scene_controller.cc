@@ -16,6 +16,7 @@
 
 #include <cmath>
 
+#include "controller/device_notify_manager.h"
 #include "hci/hci_chip_emulator.h"
 
 namespace netsim {
@@ -42,6 +43,7 @@ bool SceneController::SetPosition(const std::string &device_serial,
   for (auto &device : *scene_.mutable_devices()) {
     if (device.device_serial() == device_serial) {
       device.mutable_position()->CopyFrom(position);
+      DeviceNotifyManager::Get().Notify();
       return true;
     }
   }
