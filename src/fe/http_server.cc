@@ -20,6 +20,7 @@
 
 #include <string>
 
+#include "controller/device_notify_manager.h"
 #include "controller/scene_controller.h"
 #include "frontend.pb.h"
 
@@ -102,6 +103,8 @@ struct Session {
   Status status;
   std::string request_body = "";
   std::string response = "";
+  // Optional for register-updates request.
+  unsigned int registered_callback_id = 0;
 };
 
 int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
@@ -118,6 +121,13 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
       lws_get_peer_simple(wsi, reinterpret_cast<char *>(buf), sizeof(buf));
       lwsl_notice("HTTP: connection %s, path %s\n",
                   reinterpret_cast<const char *>(buf), session->path.c_str());
+
+      if (session->path.compare("/register-updates") == 0) {
+        session->registered_callback_id =
+            controller::DeviceNotifyManager::Get().Register(
+                [wsi]() -> void { lws_callback_on_writable(wsi); });
+        return 0;
+      }
 
       if (lws_hdr_total_length(wsi, WSI_TOKEN_GET_URI))  // GET
         // write the body separately
@@ -146,6 +156,10 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
         } else if (session->path.compare("/set-position") == 0) {
           session->status =
               SetPosition(session->request_body, session->response);
+        } else if (session->path.compare("/register-updates") == 0) {
+          // Wake up by DeviceNotifyManager.
+          session->status =
+              GetDevices(session->request_body, session->response);
         } else {
           session->status = Status(HTTP_STATUS_NOT_FOUND,
                                    "invalid url:" + std::string(session->path));
@@ -182,6 +196,13 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
       }
 
       if (lws_http_transaction_completed(wsi)) return -1;
+
+      return 0;
+
+    case LWS_CALLBACK_CLOSED_HTTP:
+      if (session->registered_callback_id > 0)
+        controller::DeviceNotifyManager::Get().Unregister(
+            session->registered_callback_id);
 
       return 0;
 
@@ -255,6 +276,8 @@ void RunHttpServer() {
   info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT |
                  LWS_SERVER_OPTION_EXPLICIT_VHOSTS |
                  LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
+  // NOTE: Web server terminates after 15 seconds and cause Http request
+  // timeout.
 
   context = lws_create_context(&info);
   if (!context) {
