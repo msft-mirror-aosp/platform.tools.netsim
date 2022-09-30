@@ -63,6 +63,7 @@ cc_library_host_static {
     srcs: [
         "src/controller/device.cc",
         "src/controller/scene_controller.cc",
+        "src/controller/device_notify_manager.cc",
         "src/core/server.cc",
         "src/fe/cli.cc",
         "src/fe/frontend_server.cc",

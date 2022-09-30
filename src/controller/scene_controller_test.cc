@@ -14,6 +14,8 @@
 
 #include "controller/scene_controller.h"
 
+#include "controller/device.h"
+
 #include "gtest/gtest.h"
 #include "model.pb.h"
 
@@ -34,6 +36,14 @@ TEST(SceneTest, AddDevicesAndGetTest) {
   const auto &scene = netsim::controller::SceneController::Singleton().Copy();
   EXPECT_EQ(scene.devices_size(), 1);
   EXPECT_EQ(scene.devices(0).visible(), true);
+}
+
+TEST(DeviceTest, DeviceConstructorTest) {
+  auto device = controller::CreateDevice("unique-serial");
+  EXPECT_EQ("unique-serial", device.device_serial());
+  // Test for non-empty position and orientationa
+  EXPECT_TRUE(device.has_position());
+  EXPECT_TRUE(device.has_orientation());
 }
 
 }  // namespace
