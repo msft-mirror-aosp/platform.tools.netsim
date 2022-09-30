@@ -45,6 +45,12 @@ class SceneController {
   std::optional<float> GetDistance(const std::string &device_serial_a,
                                    const std::string &device_serial_b);
 
+ protected:
+  friend class SceneControllerTest;
+
+  netsim::model::Device *MatchDevice(const std::string &serial,
+                                     const std::string &name);
+
  private:
   SceneController() = default;  // Disallow instantiation outside of the class.
   netsim::model::Scene scene_;
