@@ -15,6 +15,7 @@
 #include "controller/scene_controller.h"
 
 #include <cmath>
+#include <cstddef>
 
 #include "controller/device_notify_manager.h"
 #include "hci/hci_chip_emulator.h"
@@ -32,6 +33,7 @@ void SceneController::Add(netsim::model::Device &device) {
   std::unique_lock<std::mutex> lock(this->mutex_);
   scene_.add_devices()->CopyFrom(device);
 }
+
 const netsim::model::Scene SceneController::Copy() {
   std::unique_lock<std::mutex> lock(this->mutex_);
   return scene_;
@@ -84,6 +86,28 @@ void SceneController::UpdateRadio(const std::string &device_serial,
   }
 }
 
+// Returns a Mutable Device message or nullptr
+netsim::model::Device *SceneController::MatchDevice(const std::string &serial,
+                                                    const std::string &name) {
+  netsim::model::Device *found = nullptr;
+  if (serial.empty() && name.empty()) {
+    return nullptr;
+  }
+  for (netsim::model::Device &device : *scene_.mutable_devices()) {
+    // serial && name -> rename, only match by serial
+    // serial && !name -> match by serial
+    // !serial && name -> match by name
+    auto pos = (serial.empty()) ? device.name().find(name)
+                                : device.device_serial().find(serial);
+    if (pos != std::string::npos) {
+      // check for multiple matches
+      if (found != nullptr) return nullptr;
+      found = &device;
+    }
+  }
+  return found;
+}
+
 // UI requesting a change in device info
 bool SceneController::UpdateDevice(
     const netsim::model::Device &updated_device) {
@@ -91,32 +115,29 @@ bool SceneController::UpdateDevice(
   if (updated_device.device_serial().empty()) {
     return false;
   }
-  const std::string &device_serial = updated_device.device_serial();
-  for (auto &device : *scene_.mutable_devices()) {
-    if (device.device_serial() == device_serial) {
-      if (updated_device.has_position()) {
-        device.mutable_position()->CopyFrom(updated_device.position());
-      }
-      if (updated_device.has_orientation()) {
-        device.mutable_orientation()->CopyFrom(updated_device.orientation());
-      }
-      if (!updated_device.name().empty()) {
-        device.set_name(updated_device.name());
-      }
-      if (updated_device.radio_states().size()) {
-        for (auto &radio_state : updated_device.radio_states()) {
-          hci::ChipEmulator::Get().SetDeviceRadio(
-              device_serial, radio_state.radio(), radio_state.state());
-          UpdateRadioInternal(device, radio_state, false);
-        }
-      }
-      if (updated_device.radio_ranges().size()) {
-        // TODO push to model and chip emulators
-      }
-      return true;
+  netsim::model::Device *device =
+      MatchDevice(updated_device.device_serial(), updated_device.name());
+  if (device == nullptr) return false;
+  if (updated_device.has_position()) {
+    device->mutable_position()->CopyFrom(updated_device.position());
+  }
+  if (updated_device.has_orientation()) {
+    device->mutable_orientation()->CopyFrom(updated_device.orientation());
+  }
+  if (!updated_device.name().empty()) {
+    device->set_name(updated_device.name());
+  }
+  if (updated_device.radio_states().size()) {
+    for (auto &radio_state : updated_device.radio_states()) {
+      hci::ChipEmulator::Get().SetDeviceRadio(
+          device->device_serial(), radio_state.radio(), radio_state.state());
+      UpdateRadioInternal(*device, radio_state, false);
     }
   }
-  return false;
+  if (updated_device.radio_ranges().size()) {
+    // TODO push to model and chip emulators
+  }
+  return true;
 }
 
 std::optional<float> SceneController::GetDistance(
