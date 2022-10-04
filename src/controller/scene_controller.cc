@@ -137,6 +137,7 @@ bool SceneController::UpdateDevice(
   if (updated_device.radio_ranges().size()) {
     // TODO push to model and chip emulators
   }
+  DeviceNotifyManager::Get().Notify();
   return true;
 }
 
