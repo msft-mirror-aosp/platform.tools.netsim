@@ -126,7 +126,7 @@ class FrontendClient {
               radio_state.state() == model::PhyState::ON ? "up" : "down";
           std::cout << radio << ":" << state << "\t";
         }
-        std::cout << std::endl;
+        std::cout << position << std::endl;
       }
     }
   }
