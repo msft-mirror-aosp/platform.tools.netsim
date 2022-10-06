@@ -289,6 +289,7 @@ void RunHttpServer() {
   std::string cert_file = certs_dir + "server.crt";
   std::string key_file = certs_dir + "server.key";
 
+  info.iface = "127.0.0.1";  // listen only on localhost
   // Run HTTP service on 7681.
   info.port = 7681;
   info.pprotocols = pprotocols;
@@ -300,7 +301,7 @@ void RunHttpServer() {
     goto bail;
   }
 
-  // Run HTTP service on 7682.
+  // Run HTTPS service on 7682.
   info.port = 7682;
 #if defined(LWS_WITH_TLS)
   info.ssl_cert_filepath = cert_file.c_str();
