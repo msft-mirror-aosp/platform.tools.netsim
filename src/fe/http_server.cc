@@ -161,8 +161,7 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
           session->status =
               GetDevices(session->request_body, session->response);
         } else {
-          session->status = Status(HTTP_STATUS_NOT_FOUND,
-                                   "invalid url:" + std::string(session->path));
+          session->status = Status(HTTP_STATUS_NOT_FOUND, "invalid url");
         }
 
         if (!session->status.Ok())
