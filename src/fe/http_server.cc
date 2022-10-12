@@ -86,9 +86,9 @@ Status SetPosition(const std::string &request, std::string &response) {
 
 Status GetDevices(const std::string &request, std::string &response) {
   frontend::GetDevicesResponse response_proto;
-  const auto &scene = netsim::controller::SceneController::Singleton().Copy();
-  for (const auto &device : scene.devices())
-    response_proto.add_devices()->CopyFrom(device);
+  const auto &devices = netsim::controller::SceneController::Singleton().Copy();
+  for (const auto &device : devices)
+    response_proto.add_devices()->CopyFrom(device->model);
 
   google::protobuf::util::MessageToJsonString(response_proto, &response);
   return Status(true);
