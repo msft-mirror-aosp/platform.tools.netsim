@@ -45,16 +45,16 @@ const std::string GetName(std::string_view device_serial) {
 }
 }  // namespace
 
-model::Device CreateDevice(std::string_view device_serial) {
-  model::Device device;
-  device.set_device_serial(stringutils::AsString(device_serial));
-  device.set_visible(true);
+std::shared_ptr<Device> CreateDevice(std::string_view serial) {
+  model::Device model;
+  model.set_device_serial(stringutils::AsString(serial));
+  model.set_visible(true);
   // default name
-  device.set_name(GetName(device_serial));
+  model.set_name(GetName(serial));
   // required sub-messages to simplify ui
-  device.mutable_position();
-  device.mutable_orientation();
-  return device;
+  model.mutable_position();
+  model.mutable_orientation();
+  return std::make_shared<Device>(model);
 }
 
 }  // namespace controller
