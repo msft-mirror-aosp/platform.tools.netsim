@@ -48,10 +48,9 @@ message StartupInfo {
 }
 
 message ChipInfo {
-  string serial = 1;        // unique serial name of device
-  Chip chip = 2;            // single chip
+  string serial = 1;  // unique serial name of device
+  Chip chip = 2;      // single chip
 }
-
 
 message Chip {
   enum ChipKind {

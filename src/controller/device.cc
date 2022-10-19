@@ -82,6 +82,12 @@ void Device::AddChip(std::shared_ptr<Device> device, std::shared_ptr<Chip> chip,
   model.mutable_chips()->Add()->CopyFrom(chip_model);
   chips.push_back(std::move(chip));
 }
+void Device::Reset() {
+  this->model.set_visible(true);
+  this->model.mutable_position()->Clear();
+  this->model.mutable_orientation()->Clear();
+  // TODO: Reset chips and radios.
+}
 
 std::shared_ptr<Device> CreateDevice(std::string_view serial) {
   model::Device model;

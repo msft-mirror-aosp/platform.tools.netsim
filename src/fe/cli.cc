@@ -47,7 +47,7 @@ std::optional<std::string> GetServerAddress() {
 
 void Usage(const char *msg) { std::cerr << "Usage: " << msg << std::endl; }
 
-constexpr char kUsage[] = "Usage: [version|devices|radio|move|capture]";
+constexpr char kUsage[] = "Usage: [version|devices|radio|move|capture|reset]";
 using Args = std::vector<std::string_view>;
 
 // A synchronous client for the netsim frontend service.
@@ -194,6 +194,16 @@ class FrontendClient {
     }
   }
 
+  // Reset all devices.
+  // reset
+  void Reset(const Args &args) {
+    if (args.size() != 1) return Usage("reset");
+    google::protobuf::Empty response;
+    auto status = stub_->Reset(&context_, {}, &response);
+    if (CheckStatus(status, "Reset"))
+      std::cout << "Reset all devices" << std::endl;
+  }
+
  private:
   std::unique_ptr<frontend::FrontendService::Stub> stub_;
   grpc::ClientContext context_;
@@ -252,6 +262,8 @@ int SendCommand(std::unique_ptr<frontend::FrontendService::Stub> stub,
     frontend.GetDevices(args);
   else if (cmd == "capture")
     frontend.SetPacketCapture(args);
+  else if (cmd == "reset")
+    frontend.Reset(args);
   else if (cmd == "positions" || cmd == "visibility" ||
            cmd == "set-link-loss" || cmd == "set-range" || cmd == "net-cat") {
     std::cout << "Not implement yet" << std::endl;
