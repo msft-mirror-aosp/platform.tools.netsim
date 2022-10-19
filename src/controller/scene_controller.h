@@ -47,6 +47,8 @@ class SceneController {
 
   float GetDistance(const Device &, const Device &);
 
+  void Reset();
+
  protected:
   friend class SceneControllerTest;
   friend class FrontendServerTest;
