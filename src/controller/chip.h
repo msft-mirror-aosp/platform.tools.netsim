@@ -32,7 +32,7 @@ class Chip {
  public:
   explicit Chip() {}
 
-  virtual ~Chip() {};
+  virtual ~Chip(){};
 
   /**
    * Update processing for the chip. Validate and move state from the request
