@@ -45,6 +45,44 @@ const std::string GetName(std::string_view device_serial) {
 }
 }  // namespace
 
+void Device::Update(const model::Device &request) {
+  if (request.has_position()) {
+    this->model.mutable_position()->CopyFrom(request.position());
+  }
+  if (request.has_orientation()) {
+    this->model.mutable_orientation()->CopyFrom(request.orientation());
+  }
+  if (!request.name().empty()) {
+    this->model.set_name(request.name());
+  }
+  for (auto &request_chip_model : request.chips()) {
+    auto found = false;
+    for (auto &chip : chips) {
+      if (chip->KeyComp(request_chip_model)) {
+        chip->Update(request_chip_model);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      std::cerr << "Unknown chip in update" << std::endl;
+    }
+  }
+}
+
+void Device::AddChip(std::shared_ptr<Device> device, std::shared_ptr<Chip> chip,
+                     const model::Chip &chip_model) {
+  for (auto &c : chips) {
+    if (c->KeyComp(chip_model)) {
+      std::cerr << "Trying to add a duplicate chip, skipping!" << std::endl;
+      return;
+    }
+  }
+  chip->Init(std::move(device), chips.size());
+  model.mutable_chips()->Add()->CopyFrom(chip_model);
+  chips.push_back(std::move(chip));
+}
+
 std::shared_ptr<Device> CreateDevice(std::string_view serial) {
   model::Device model;
   model.set_device_serial(stringutils::AsString(serial));
