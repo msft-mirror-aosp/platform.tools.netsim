@@ -88,6 +88,13 @@ class FrontendServer final : public frontend::FrontendService::Service {
     controller::SceneController::Singleton().UpdateDevice(device);
     return grpc::Status::OK;
   }
+
+  grpc::Status Reset(grpc::ServerContext *context,
+                     const google::protobuf::Empty *request,
+                     google::protobuf::Empty *empty) {
+    netsim::controller::SceneController::Singleton().Reset();
+    return grpc::Status::OK;
+  }
 };
 
 void RunFrontendServer() {

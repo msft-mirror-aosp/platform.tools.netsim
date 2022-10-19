@@ -41,6 +41,8 @@ class Device {
     model.set_device_serial(serial);
   }
 
+  void Reset();
+
  protected:
   std::vector<std::shared_ptr<Chip>> chips;
 };

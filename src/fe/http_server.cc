@@ -94,6 +94,14 @@ Status GetDevices(const std::string &request, std::string &response) {
   return Status(true);
 }
 
+Status Reset(const std::string &request, std::string &response) {
+  netsim::controller::SceneController::Singleton().Reset();
+  google::protobuf::Empty response_proto;
+  google::protobuf::util::MessageToJsonString(response_proto, &response);
+
+  return Status(true);
+}
+
 // Per-session user data.
 struct Session {
   std::string path;
@@ -156,6 +164,8 @@ int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user,
         } else if (session->path.compare("/set-position") == 0) {
           session->status =
               SetPosition(session->request_body, session->response);
+        } else if (session->path.compare("/reset") == 0) {
+          session->status = Reset(session->request_body, session->response);
         } else if (session->path.compare("/register-updates") == 0) {
           // Wake up by DeviceNotifyManager.
           session->status =
