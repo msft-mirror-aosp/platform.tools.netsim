@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string_view>
 
 #include "model.pb.h"
@@ -23,7 +24,16 @@
 namespace netsim {
 namespace controller {
 
-model::Device CreateDevice(std::string_view device_serial);
+class Device {
+ public:
+  model::Device model;
+
+  // virtual void Update(const model::Device& request);
+
+  explicit Device(const model::Device &model) : model(model) {}
+};
+
+std::shared_ptr<Device> CreateDevice(std::string_view device_serial);
 
 }  // namespace controller
 }  // namespace netsim
