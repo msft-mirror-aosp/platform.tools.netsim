@@ -60,6 +60,9 @@ service FrontendService {
 
   // Turn on/off packet capture for connected devices.
   rpc SetPacketCapture(SetPacketCaptureRequest) returns (google.protobuf.Empty);
+
+  // Reset all devices.
+  rpc Reset(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 message VersionResponse {
