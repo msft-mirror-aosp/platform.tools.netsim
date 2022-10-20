@@ -83,31 +83,31 @@ TEST_F(FrontendServerTest, UpdateDevice) {
   auto name = std::string("name-for-update");
   auto device_to_add = controller::CreateDevice(serial);
   device_to_add->model.set_name(name);
-  device_to_add->model.set_device_serial(serial);
-  netsim::model::ChipPhyState cps;
-  cps.set_radio(netsim::model::PhyKind::BLUETOOTH_CLASSIC);
-  cps.set_state(netsim::model::PhyState::UP);
-  device_to_add->model.mutable_radio_states()->Add()->CopyFrom(cps);
+  {
+    auto chip = device_to_add->model.mutable_chips()->Add();
+    chip->mutable_bt()->mutable_classic()->set_state(model::State::ON);
+  }
   netsim::controller::SceneController::Singleton().Add(device_to_add);
 
   frontend::UpdateDeviceRequest request;
   google::protobuf::Empty response;
   request.mutable_device()->set_device_serial(serial);
   request.mutable_device()->set_name(name);
-  auto radio = request.mutable_device()->mutable_radio_states()->Add();
-  radio->set_radio(netsim::model::PhyKind::BLUETOOTH_CLASSIC);
-  radio->set_state(netsim::model::PhyState::UP);
+  {
+    auto chip = request.mutable_device()->mutable_chips()->Add();
+    chip->mutable_bt()->mutable_classic()->set_state(model::State::ON);
+  }
 
   grpc::Status status = service_.UpdateDevice(&context_, &request, &response);
   ASSERT_TRUE(status.ok());
   auto optional_device = GetDevice(serial);
   ASSERT_TRUE(optional_device != nullptr);
   ASSERT_TRUE(optional_device->model.name() == name);
-  ASSERT_TRUE(optional_device->model.radio_states().size() == 1);
-  ASSERT_TRUE(optional_device->model.radio_states().Get(0).radio() ==
-              netsim::model::PhyKind::BLUETOOTH_CLASSIC);
-  ASSERT_TRUE(optional_device->model.radio_states().Get(0).state() ==
-              netsim::model::PhyState::UP);
+  ASSERT_TRUE(optional_device->model.chips().size() == 1);
+  ASSERT_TRUE(optional_device->model.chips().Get(0).chip_case() ==
+              model::Chip::ChipCase::kBt);
+  ASSERT_TRUE(optional_device->model.chips().Get(0).bt().classic().state() ==
+              model::State::ON);
 }
 
 TEST_F(FrontendServerTest, SetPositionDeviceNotFound) {
