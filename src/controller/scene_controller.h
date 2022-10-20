@@ -35,19 +35,17 @@ class SceneController {
 
   static SceneController &Singleton();
 
+  std::shared_ptr<Device> GetOrCreate(const std::string &);
+
   void Add(std::shared_ptr<Device> &device);
 
   const std::vector<std::shared_ptr<Device>> Copy();
   bool SetPosition(const std::string &device_serial,
                    const netsim::model::Position &position);
 
-  bool UpdateDevice(const netsim::model::Device &updated_device);
+  bool UpdateDevice(const model::Device &);
 
-  void UpdateRadio(const std::string &device_serial,
-                   netsim::model::PhyKind radio, netsim::model::PhyState state);
-
-  std::optional<float> GetDistance(const std::string &device_serial_a,
-                                   const std::string &device_serial_b);
+  float GetDistance(const Device &, const Device &);
 
  protected:
   friend class SceneControllerTest;
