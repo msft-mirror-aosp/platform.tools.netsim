@@ -44,8 +44,8 @@ service PacketStreamer {
 message StreamPacketsRequest {
   // The pattern of oneof in a stream from grpc/load_balancer.proto
   oneof request_type {
-    // This message should be sent on the first request to the network simulator.
-    // Specifies the device name and chip type for the packet stream.
+    // This message should be sent on the first request to the network
+    // simulator. Specifies the device name and chip type for the packet stream.
     netsim.startup.ChipInfo initial_info = 1;
 
     // The streamed data for an attached radio chip

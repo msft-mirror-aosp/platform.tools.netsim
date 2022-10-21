@@ -112,5 +112,13 @@ float SceneController::GetDistance(const Device &a, const Device &b) {
                pow(a.model.position().z() - b.model.position().z(), 2)));
 }
 
+void SceneController::Reset() {
+  std::unique_lock<std::mutex> lock(this->mutex_);
+  for (auto &device : devices_) {
+    device->Reset();
+  }
+  DeviceNotifyManager::Get().Notify();
+}
+
 }  // namespace controller
 }  // namespace netsim
