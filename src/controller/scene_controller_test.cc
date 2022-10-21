@@ -14,6 +14,8 @@
 
 #include "controller/scene_controller.h"
 
+#include <memory>
+
 #include "controller/device.h"
 #include "gtest/gtest.h"
 #include "model.pb.h"
@@ -66,6 +68,35 @@ TEST_F(SceneControllerTest, MatchDeviceTest) {
 
   // with no serial, matches with name
   ASSERT_TRUE(match("", "dd") != nullptr);
+}
+
+TEST_F(SceneControllerTest, ResetTest) {
+  auto device_to_add = controller::CreateDevice("serial-for-reset-test");
+  device_to_add->model.set_visible(false);
+  device_to_add->model.mutable_position()->set_x(10.0);
+  device_to_add->model.mutable_position()->set_y(20.0);
+  device_to_add->model.mutable_position()->set_z(30.0);
+  device_to_add->model.mutable_orientation()->set_pitch(1.0);
+  device_to_add->model.mutable_orientation()->set_roll(2.0);
+  device_to_add->model.mutable_orientation()->set_yaw(3.0);
+
+  SceneController::Singleton().Add(device_to_add);
+
+  auto device = match("serial-for-reset-test", "");
+  EXPECT_EQ(device->model.visible(), false);
+  EXPECT_EQ(device->model.position().x(), 10.0);
+  EXPECT_EQ(device->model.orientation().pitch(), 1.0);
+
+  SceneController::Singleton().Reset();
+
+  device = match("serial-for-reset-test", "");
+  EXPECT_EQ(device->model.visible(), true);
+  EXPECT_EQ(device->model.position().x(), 0.0);
+  EXPECT_EQ(device->model.position().y(), 0.0);
+  EXPECT_EQ(device->model.position().z(), 0.0);
+  EXPECT_EQ(device->model.orientation().pitch(), 0.0);
+  EXPECT_EQ(device->model.orientation().roll(), 0.0);
+  EXPECT_EQ(device->model.orientation().yaw(), 0.0);
 }
 
 }  // namespace controller
