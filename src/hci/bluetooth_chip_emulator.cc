@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 
 #include "controller/chip.h"
@@ -158,7 +159,7 @@ class BluetoothChipEmulatorImpl : public BluetoothChipEmulator {
   }
 
  private:
-  std::vector<std::shared_ptr<controller::Chip>> id_to_chip_;
+  std::unordered_map<size_t, std::shared_ptr<controller::Chip>> id_to_chip_;
 
   size_t phy_low_energy_index_;
   size_t phy_classic_index_;
