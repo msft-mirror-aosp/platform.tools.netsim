@@ -209,7 +209,7 @@ class BluetoothChip : public controller::Chip {
   void Update(const model::Chip &request) override {
     controller::Chip::Update(request);
 
-    auto model = Model();
+    auto &model = Model();
 
     // Update packet capture
     if (changedState(model.capture(), request.capture())) {
@@ -220,7 +220,7 @@ class BluetoothChip : public controller::Chip {
 
     // Low_energy radio state
     auto request_state = request.bt().low_energy().state();
-    auto le = model.mutable_bt()->mutable_low_energy();
+    auto *le = model.mutable_bt()->mutable_low_energy();
     if (changedState(le->state(), request_state)) {
       le->set_state(request_state);
       chip_emulator->UpdatePhy(device_index, request_state == model::State::ON,
@@ -228,7 +228,7 @@ class BluetoothChip : public controller::Chip {
     }
     // Classic radio state
     request_state = request.bt().classic().state();
-    auto classic = model.mutable_bt()->mutable_classic();
+    auto *classic = model.mutable_bt()->mutable_classic();
     if (changedState(classic->state(), request_state)) {
       classic->set_state(request_state);
       chip_emulator->UpdatePhy(device_index, request_state == model::State::ON,
@@ -257,7 +257,7 @@ class BluetoothChip : public controller::Chip {
     }
     // TODO: make multi-os
     // Filename: emulator-5554-hci.pcap
-    auto model = DeviceModel();
+    auto &model = DeviceModel();
     auto filename = "/tmp/" + model.device_serial() + "-hci.pcap";
     for (auto i = 0; std::filesystem::exists(filename); ++i) {
       filename = "/tmp/" + model.device_serial() + "-hci-" + std::to_string(i) +
