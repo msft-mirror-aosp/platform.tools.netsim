@@ -37,7 +37,9 @@ cc_defaults {
     name: "netsim_defaults",
     cflags: [
         "-Wno-unused-parameter",
+        "-g", // Produce debugging information.
     ],
+    ldflags: ["-rdynamic"], // Allow obtaining backtraces for debugging.
     local_include_dirs: [
         "src",
     ],
