@@ -51,17 +51,6 @@ class FrontendServer final : public frontend::FrontendService::Service {
     return grpc::Status::OK;
   }
 
-  grpc::Status SetPosition(grpc::ServerContext *context,
-                           const frontend::SetPositionRequest *request,
-                           google::protobuf::Empty *empty) {
-    auto status = netsim::controller::SceneController::Singleton().SetPosition(
-        request->device_serial(), request->position());
-    if (!status)
-      return grpc::Status(grpc::StatusCode::NOT_FOUND,
-                          "device " + request->device_serial() + " not found.");
-    return grpc::Status::OK;
-  }
-
   grpc::Status UpdateDevice(grpc::ServerContext *context,
                             const frontend::UpdateDeviceRequest *request,
                             google::protobuf::Empty *response) {
