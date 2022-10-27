@@ -47,7 +47,7 @@ DiscoveryDir discovery {
 }  // namespace
 
 std::filesystem::path GetDiscoveryDirectory() {
-  const char* env_p = std::getenv(discovery.root_env);
+  const char *env_p = std::getenv(discovery.root_env);
   if (!env_p) {
     BtsLog("No discovery env for %s, using tmp/", discovery.root_env);
     env_p = "/tmp";
