@@ -28,8 +28,8 @@
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
 #include "util/ini_file.h"
-#include "util/os_utils.h"
 #include "util/log.h"
+#include "util/os_utils.h"
 
 namespace netsim {
 
@@ -97,7 +97,8 @@ void RunFrontendServer() {
   builder.RegisterService(&service);
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
-  BtsLog("Server listening on localhost: %s", std::to_string(selected_port).c_str());
+  BtsLog("Server listening on localhost: %s",
+         std::to_string(selected_port).c_str());
 
   // Writes port to ini file.
   auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");

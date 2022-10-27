@@ -24,7 +24,7 @@
 #include "core/server_rpc.h"
 #endif
 #include "fe/cli.h"
-#include "hci/bluetooth_chip_emulator.h"
+#include "hci/bluetooth_facade.h"
 
 // Wireless network simulator for android (and other) emulated devices.
 
