@@ -47,10 +47,6 @@ void ArgError(char *argv[], int c) {
 }
 
 int main(int argc, char *argv[]) {
-#if defined(__linux__)
-  std::cout << "Testing: __linux__ is defined" << std::endl;
-#endif
-
   signal(SIGSEGV, SignalHandler);
 
   const char *kShortOpt = "s:dg";
