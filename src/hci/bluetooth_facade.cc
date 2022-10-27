@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "hci/bluetooth_chip_emulator.h"
+#include "hci/bluetooth_facade.h"
 
 #include <cassert>
 #include <filesystem>
