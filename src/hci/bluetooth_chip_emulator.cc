@@ -38,6 +38,8 @@ namespace hci {
 namespace {
 
 int8_t ComputeRssi(int send_id, int recv_id, int8_t tx_power);
+void IncrTx(uint32_t send_id, rootcanal::Phy::Type phy_type);
+void IncrRx(uint32_t receive_id, rootcanal::Phy::Type phy_type);
 
 class SimPhyLayerFactory : public rootcanal::PhyLayerFactory {
   // for constructor inheritance
@@ -46,6 +48,8 @@ class SimPhyLayerFactory : public rootcanal::PhyLayerFactory {
   // Overrides Send in PhyLayerFactory to rewrite rssi in packets
   void Send(::model::packets::LinkLayerPacketView packet, uint32_t id,
             uint32_t device_id) override {
+    IncrTx(device_id, GetType());
+
     if (packet.GetType() != ::model::packets::PacketType::RSSI_WRAPPER) {
       rootcanal::PhyLayerFactory::Send(packet, id, device_id);
       return;
@@ -62,6 +66,7 @@ class SimPhyLayerFactory : public rootcanal::PhyLayerFactory {
     for (const auto &recv_phy : phy_layers_) {
       if (id == recv_phy->GetId()) continue;
       int8_t rssi = ComputeRssi(device_id, recv_phy->GetDeviceId(), tx_power);
+      IncrRx(recv_phy->GetDeviceId(), GetType());
       // Simply changes the rssi value in the LinkLayerPacketView (!)
       auto rssi_builder = ::model::packets::RssiWrapperBuilder::Create(
           rssi_wrapper.GetSourceAddress(), rssi_wrapper.GetDestinationAddress(),
@@ -128,6 +133,7 @@ class BluetoothChipEmulatorImpl : public BluetoothChipEmulator {
       const std::string &serial,
       std::shared_ptr<rootcanal::HciTransport> transport) override;
 
+  std::shared_ptr<BluetoothChip> Get(int device_index);
   void Remove(int device_index);
 
   // Resets the root canal library.
@@ -137,17 +143,7 @@ class BluetoothChipEmulatorImpl : public BluetoothChipEmulator {
     mStarted = false;
   }
 
-  int8_t ComputeRssi(int send_id, int recv_id, int8_t tx_power) {
-    auto sender = id_to_chip_[send_id];
-    auto receiver = id_to_chip_[recv_id];
-    if (!sender || !receiver) {
-      BtsLog("GetRssi unknown send or recv id");
-      return tx_power;
-    }
-    auto distance = controller::SceneController::Singleton().GetDistance(
-        *(sender->parent), *(receiver->parent));
-    return netsim::DistanceToRssi(tx_power, distance);
-  }
+  int8_t ComputeRssi(int send_id, int recv_id, int8_t tx_power);
 
   void UpdatePhy(int device_id, bool isAddToPhy, bool isLowEnergy) {
     auto phy_index = (isLowEnergy) ? phy_low_energy_index_ : phy_classic_index_;
@@ -159,7 +155,7 @@ class BluetoothChipEmulatorImpl : public BluetoothChipEmulator {
   }
 
  private:
-  std::unordered_map<size_t, std::shared_ptr<controller::Chip>> id_to_chip_;
+  std::unordered_map<size_t, std::shared_ptr<BluetoothChip>> id_to_chip_;
 
   size_t phy_low_energy_index_;
   size_t phy_classic_index_;
@@ -245,6 +241,26 @@ class BluetoothChip : public controller::Chip {
     chip_emulator = nullptr;
   }
 
+  void IncrTx(rootcanal::Phy::Type phy_type) {
+    if (phy_type == rootcanal::Phy::Type::LOW_ENERGY) {
+      auto *low_energy = Model().mutable_bt()->mutable_low_energy();
+      low_energy->set_tx_count(low_energy->tx_count() + 1);
+    } else {
+      auto *classic = Model().mutable_bt()->mutable_classic();
+      classic->set_tx_count(classic->tx_count() + 1);
+    }
+  }
+
+  void IncrRx(rootcanal::Phy::Type phy_type) {
+    if (phy_type == rootcanal::Phy::Type::LOW_ENERGY) {
+      auto *low_energy = Model().mutable_bt()->mutable_low_energy();
+      low_energy->set_rx_count(low_energy->rx_count() + 1);
+    } else {
+      auto *classic = Model().mutable_bt()->mutable_classic();
+      classic->set_rx_count(classic->rx_count() + 1);
+    }
+  }
+
  private:
   bool changedState(model::State a, model::State b) {
     return (b != model::State::UNKNOWN && a != b);
@@ -272,6 +288,10 @@ class BluetoothChip : public controller::Chip {
   int device_index;
 };
 
+std::shared_ptr<BluetoothChip> BluetoothChipEmulatorImpl::Get(int device_id) {
+  return id_to_chip_[device_id];
+}
+
 void BluetoothChipEmulatorImpl::Remove(int device_id) {
   // clear the shared pointer
   id_to_chip_[device_id] = nullptr;
@@ -297,7 +317,6 @@ void BluetoothChipEmulatorImpl::AddHciConnection(
   model.mutable_bt()->mutable_low_energy()->set_state(model::State::ON);
   model.set_capture(model::State::OFF);
 
-  //    auto chip = std::shared_ptr<BluetoothChip>(this, sniffer, device_id);
   auto chip = std::make_shared<BluetoothChip>(this, sniffer, device_id);
   auto device = controller::SceneController::Singleton().GetOrCreate(serial);
   device->AddChip(device, std::static_pointer_cast<controller::Chip>(chip),
@@ -305,10 +324,40 @@ void BluetoothChipEmulatorImpl::AddHciConnection(
   id_to_chip_[device_id] = chip;
 }
 
-// For accessing the implementation method from SimPhyLayerFactory
+int8_t BluetoothChipEmulatorImpl::ComputeRssi(int send_id, int recv_id,
+                                              int8_t tx_power) {
+  auto sender = id_to_chip_[send_id];
+  auto receiver = id_to_chip_[recv_id];
+  if (!sender || !receiver) {
+    BtsLog("GetRssi unknown send or recv id");
+    return tx_power;
+  }
+  auto distance = controller::SceneController::Singleton().GetDistance(
+      *(sender->parent), *(receiver->parent));
+  return netsim::DistanceToRssi(tx_power, distance);
+}
+
+// For accessing the implementation methods from SimPhyLayerFactory
+// avoiding forward references.
 int8_t ComputeRssi(int send_id, int recv_id, int8_t tx_power) {
   return static_cast<BluetoothChipEmulatorImpl &>(BluetoothChipEmulator::Get())
       .ComputeRssi(send_id, recv_id, tx_power);
+}
+void IncrTx(uint32_t send_id, rootcanal::Phy::Type phy_type) {
+  auto chip =
+      static_cast<BluetoothChipEmulatorImpl &>(BluetoothChipEmulator::Get())
+          .Get(send_id);
+  if (chip) {
+    chip->IncrTx(phy_type);
+  }
+}
+void IncrRx(uint32_t receive_id, rootcanal::Phy::Type phy_type) {
+  auto chip =
+      static_cast<BluetoothChipEmulatorImpl &>(BluetoothChipEmulator::Get())
+          .Get(receive_id);
+  if (chip) {
+    chip->IncrRx(phy_type);
+  }
 }
 
 }  // namespace
