@@ -43,12 +43,12 @@ void SignalHandler(int sig) {
   backtrace_symbols_fd(buffer, size, STDERR_FILENO);
   exit(sig);
 }
+#endif
 
 void ArgError(char *argv[], int c) {
   std::cerr << argv[0] << ": invalid option -- " << (char)c << "\n";
   std::cerr << "Try `" << argv[0] << " --help' for more information.\n";
 }
-#endif
 
 int main(int argc, char *argv[]) {
 #if defined(__linux__)
