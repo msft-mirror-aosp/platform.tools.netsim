@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <execinfo.h>
 #include <getopt.h>
+#if defined(__linux__)
+#include <execinfo.h>
 #include <signal.h>
 #include <unistd.h>
 
 #include <cstdio>
+#endif
 
 #include "core/server.h"
 #ifdef NETSIM_ANDROID_EMULATOR
@@ -28,6 +30,7 @@
 
 // Wireless network simulator for android (and other) emulated devices.
 
+#if defined(__linux__)
 // Signal handler to print backtraces and then terminate the program.
 void SignalHandler(int sig) {
   size_t buffer_size = 20;  // Number of entries in that array.
@@ -45,14 +48,12 @@ void ArgError(char *argv[], int c) {
   std::cerr << argv[0] << ": invalid option -- " << (char)c << "\n";
   std::cerr << "Try `" << argv[0] << " --help' for more information.\n";
 }
+#endif
 
 int main(int argc, char *argv[]) {
 #if defined(__linux__)
-  std::cout << "Testing: __linux__ is defined" << std::endl;
-#endif
-
   signal(SIGSEGV, SignalHandler);
-
+#endif
   const char *kShortOpt = "s:dg";
   bool debug = false;
   bool grpc_startup = false;
