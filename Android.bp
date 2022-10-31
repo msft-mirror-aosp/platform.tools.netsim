@@ -125,6 +125,32 @@ cc_binary_host {
     ],
 }
 
+cc_binary_host {
+    name: "netsimd",
+    defaults: ["netsim_defaults"],
+    srcs: [
+        "src/netsim.cc",
+    ],
+    shared_libs: [
+        "libgrpc++",
+        "libcap",
+        "libcrypto",
+        "libssl",
+    ],
+    static_libs: [
+        "libc++fs",
+        "libjsoncpp",
+        "libprotobuf-cpp-full",
+        "libscriptedbeaconpayload-protos-lite",
+        "libwebsockets",
+        "netsim-proto",
+        "lib-netsim",
+    ],
+    whole_static_libs: [
+        "libbt-rootcanal",
+    ],
+}
+
 cc_test_host {
     name: "netsim-test",
     defaults: ["netsim_defaults"],
