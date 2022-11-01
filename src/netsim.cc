@@ -55,13 +55,21 @@ int main(int argc, char *argv[]) {
   signal(SIGSEGV, SignalHandler);
 #endif
   const char *kShortOpt = "s:dg";
+  const option kLongOptions[] = {
+      {"rootcanal_default_commands_file", required_argument, 0, 'c'},
+      {"rootcanal_controller_properties_file", required_argument, 0, 'p'},
+  };
+
   bool debug = false;
   bool grpc_startup = false;
   std::string fd_startup_str;
+  std::string rootcanal_default_commands_file;
+  std::string rootcanal_controller_properties_file;
 
   int c;
 
-  while ((c = getopt_long(argc, argv, kShortOpt, nullptr, nullptr)) != -1) {
+  while ((c = getopt_long(argc, argv, kShortOpt, kLongOptions, nullptr)) !=
+         -1) {
     switch (c) {
       case 's':
         fd_startup_str = std::string(optarg);
@@ -75,6 +83,14 @@ int main(int argc, char *argv[]) {
         debug = true;
         break;
 
+      case 'c':
+        rootcanal_default_commands_file = std::string(optarg);
+        break;
+
+      case 'p':
+        rootcanal_controller_properties_file = std::string(optarg);
+        break;
+
       default:
         ArgError(argv, c);
         return (-2);
@@ -82,8 +98,10 @@ int main(int argc, char *argv[]) {
   }
 
   // Daemon mode -- start radio managers
-  if (!fd_startup_str.empty() || grpc_startup)
-    netsim::hci::BluetoothChipEmulator::Get().Start();
+  if (!fd_startup_str.empty() || grpc_startup) {
+    netsim::hci::BluetoothChipEmulator::Get().Start(
+        rootcanal_default_commands_file, rootcanal_controller_properties_file);
+  }
 
   if (!fd_startup_str.empty()) {
     netsim::StartWithFds(fd_startup_str, debug);
