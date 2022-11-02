@@ -31,7 +31,7 @@
 #include "model/setup/test_model.h"
 #include "packet/raw_builder.h"  // for RawBuilder
 #include "util/log.h"
-#include "libranging_cxx_generated.h"
+#include "util/ranging.h"
 
 namespace netsim {
 namespace hci {
