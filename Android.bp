@@ -129,7 +129,7 @@ cc_binary_host {
     name: "netsimd",
     defaults: ["netsim_defaults"],
     srcs: [
-        "src/netsim.cc",
+        "src/netsimd.cc",
     ],
     shared_libs: [
         "libgrpc++",
