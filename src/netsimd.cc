@@ -25,7 +25,7 @@
 #ifdef NETSIM_ANDROID_EMULATOR
 #include "core/server_rpc.h"
 #endif
-#include "fe/cli.h"
+#include "frontend/cli.h"
 #include "hci/bluetooth_facade.h"
 
 // Wireless network simulator for android (and other) emulated devices.
