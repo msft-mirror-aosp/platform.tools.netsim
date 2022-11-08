@@ -18,9 +18,9 @@
 #include <memory>
 
 #include "backend/rpc_hal_transport.h"
+#include "fe/cli.h"
+#include "fe/frontend_server.h"
 #include "frontend.grpc.pb.h"
-#include "frontend/cli.h"
-#include "frontend/frontend_server.h"
 #include "util/os_utils.h"
 
 namespace netsim {

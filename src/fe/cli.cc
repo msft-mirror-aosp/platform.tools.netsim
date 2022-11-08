@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Frontend command line interface.
-#include "frontend/cli.h"
+#include "fe/cli.h"
 
 #include <stdlib.h>
 
