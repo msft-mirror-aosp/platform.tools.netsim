@@ -47,6 +47,11 @@ DiscoveryDir discovery {
 }  // namespace
 
 std::filesystem::path GetDiscoveryDirectory() {
+  // $TMPDIR is the temp directory on buildbots.
+  const char *test_env_p = std::getenv("TMPDIR");
+  if (test_env_p && *test_env_p) {
+    return std::filesystem::path(test_env_p);
+  }
   const char *env_p = std::getenv(discovery.root_env);
   if (!env_p) {
     BtsLog("No discovery env for %s, using tmp/", discovery.root_env);
