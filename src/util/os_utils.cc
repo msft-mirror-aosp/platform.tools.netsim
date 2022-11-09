@@ -62,39 +62,5 @@ std::filesystem::path GetDiscoveryDirectory() {
   return path;
 }
 
-int Daemon() {
-  pid_t pid = 0;
-
-  /* fork the child process */
-  pid = fork();
-
-  /* return pid or -1 to parent */
-  if (pid != 0) {
-    return pid;
-  }
-
-  // child process continues...
-
-  // disassociate from parent's session
-  if (setsid() < 0) {
-    exit(EXIT_FAILURE);
-  }
-
-  // change to the root directory
-  chdir("/");
-
-  // redirect stdin, stdout, and stderr to /dev/null
-  int fd = open("/dev/null", O_RDWR | O_CLOEXEC);
-  if (fd < 0) exit(EXIT_FAILURE);
-  if (dup2(fd, STDIN_FILENO) < 0 || dup2(fd, STDOUT_FILENO) < 0 ||
-      dup2(fd, STDERR_FILENO) < 0) {
-    close(fd);
-    exit(EXIT_FAILURE);
-  }
-  close(fd);
-
-  // Child process returns 0 to caller
-  return 0;
-}
 }  // namespace osutils
 }  // namespace netsim
