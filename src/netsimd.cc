@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if defined(_WIN32)
+#include <msvc-getopt.h>
+#else
 #include <getopt.h>
+#endif
+
 #if defined(__linux__)
 #include <execinfo.h>
 #include <signal.h>
@@ -72,12 +77,13 @@ int main(int argc, char *argv[]) {
   while ((c = getopt_long(argc, argv, kShortOpt, kLongOptions, nullptr)) !=
          -1) {
     switch (c) {
-      case 's':
-        fd_startup_str = std::string(optarg);
-        break;
 #ifdef NETSIM_ANDROID_EMULATOR
       case 'g':
         grpc_startup = true;
+        break;
+#else
+      case 's':
+        fd_startup_str = std::string(optarg);
         break;
 #endif
       case 'd':
