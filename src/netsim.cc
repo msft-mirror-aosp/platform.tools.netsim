@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+#if defined(_WIN32)
+#include <msvc-getopt.h>
+#else
 #include <getopt.h>
+#endif
 #if defined(__linux__)
 #include <execinfo.h>
 #include <signal.h>
