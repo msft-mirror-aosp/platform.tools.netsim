@@ -126,10 +126,11 @@ class FrontendClient {
             case model::Chip::ChipCase::kBt:
               std::cout << "ble:" << stateToString(chip.bt().low_energy())
                         << "\t"
-                        << "classic:" << stateToString(chip.bt().classic());
+                        << "classic:" << stateToString(chip.bt().classic())
+                        << "\t";
               break;
             default:
-              std::cout << "unknown:down";
+              std::cout << "unknown:down" << "\t";
               break;
           }
         }
