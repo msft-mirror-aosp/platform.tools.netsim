@@ -181,3 +181,8 @@ cc_test_host {
         "libbt-rootcanal",
     ],
 }
+
+rust_binary_host {
+    name: "netsim-cli",
+    srcs: ["rust/netsim-cli/src/main.rs"],
+}
