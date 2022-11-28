@@ -44,14 +44,16 @@ target_compile_definitions(netsimd PUBLIC NETSIM_ANDROID_EMULATOR)
 
 android_add_test(
   TARGET netsim-test LICENSE Apache-2.0
-  SRC src/backend/startup_test.cc
+  SRC src/backend/packet_streamer_client_test.cc
+      src/backend/startup_test.cc
       src/controller/device_test.cc
       src/controller/scene_controller_test.cc
       src/frontend/frontend_server_test.cc
       src/util/ini_file_test.cc
       src/util/os_utils_test.cc
       src/util/string_utils_test.cc
-  DEPS controller-lib
+  DEPS android-emu-base-headers
+       controller-lib
        core-lib
        frontend-lib
        grpc++
@@ -59,12 +61,11 @@ android_add_test(
        gtest_main
        libbt-rootcanal
        netsim-lib
+       packet-streamer-client-lib
        protobuf::libprotobuf
        util-lib
-  TEST_PARAMS
-      --gtest_filter=-OsUtilsTest.GetDiscoveryDir
-)
+  TEST_PARAMS --gtest_filter=-OsUtilsTest.GetDiscoveryDir)
+
+add_dependencies(netsim-test netsimd emulator) # For PacketStreamerClientTest.
 
 target_include_directories(netsim-test PRIVATE src)
-
-# add_test(NAME netsim-test COMMAND netsim-test)
