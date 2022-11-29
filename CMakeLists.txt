@@ -18,12 +18,19 @@ project(netsim)
 cmake_minimum_required(VERSION 3.5)
 
 if(NOT ANDROID_EMULATOR_BUILD)
+  message(ERROR "Netsim should be built with emulator")
   set(CMAKE_BUILD_TYPE Debug)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED True)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
   include(netsim_dependencies)
 endif()
+
+if(NOT Rust_COMPILER AND NOT OPTION_ENABLE_SYSTEM_RUST)
+  message(ERROR " No Rust for netsim ${Rust_COMPILER}")
+endif()
+
+add_subdirectory(rust)
 
 add_subdirectory(src)
 android_add_executable(
@@ -36,7 +43,7 @@ target_compile_definitions(netsim PUBLIC NETSIM_ANDROID_EMULATOR)
 
 android_add_executable(
   TARGET netsimd LICENSE Apache-2.0 INSTALL . SRC src/netsimd.cc
-  DEPS grpc++ libbt-rootcanal netsim-lib protobuf::libprotobuf)
+  DEPS grpc++ libbt-rootcanal netsim-lib netsim-rust-lib protobuf::libprotobuf)
 
 android_target_dependency(netsimd linux TCMALLOC_OS_DEPENDENCIES)
 
@@ -61,6 +68,7 @@ android_add_test(
        gtest_main
        libbt-rootcanal
        netsim-lib
+       netsim-rust-lib
        packet-streamer-client-lib
        protobuf::libprotobuf
        util-lib
