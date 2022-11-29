@@ -224,3 +224,8 @@ cc_test_host {
     ],
     ldflags: ["-Wl,--allow-multiple-definition"]
 }
+
+rust_binary_host {
+    name: "netsim-cli",
+    srcs: ["rust/netsim-cli/src/main.rs"],
+}
