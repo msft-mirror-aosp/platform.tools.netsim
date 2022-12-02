@@ -77,3 +77,5 @@ android_add_test(
 add_dependencies(netsim-test netsimd emulator) # For PacketStreamerClientTest.
 
 target_include_directories(netsim-test PRIVATE src)
+
+add_subdirectory(ui)
