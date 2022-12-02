@@ -15,9 +15,9 @@
 #include "controller/scene_controller.h"
 
 #include <cmath>
+#include <cstddef>
 
-#include "hci/hci_chip_emulator.h"
-#include "util/log.h"
+#include "controller/device_notify_manager.h"
 
 namespace netsim {
 namespace controller {
@@ -28,82 +28,83 @@ SceneController &SceneController::Singleton() {
   return *kInstance;
 }
 
-void SceneController::Add(netsim::model::Device &device) {
+void SceneController::Add(std::shared_ptr<Device> &device) {
   std::unique_lock<std::mutex> lock(this->mutex_);
-  scene_.add_devices()->CopyFrom(device);
+  devices_.push_back(device);
 }
-const netsim::model::Scene &SceneController::Get() const { return scene_; }
 
-bool SceneController::SetPosition(const std::string &device_serial,
-                                  const netsim::model::Position &position) {
-  for (auto &device : *scene_.mutable_devices()) {
-    if (device.device_serial() == device_serial) {
-      device.mutable_position()->CopyFrom(position);
-      return true;
+const std::vector<std::shared_ptr<Device>> SceneController::Copy() {
+  std::unique_lock<std::mutex> lock(this->mutex_);
+  return devices_;
+}
+
+std::shared_ptr<Device> SceneController::GetOrCreate(
+    const std::string &serial) {
+  std::unique_lock<std::mutex> lock(this->mutex_);
+  auto device = GetDevice(serial);
+  if (device != nullptr) {
+    return device;
+  }
+  device = std::make_shared<Device>(serial);
+  devices_.push_back(device);
+  return device;
+}
+
+std::shared_ptr<Device> SceneController::GetDevice(const std::string &serial) {
+  for (auto device : devices_) {
+    if (device->model.device_serial() == serial) return device;
+  }
+  return {nullptr};
+}
+
+// Returns a Device shared_ptr or nullptr
+std::shared_ptr<Device> SceneController::MatchDevice(const std::string &serial,
+                                                     const std::string &name) {
+  std::shared_ptr<Device> found = nullptr;
+  if (serial.empty() && name.empty()) {
+    return nullptr;
+  }
+  for (auto &device : devices_) {
+    // serial && name -> rename, only match by serial
+    // serial && !name -> match by serial
+    // !serial && name -> match by name
+    auto pos = (serial.empty()) ? device->model.name().find(name)
+                                : device->model.device_serial().find(serial);
+    if (pos != std::string::npos) {
+      // check for multiple matches
+      if (found != nullptr) return nullptr;
+      found = device;
     }
   }
-  return false;
+  return found;
 }
 
-void UpdateRadioInternal(netsim::model::Radios &mutable_radios,
-                         netsim::model::Radio radio,
-                         netsim::model::RadioState state) {
-  switch (radio) {
-    case netsim::model::Radio::BLUETOOTH_LOW_ENERGY:
-      mutable_radios.set_bluetooth_low_energy(state);
-      break;
-    case netsim::model::Radio::BLUETOOTH_CLASSIC:
-      mutable_radios.set_bluetooth_classic(state);
-      break;
-    default:
-      // do not care about unimplemented radios
-      break;
-  }
-}
-
-// Radio Facade informing a change in radio state
-void SceneController::UpdateRadio(const std::string &device_serial,
-                                  netsim::model::Radio radio,
-                                  netsim::model::RadioState state) {
+// UI requesting a change in device info
+bool SceneController::UpdateDevice(const netsim::model::Device &request) {
   std::unique_lock<std::mutex> lock(this->mutex_);
-  for (auto &device : *scene_.mutable_devices()) {
-    if (device.device_serial() == device_serial) {
-      UpdateRadioInternal(*device.mutable_radios(), radio, state);
-      break;
-    }
+  if (request.device_serial().empty()) {
+    return false;
   }
+  auto device = MatchDevice(request.device_serial(), request.name());
+  if (device == nullptr) return false;
+  device->Update(request);
+  DeviceNotifyManager::Get().Notify();
+  return true;
 }
 
-// UI requesting a change in radios
-bool SceneController::SetRadio(const std::string &device_serial,
-                               netsim::model::Radio radio,
-                               netsim::model::RadioState state) {
+// Euclidian distance between two devices.
+float SceneController::GetDistance(const Device &a, const Device &b) {
+  return sqrt((pow(a.model.position().x() - b.model.position().x(), 2) +
+               pow(a.model.position().y() - b.model.position().y(), 2) +
+               pow(a.model.position().z() - b.model.position().z(), 2)));
+}
+
+void SceneController::Reset() {
   std::unique_lock<std::mutex> lock(this->mutex_);
-  for (auto &device : *scene_.mutable_devices()) {
-    if (device.device_serial() == device_serial) {
-      hci::ChipEmulator::Get().SetDeviceRadio(device_serial, radio, state);
-      UpdateRadioInternal(*device.mutable_radios(), radio, state);
-      return true;
-    }
+  for (auto &device : devices_) {
+    device->Reset();
   }
-  return false;
-}
-
-std::optional<float> SceneController::GetDistance(
-    const std::string &device_serial_a, const std::string &device_serial_b) {
-  auto a = std::find_if(scene_.devices().begin(), scene_.devices().end(),
-                        [device_serial_a](const model::Device &d) {
-                          return d.device_serial() == device_serial_a;
-                        });
-  if (a == std::end(scene_.devices())) return {};
-  auto b = std::find_if(scene_.devices().begin(), scene_.devices().end(),
-                        [device_serial_b](const model::Device &d) {
-                          return d.device_serial() == device_serial_b;
-                        });
-  if (b == std::end(scene_.devices())) return {};
-  return sqrt((pow(a->position().x() - b->position().x(), 2) +
-               pow(a->position().y() - b->position().y(), 2) +
-               pow(a->position().z() - b->position().z(), 2)));
+  DeviceNotifyManager::Get().Notify();
 }
 
 }  // namespace controller

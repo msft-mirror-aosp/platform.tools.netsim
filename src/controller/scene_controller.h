@@ -16,6 +16,11 @@
 
 #pragma once
 
+#include <memory>
+#include <optional>
+#include <vector>
+
+#include "controller/device.h"
 #include "model.pb.h"
 
 namespace netsim {
@@ -30,23 +35,30 @@ class SceneController {
 
   static SceneController &Singleton();
 
-  void Add(netsim::model::Device &device);
-  const netsim::model::Scene &Get() const;
-  bool SetPosition(const std::string &device_serial,
-                   const netsim::model::Position &position);
+  std::shared_ptr<Device> GetOrCreate(const std::string &);
 
-  bool SetRadio(const std::string &device_serial, netsim::model::Radio radio,
-                netsim::model::RadioState state);
+  void Add(std::shared_ptr<Device> &device);
 
-  void UpdateRadio(const std::string &device_serial, netsim::model::Radio radio,
-                   netsim::model::RadioState state);
+  const std::vector<std::shared_ptr<Device>> Copy();
 
-  std::optional<float> GetDistance(const std::string &device_serial_a,
-                                   const std::string &device_serial_b);
+  bool UpdateDevice(const model::Device &);
+
+  float GetDistance(const Device &, const Device &);
+
+  void Reset();
+
+ protected:
+  friend class SceneControllerTest;
+  friend class FrontendServerTest;
+
+  std::shared_ptr<Device> GetDevice(const std::string &serial);
+
+  std::shared_ptr<Device> MatchDevice(const std::string &serial,
+                                      const std::string &name);
 
  private:
   SceneController() = default;  // Disallow instantiation outside of the class.
-  netsim::model::Scene scene_;
+  std::vector<std::shared_ptr<Device>> devices_;
   std::mutex mutex_;
 };
 

@@ -16,15 +16,20 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 
-#include "fe/frontend_server.h"
-#include "hci/fd_startup.h"
+#include "backend/fd_startup.h"
+#include "frontend/frontend_server.h"
+#include "frontend/http_server.h"
 
 namespace netsim {
 
 void StartWithFds(const std::string &startup_str, bool debug) {
   std::unique_ptr<hci::FdStartup> fds = hci::FdStartup::Create();
   fds->Connect(startup_str);
+
+  std::thread http_server(netsim::http::RunHttpServer);
+
   // running the frontend server blocks
   netsim::RunFrontendServer();
 }

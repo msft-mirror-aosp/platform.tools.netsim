@@ -18,6 +18,7 @@
 // OS specific utility functions.
 
 #include <filesystem>
+#include <optional>
 #include <string>
 
 namespace netsim {
@@ -29,20 +30,8 @@ namespace osutils {
 std::filesystem::path GetDiscoveryDirectory();
 
 /**
- * \brief Run a child process in the background
- *
- * The Daemon() function creates a child process that detaches from the
- * controlling terminal and runs in the background as a system daemon.
- *
- * This implementation follows unistd Daemon(3) with these differences:
- *
- * 1. Parent returns with pid or -1 instead of exiting.
- *
- * In our uses of daemon the parent is not long running, it exits after
- * completing the one-short command. For this reason it is not necessary to use
- * the double fork approach.
+ * Return the frontend grpc port.
  */
-int Daemon();
-
+std::optional<std::string> GetServerAddress();
 }  // namespace osutils
 }  // namespace netsim

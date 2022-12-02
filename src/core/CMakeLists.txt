@@ -13,8 +13,9 @@
 # limitations under the License.
 
 android_add_library(
-  TARGET core-lib LICENSE Apache-2.0 SRC server.cc server.h server_rpc.cc
-                                         server_rpc.h
+  TARGET core-lib LICENSE Apache-2.0 SRC server_rpc.cc server_rpc.h
   DEPS frontend-grpc-lib frontend-lib grpc++ protobuf::libprotobuf)
 
 target_include_directories(core-lib PRIVATE ..)
+
+target_compile_definitions(core-lib PUBLIC NETSIM_ANDROID_EMULATOR)

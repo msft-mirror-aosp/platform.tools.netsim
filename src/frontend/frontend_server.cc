@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "fe/frontend_server.h"
+#include "frontend/frontend_server.h"
 
 #include <iostream>
 #include <memory>
@@ -22,14 +22,13 @@
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"
-#include "grpc/grpc_security_constants.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
-#include "hci/hci_chip_emulator.h"
 #include "util/ini_file.h"
+#include "util/log.h"
 #include "util/os_utils.h"
 
 namespace netsim {
@@ -46,31 +45,22 @@ class FrontendServer final : public frontend::FrontendService::Service {
   grpc::Status GetDevices(grpc::ServerContext *context,
                           const google::protobuf::Empty *empty,
                           frontend::GetDevicesResponse *reply) {
-    const auto &scene = netsim::controller::SceneController::Singleton().Get();
-    for (const auto &device : scene.devices())
-      reply->add_devices()->CopyFrom(device);
+    const auto devices =
+        netsim::controller::SceneController::Singleton().Copy();
+    for (const auto &device : devices)
+      reply->add_devices()->CopyFrom(device->model);
     return grpc::Status::OK;
   }
 
-  grpc::Status SetPosition(grpc::ServerContext *context,
-                           const frontend::SetPositionRequest *request,
-                           google::protobuf::Empty *empty) {
-    auto status = netsim::controller::SceneController::Singleton().SetPosition(
-        request->device_serial(), request->position());
+  grpc::Status UpdateDevice(grpc::ServerContext *context,
+                            const frontend::UpdateDeviceRequest *request,
+                            google::protobuf::Empty *response) {
+    auto status = netsim::controller::SceneController::Singleton().UpdateDevice(
+        request->device());
     if (!status)
-      return grpc::Status(grpc::StatusCode::NOT_FOUND,
-                          "device " + request->device_serial() + " not found.");
-    return grpc::Status::OK;
-  }
-
-  grpc::Status SetRadio(grpc::ServerContext *context,
-                        const frontend::SetRadioRequest *request,
-                        google::protobuf::Empty *empty) {
-    auto status = netsim::controller::SceneController::Singleton().SetRadio(
-        request->device_serial(), request->radio(), request->state());
-    if (!status)
-      return grpc::Status(grpc::StatusCode::NOT_FOUND,
-                          "device " + request->device_serial() + " not found.");
+      return grpc::Status(
+          grpc::StatusCode::NOT_FOUND,
+          "device " + request->device().device_serial() + " not found.");
     return grpc::Status::OK;
   }
 
@@ -78,8 +68,21 @@ class FrontendServer final : public frontend::FrontendService::Service {
       grpc::ServerContext *context,
       const frontend::SetPacketCaptureRequest *request,
       google::protobuf::Empty *empty) {
-    hci::ChipEmulator::Get().SetPacketCapture(request->device_serial(),
-                                              request->capture());
+    model::Device device;
+    device.set_device_serial(request->device_serial());
+    model::Chip chip;
+    // Turn on bt packet capture
+    chip.set_capture(request->capture() ? model::State::ON : model::State::OFF);
+    chip.mutable_bt();
+    device.mutable_chips()->Add()->CopyFrom(chip);
+    controller::SceneController::Singleton().UpdateDevice(device);
+    return grpc::Status::OK;
+  }
+
+  grpc::Status Reset(grpc::ServerContext *context,
+                     const google::protobuf::Empty *request,
+                     google::protobuf::Empty *empty) {
+    netsim::controller::SceneController::Singleton().Reset();
     return grpc::Status::OK;
   }
 };
@@ -94,7 +97,8 @@ void RunFrontendServer() {
   builder.RegisterService(&service);
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
-  std::cout << "Server listening on localhost:" << selected_port << std::endl;
+  BtsLog("Server listening on localhost: %s",
+         std::to_string(selected_port).c_str());
 
   // Writes port to ini file.
   auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");

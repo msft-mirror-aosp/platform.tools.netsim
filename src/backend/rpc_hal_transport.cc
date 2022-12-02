@@ -15,7 +15,7 @@
 /// Transport of virtual controller messages (hci, uci, netlink) from
 /// desktop emulator (emu) to simulator.
 
-#include "hci/rpc_hal_transport.h"
+#include "backend/rpc_hal_transport.h"
 
 #include <chrono>
 #include <filesystem>
@@ -29,7 +29,7 @@
 #include "emulated_bluetooth_vhci.pb.h"       // for HCIPacket
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
-#include "hci/hci_chip_emulator.h"
+#include "hci/bluetooth_facade.h"
 #include "hci/rpc_hci_forwarder.h"
 #include "util/ini_file.h"
 #include "util/os_utils.h"
@@ -39,7 +39,11 @@ namespace {
 
 using android::emulation::bluetooth::VhciForwardingService;
 
+#ifdef WIN32
+const wchar_t *kFilenameFormat = L"pid_%d.ini";
+#else
 const char *kFilenameFormat = "pid_%d.ini";
+#endif
 
 const std::chrono::duration kConnectionDeadline = std::chrono::seconds(1);
 
@@ -89,12 +93,27 @@ class RpcHalTransportImpl : public RpcHalTransport {
     // Add a new HCI device for this RpcHciTransport
 
     std::shared_ptr<rootcanal::HciTransport> transport = forwarder;
-    hci::ChipEmulator::Get().AddHciConnection(serial, transport);
+    hci::BluetoothChipEmulator::Get().AddHciConnection(serial, transport);
 
     // Start the rpc transport
     forwarder->Start(serial, std::move(stream), std::move(context));
 
     return true;
+  }
+
+  static auto isPidFile(const std::filesystem::directory_entry &entry) -> bool {
+    if (!entry.is_regular_file()) {
+      return false;
+    }
+
+    int pid = 0;
+#ifndef _WIN32
+    return std::sscanf(entry.path().filename().c_str(), kFilenameFormat,
+                       &pid) != 1;
+#else
+    return std::swscanf(entry.path().filename().c_str(), kFilenameFormat,
+                        &pid) != 1;
+#endif
   }
 
   // Connect all Grpc endpoints.
@@ -109,10 +128,7 @@ class RpcHalTransportImpl : public RpcHalTransport {
     }
 
     for (const auto &entry : std::filesystem::directory_iterator(path)) {
-      int pid = 0;
-      if (!entry.is_regular_file() ||
-          std::sscanf(entry.path().filename().c_str(), kFilenameFormat, &pid) !=
-              1) {
+      if (!isPidFile(entry)) {
         continue;
       }
       IniFile iniFile(entry.path());

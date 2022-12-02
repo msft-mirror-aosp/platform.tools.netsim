@@ -21,6 +21,9 @@
 #include <filesystem>
 #include <string>
 
+#include "util/ini_file.h"
+#include "util/log.h"
+
 namespace netsim {
 namespace osutils {
 namespace {
@@ -45,44 +48,34 @@ DiscoveryDir discovery {
 }  // namespace
 
 std::filesystem::path GetDiscoveryDirectory() {
-  std::filesystem::path path(std::getenv(discovery.root_env));
+  // $TMPDIR is the temp directory on buildbots.
+  const char *test_env_p = std::getenv("TMPDIR");
+  if (test_env_p && *test_env_p) {
+    return std::filesystem::path(test_env_p);
+  }
+  const char *env_p = std::getenv(discovery.root_env);
+  if (!env_p) {
+    BtsLog("No discovery env for %s, using tmp/", discovery.root_env);
+    env_p = "/tmp";
+  }
+  std::filesystem::path path(env_p);
   path.append(discovery.subdir);
   return path;
 }
 
-int Daemon() {
-  pid_t pid = 0;
-
-  /* fork the child process */
-  pid = fork();
-
-  /* return pid or -1 to parent */
-  if (pid != 0) {
-    return pid;
+std::optional<std::string> GetServerAddress() {
+  auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");
+  if (!std::filesystem::exists(filepath)) {
+    BtsLog("Unable to find discovery directory: %d", filepath.c_str());
+    return std::nullopt;
   }
-
-  // child process continues...
-
-  // disassociate from parent's session
-  if (setsid() < 0) {
-    exit(EXIT_FAILURE);
+  if (!std::filesystem::is_regular_file(filepath)) {
+    BtsLog("Not a regular file: %d", filepath.c_str());
+    return std::nullopt;
   }
-
-  // change to the root directory
-  chdir("/");
-
-  // redirect stdin, stdout, and stderr to /dev/null
-  int fd = open("/dev/null", O_RDWR | O_CLOEXEC);
-  if (fd < 0) exit(EXIT_FAILURE);
-  if (dup2(fd, STDIN_FILENO) < 0 || dup2(fd, STDOUT_FILENO) < 0 ||
-      dup2(fd, STDERR_FILENO) < 0) {
-    close(fd);
-    exit(EXIT_FAILURE);
-  }
-  close(fd);
-
-  // Child process returns 0 to caller
-  return 0;
+  IniFile iniFile(filepath);
+  iniFile.Read();
+  return iniFile.Get("grpc.port");
 }
 }  // namespace osutils
 }  // namespace netsim

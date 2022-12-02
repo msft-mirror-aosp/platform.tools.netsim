@@ -37,7 +37,9 @@ cc_defaults {
     name: "netsim_defaults",
     cflags: [
         "-Wno-unused-parameter",
+        "-g", // Produce debugging information.
     ],
+    ldflags: ["-rdynamic"], // Allow obtaining backtraces for debugging.
     local_include_dirs: [
         "src",
     ],
@@ -57,32 +59,68 @@ cc_defaults {
     ],
 }
 
+rust_ffi_host_static {
+    name: "libranging_rust",
+    crate_name: "ranging_rust",
+    rlibs: ["libcxx"],
+    srcs: ["rust/ranging/src/lib.rs"],
+}
+
+genrule {
+    name: "libranging_cxx",
+    tools: ["cxxbridge"],
+    cmd: "$(location cxxbridge) $(in) >> $(out)",
+    srcs: ["rust/ranging/src/lib.rs"],
+    out: ["libranging_cxx_generated.cc"],
+}
+
+genrule {
+    name: "libranging_cxx_h",
+    tools: ["cxxbridge"],
+    cmd: "$(location cxxbridge) $(in) --header >> $(out)",
+    srcs: ["rust/ranging/src/lib.rs"],
+    out: ["libranging_cxx_generated.h"],
+}
+
 cc_library_host_static {
     name: "lib-netsim",
     defaults: ["netsim_defaults"],
     srcs: [
+        "src/controller/chip.cc",
         "src/controller/device.cc",
         "src/controller/scene_controller.cc",
+        "src/controller/device_notify_manager.cc",
         "src/core/server.cc",
-        "src/fe/cli.cc",
-        "src/fe/frontend_server.cc",
-        "src/hci/fd_startup.cc",
-        "src/hci/hci_chip_emulator.cc",
+        "src/frontend/cli.cc",
+        "src/frontend/frontend_server.cc",
+        "src/frontend/http_server.cc",
+        "src/backend/fd_startup.cc",
+        "src/hci/bluetooth_facade.cc",
         "src/hci/hci_debug.cc",
         "src/util/ini_file.cc",
         "src/util/log.cc",
         "src/util/os_utils.cc",
-        "src/util/ranging.cc",
         "src/util/string_utils.cc",
+    ],
+    generated_headers: [
+        "cxx-bridge-header",
+        "libranging_cxx_h"
+    ],
+    generated_sources: [
+        "libranging_cxx",
     ],
     shared_libs: [
         "libgrpc++",
+        "libcap",
+        "libcrypto",
+        "libssl",
     ],
     static_libs: [
         "libc++fs",
         "libjsoncpp",
         "libprotobuf-cpp-full",
         "libscriptedbeaconpayload-protos-lite",
+        "libwebsockets",
         "netsim-proto",
     ],
     whole_static_libs: [
@@ -96,20 +134,64 @@ cc_binary_host {
     srcs: [
         "src/netsim.cc",
     ],
+    generated_headers: [
+        "cxx-bridge-header",
+        "libranging_cxx_h"
+    ],
     shared_libs: [
+        "libbase",
         "libgrpc++",
+        "libcap",
+        "libcrypto",
+        "libssl",
     ],
     static_libs: [
         "libc++fs",
         "libjsoncpp",
         "libprotobuf-cpp-full",
         "libscriptedbeaconpayload-protos-lite",
+        "libwebsockets",
         "netsim-proto",
         "lib-netsim",
     ],
     whole_static_libs: [
+        "libranging_rust",
         "libbt-rootcanal",
     ],
+    ldflags: ["-Wl,--allow-multiple-definition"]
+}
+
+cc_binary_host {
+    name: "netsimd",
+    defaults: ["netsim_defaults"],
+    srcs: [
+        "src/netsimd.cc",
+    ],
+    generated_headers: [
+        "cxx-bridge-header",
+        "libranging_cxx_h"
+    ],
+    shared_libs: [
+        "libbase",
+        "libgrpc++",
+        "libcap",
+        "libcrypto",
+        "libssl",
+    ],
+    static_libs: [
+        "libc++fs",
+        "libjsoncpp",
+        "libprotobuf-cpp-full",
+        "libscriptedbeaconpayload-protos-lite",
+        "libwebsockets",
+        "netsim-proto",
+        "lib-netsim",
+    ],
+    whole_static_libs: [
+        "libranging_rust",
+        "libbt-rootcanal",
+    ],
+    ldflags: ["-Wl,--allow-multiple-definition"]
 }
 
 cc_test_host {
@@ -118,14 +200,15 @@ cc_test_host {
     srcs: [
         "src/controller/device_test.cc",
         "src/controller/scene_controller_test.cc",
-        "src/fe/frontend_server_test.cc",
-        "src/hci/startup_test.cc",
+        "src/frontend/frontend_server_test.cc",
+        "src/backend/startup_test.cc",
         "src/util/ini_file_test.cc",
         "src/util/os_utils_test.cc",
         "src/util/string_utils_test.cc",
     ],
     shared_libs: [
         "libgrpc++",
+        "libbase",
     ],
     static_libs: [
         "libc++fs",
@@ -136,6 +219,13 @@ cc_test_host {
         "lib-netsim",
     ],
     whole_static_libs: [
+        "libranging_rust",
         "libbt-rootcanal",
     ],
+    ldflags: ["-Wl,--allow-multiple-definition"]
+}
+
+rust_binary_host {
+    name: "netsim-cli",
+    srcs: ["rust/netsim-cli/src/main.rs"],
 }

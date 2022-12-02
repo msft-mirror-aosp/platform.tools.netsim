@@ -30,8 +30,7 @@ message Orientation {
   float roll = 3;
 }
 
-// A single Radio
-enum Radio {
+enum PhyKind {
   NONE = 0;
   BLUETOOTH_CLASSIC = 1;
   BLUETOOTH_LOW_ENERGY = 2;
@@ -40,26 +39,48 @@ enum Radio {
   WIFI_RTT = 5;
 }
 
-enum RadioState {
+// An explicit valued boolean.
+enum State {
   UNKNOWN = 0;
-  UP = 1;
-  DOWN = 2;
+  ON = 1;
+  OFF = 2;
 }
 
-// A set of Radios
-message Radios {
-  RadioState bluetooth_classic = 1;
-  RadioState bluetooth_low_energy = 2;
-  RadioState wifi = 3;
-  RadioState uwb = 4;
-  RadioState wifi_rtt = 5;
+message Chip {
+  // Radio state associated with the Chip
+  message Radio {
+    State state = 1;
+    float range = 2;
+    int32 tx_count = 3;
+    int32 rx_count = 4;
+  }
+
+  // Bluetooth has 2 radios
+  message Bluetooth {
+    Radio low_energy = 1;
+    Radio classic = 2;
+  }
+
+  string chip_id = 1;       // optional like "rear-right"
+  string manufacturer = 2;  // optional like Quorvo
+  string model = 3;         // optional like DW300
+  State capture = 4;        // packet capture
+
+  oneof chip {
+    Bluetooth bt = 5;
+    Radio uwb = 6;
+    Radio wifi = 7;
+  }
 }
 
 message Device {
   string device_serial = 1;  // unique device serial number
-  bool visible = 2;
-  Position position = 3;
-  Radios radios = 4;
+  string name = 2;           // user settable unique alias
+  bool visible = 3;
+  Position position = 4;
+  Orientation orientation = 5;
+  // Device can have multiple chips of the same kind.
+  repeated Chip chips = 6;
 }
 
 message Scene {
