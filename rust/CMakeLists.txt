@@ -1,7 +1,6 @@
 message(STATUS "Adding rust ${CMAKE_CURRENT_LIST_DIR}/ranging/Cargo.toml")
 
 add_subdirectory(ranging)
-add_subdirectory(netsim-cli)
 
 add_library(netsim-rust-lib INTERFACE)
 target_link_libraries(netsim-rust-lib INTERFACE ranging ranging_cxx)
