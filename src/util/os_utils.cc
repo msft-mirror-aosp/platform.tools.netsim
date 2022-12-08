@@ -66,11 +66,11 @@ std::filesystem::path GetDiscoveryDirectory() {
 std::optional<std::string> GetServerAddress() {
   auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");
   if (!std::filesystem::exists(filepath)) {
-    BtsLog("Unable to find discovery directory: %d", filepath.c_str());
+    BtsLog("Unable to find discovery directory: %s", filepath.c_str());
     return std::nullopt;
   }
   if (!std::filesystem::is_regular_file(filepath)) {
-    BtsLog("Not a regular file: %d", filepath.c_str());
+    BtsLog("Not a regular file: %s", filepath.c_str());
     return std::nullopt;
   }
   IniFile iniFile(filepath);
