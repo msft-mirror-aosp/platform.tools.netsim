@@ -82,3 +82,5 @@ if (ANDROID_EMULATOR_BUILD)
 endif()
 
 target_include_directories(netsim-test PRIVATE src)
+
+add_subdirectory(ui)
