@@ -103,6 +103,7 @@ void RunFrontendServer() {
   // Writes port to ini file.
   auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");
   IniFile iniFile(filepath);
+  iniFile.Read();
   iniFile.Set("grpc.port", std::to_string(selected_port));
   iniFile.Write();
 
