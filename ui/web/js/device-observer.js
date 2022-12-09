@@ -71,6 +71,7 @@ class SimulationState {
     }
     registerObserver(elem) {
         this.observers.push(elem);
+        elem.onNotify(this.simulationInfo);
     }
     removeObserver(elem) {
         const index = this.observers.indexOf(elem);
