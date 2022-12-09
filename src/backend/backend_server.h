@@ -15,7 +15,7 @@
  */
 
 #pragma once
-// A synchronous Frontend server for the Network Simulator.
+// A synchronous Backend server for the Network Simulator.
 
 #include <memory>
 #include <string>
@@ -25,6 +25,6 @@
 
 namespace netsim {
 
-std::pair<std::unique_ptr<grpc::Server>, std::string> RunFrontendServer();
+std::pair<std::unique_ptr<grpc::Server>, std::string> RunBackendServer();
 
 }  // namespace netsim
