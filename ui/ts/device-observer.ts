@@ -152,6 +152,7 @@ class SimulationState implements Observable {
 
   registerObserver(elem: Notifiable) {
     this.observers.push(elem);
+    elem.onNotify(this.simulationInfo)
   }
 
   removeObserver(elem: Notifiable) {
