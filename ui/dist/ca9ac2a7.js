@@ -1,8 +1,8 @@
-import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let r=class extends a{connectedCallback(){super.connectedCallback()}disconnectedCallback(){super.disconnectedCallback()}render(){return n`
+import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let i=class extends a{connectedCallback(){super.connectedCallback()}disconnectedCallback(){super.disconnectedCallback()}handleClick(e){let o="main";"nav-trace-section"===e.target.id&&(o="trace"),window.dispatchEvent(new CustomEvent("changeModeEvent",{detail:{mode:o}}))}render(){return n`
       <nav>
         <div id="nav-logo-section" class="nav-section">
-          <a href=".">
-            <div class="logo"></div>
+          <a>
+            <div id="nav-logo-pic" class="logo" @click=${this.handleClick}></div>
           </a>
           <p>#betosim</p>
         </div>
@@ -10,7 +10,7 @@ import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let r=class extend
           <a href="http://go/betosim" target="_blank" rel="noopener noreferrer"
             >ABOUT</a
           >
-          <a href="./packet.html" target="_blank" rel="noopener noreferrer"
+          <a id="nav-trace-section" @click=${this.handleClick}
             >PACKET TRACE</a
           >
         </div>
@@ -23,7 +23,7 @@ import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let r=class extend
           >
         </div>
       </nav>
-    `}};r.styles=e`
+    `}};i.styles=e`
     :host {
       --border-color: rgb(255, 255, 255, 0.1);
       --background-color: #747474;
@@ -87,6 +87,10 @@ import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let r=class extend
       text-decoration: none;
     }
 
+    a:hover {
+      cursor: pointer;
+    }
+
     h1,
     h2,
     h3,
@@ -96,6 +100,6 @@ import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let r=class extend
       font-family: 'Lato';
       font-weight: bold;
       color: white;
-      font-size: 20px;
+      font-size: 25px;
     }
-  `,r=o([t("ns-navigation-bar")],r);
+  `,i=o([t("ns-navigation-bar")],i);

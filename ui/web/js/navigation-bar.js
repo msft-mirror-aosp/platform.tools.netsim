@@ -8,12 +8,21 @@ let NavigationBar = class NavigationBar extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback(); // eslint-disable-line
     }
+    handleClick(ev) {
+        let mode = "main";
+        if (ev.target.id === "nav-trace-section") {
+            mode = "trace";
+        }
+        window.dispatchEvent(new CustomEvent('changeModeEvent', {
+            detail: { mode }
+        }));
+    }
     render() {
         return html `
       <nav>
         <div id="nav-logo-section" class="nav-section">
-          <a href=".">
-            <div class="logo"></div>
+          <a>
+            <div id="nav-logo-pic" class="logo" @click=${this.handleClick}></div>
           </a>
           <p>#betosim</p>
         </div>
@@ -21,7 +30,7 @@ let NavigationBar = class NavigationBar extends LitElement {
           <a href="http://go/betosim" target="_blank" rel="noopener noreferrer"
             >ABOUT</a
           >
-          <a href="./packet.html" target="_blank" rel="noopener noreferrer"
+          <a id="nav-trace-section" @click=${this.handleClick}
             >PACKET TRACE</a
           >
         </div>
@@ -101,6 +110,10 @@ NavigationBar.styles = css `
       text-decoration: none;
     }
 
+    a:hover {
+      cursor: pointer;
+    }
+
     h1,
     h2,
     h3,
@@ -110,7 +123,7 @@ NavigationBar.styles = css `
       font-family: 'Lato';
       font-weight: bold;
       color: white;
-      font-size: 20px;
+      font-size: 25px;
     }
   `;
 NavigationBar = __decorate([
