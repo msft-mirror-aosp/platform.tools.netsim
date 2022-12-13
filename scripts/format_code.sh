@@ -20,4 +20,5 @@ find src \( -name '*.cc' -o -name '*.h' -o -name '*.proto' \) \
   -exec clang-format -i {} \;
 
 # Format rust.
+REPO_EMU=$(dirname "$0")/../../../
 $REPO_EMU/prebuilts/rust/linux-x86/stable/rustfmt -v -- $REPO_EMU/tools/netsim/rust/*/src/*.rs
