@@ -11,14 +11,23 @@ if(WIN32)
   #    which is used by cc crate.
   # 3. This isn't needed in mac and Linux because corrosion doesn't pass
   #    -fno-exception flag.
-  corrosion_set_env_vars(netsim-cli CXXFLAGS=/DRUST_CXX_NO_EXCEPTIONS)
+  corrosion_set_env_vars(frontend-client-cxx CXXFLAGS=/DRUST_CXX_NO_EXCEPTIONS)
 endif()
 
 if(LINUX)
   # b/260271048
   corrosion_add_target_rustflags(
-    "netsim-cli" "-Clink-args=-Wl,-rpath,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    frontend-client-cxx "-Clink-args=-Wl,-rpath,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 endif()
 
-target_link_libraries(netsim-cli INTERFACE frontend-client-lib frontend-grpc-lib)
-corrosion_install(TARGETS netsim-cli RUNTIME DESTINATION .)
+# Link C/C++ libraries with your Rust target
+corrosion_link_libraries(frontend-client-cxx frontend_client_cxx_generated frontend-client)
+
+
+android_add_library(
+  TARGET frontend_client_cxx_generated LICENSE Apache-2.0
+  SRC ${CMAKE_CURRENT_LIST_DIR}/cxx/frontend_client_cxx_generated.cc
+  DEPS frontend-grpc-lib grpc++ protobuf::libprotobuf)
+
+target_include_directories(frontend_client_cxx_generated PRIVATE ../../src)
+
