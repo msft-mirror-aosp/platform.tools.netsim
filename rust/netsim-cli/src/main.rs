@@ -15,6 +15,7 @@
 //! Command Line Interface for Netsim
 
 mod args;
+mod browser;
 use args::NetsimArgs;
 use clap::Parser;
 
@@ -60,6 +61,9 @@ fn call_command(command: &args::CommandType, mut writer: impl std::io::Write) {
         }
         args::CommandType::Reset => {
             writeln!(writer, "(Not yet implemented.) Reset netsim: ").expect(err_msg);
+        }
+        args::CommandType::Ui => {
+            browser::open("https://google.com");
         }
     }
 }
