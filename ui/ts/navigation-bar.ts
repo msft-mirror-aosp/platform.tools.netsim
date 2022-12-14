@@ -11,28 +11,13 @@ export class NavigationBar extends LitElement {
     }
 
     .logo {
-      animation: app-logo-two infinite 10s;
+      background-image: url(./assets/netsim-logo.svg);
       background-repeat: no-repeat;
       margin-left: 25%;
       width: 50px;
       height: 50px;
     }
-
-    @keyframes app-logo-two {
-      0%,
-      50% {
-        background-image: url(./assets/netsim-logo.svg);
-      }
-      55%,
-      60% {
-        background-image: url(./assets/netsim-logo-b.svg);
-      }
-      65%,
-      100% {
-        background-image: url(./assets/netsim-logo.svg);
-      }
-    }
-
+    
     nav {
       display: flex;
       width: 100%;
