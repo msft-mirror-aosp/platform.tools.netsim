@@ -30,6 +30,7 @@
 #include "util/log.h"
 
 namespace netsim {
+namespace {
 
 class BackendServer final : public packet::PacketStreamer::Service {
  public:
@@ -48,9 +49,10 @@ class BackendServer final : public packet::PacketStreamer::Service {
   }
 };
 
-std::pair<std::unique_ptr<grpc::Server>, std::string> RunBackendServer() {
-  BackendServer service;
+BackendServer service;
+}
 
+std::pair<std::unique_ptr<grpc::Server>, std::string> RunBackendServer() {
   grpc::ServerBuilder builder;
   int selected_port;
   builder.AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(),
