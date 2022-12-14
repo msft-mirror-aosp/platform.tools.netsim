@@ -50,7 +50,7 @@ class BackendServer final : public packet::PacketStreamer::Service {
 };
 
 BackendServer service;
-}
+}  // namespace
 
 std::pair<std::unique_ptr<grpc::Server>, std::string> RunBackendServer() {
   grpc::ServerBuilder builder;
