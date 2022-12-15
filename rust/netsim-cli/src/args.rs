@@ -34,6 +34,8 @@ pub enum CommandType {
     Capture(CaptureCommand),
     /// Reset Netsim device scene
     Reset,
+    /// Open netsim Web UI
+    Ui,
 }
 
 #[derive(Debug, Args)]
