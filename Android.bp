@@ -226,10 +226,24 @@ cc_test_host {
     ldflags: ["-Wl,--allow-multiple-definition"]
 }
 
+rust_library_host {
+    name: "libfrontend_proto",
+    crate_name: "frontend_proto",
+    srcs: ["rust/frontend-proto/src/lib.rs"],
+    features: ["serde", "serde_derive", "with-serde"],
+    rustlibs: [
+        "libprotobuf_with_serde",
+        "libserde",
+    ],
+}
+
 rust_binary_host {
     name: "netsim-cli",
     srcs: ["rust/netsim-cli/src/main.rs"],
+    features: ["with-serde"],
     rustlibs: [
         "libclap",
+        "libserde_json",
+        "libfrontend_proto",
     ],
 }
