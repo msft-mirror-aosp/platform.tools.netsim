@@ -87,7 +87,7 @@ class FrontendServer final : public frontend::FrontendService::Service {
 };
 
 FrontendServer service;
-}
+}  // namespace
 
 std::pair<std::unique_ptr<grpc::Server>, std::string> RunFrontendServer() {
   grpc::ServerBuilder builder;
