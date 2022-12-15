@@ -1,4 +1,4 @@
-import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let i=class extends a{connectedCallback(){super.connectedCallback()}disconnectedCallback(){super.disconnectedCallback()}handleClick(e){let o="main";"nav-trace-section"===e.target.id&&(o="trace"),window.dispatchEvent(new CustomEvent("changeModeEvent",{detail:{mode:o}}))}render(){return n`
+import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let r=class extends a{connectedCallback(){super.connectedCallback()}disconnectedCallback(){super.disconnectedCallback()}handleClick(e){let o="main";"nav-trace-section"===e.target.id&&(o="trace"),window.dispatchEvent(new CustomEvent("changeModeEvent",{detail:{mode:o}}))}render(){return n`
       <nav>
         <div id="nav-logo-section" class="nav-section">
           <a>
@@ -23,35 +23,20 @@ import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let i=class extend
           >
         </div>
       </nav>
-    `}};i.styles=e`
+    `}};r.styles=e`
     :host {
       --border-color: rgb(255, 255, 255, 0.1);
       --background-color: #747474;
     }
 
     .logo {
-      animation: app-logo-two infinite 10s;
+      background-image: url(./assets/netsim-logo.svg);
       background-repeat: no-repeat;
       margin-left: 25%;
       width: 50px;
       height: 50px;
     }
-
-    @keyframes app-logo-two {
-      0%,
-      50% {
-        background-image: url(./assets/netsim-logo.svg);
-      }
-      55%,
-      60% {
-        background-image: url(./assets/netsim-logo-b.svg);
-      }
-      65%,
-      100% {
-        background-image: url(./assets/netsim-logo.svg);
-      }
-    }
-
+    
     nav {
       display: flex;
       width: 100%;
@@ -102,4 +87,4 @@ import{i as e,_ as o,s as a,y as n,e as t}from"./48895b41.js";let i=class extend
       color: white;
       font-size: 25px;
     }
-  `,i=o([t("ns-navigation-bar")],i);
+  `,r=o([t("ns-navigation-bar")],r);
