@@ -14,11 +14,12 @@
 
 #include "backend/backend_server.h"
 
-#include <grpcpp/support/status.h>
+#include <google/protobuf/util/json_util.h>
 
 #include <memory>
 #include <string>
 
+#include "backend_cxx_generated.h"
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
@@ -36,21 +37,35 @@ class BackendServer final : public packet::PacketStreamer::Service {
  public:
   ::grpc::Status StreamPackets(
       ::grpc::ServerContext *context,
-      ::grpc::ServerReaderWriter< ::netsim::packet::StreamPacketsResponse,
-                                  ::netsim::packet::StreamPacketsRequest>
-          *stream) {
+      ::grpc::ServerReaderWriter<::netsim::packet::StreamPacketsResponse,
+                                 ::netsim::packet::StreamPacketsRequest>
+          *stream) override {
     BtsLog("Streaming packets");
-
-    packet::StreamPacketsRequest request;
-    stream->Read(&request);
-    packet::StreamPacketsResponse response;
-    stream->Write(response);
+    // TODO: Call StreamPacketHandler().
     return ::grpc::Status::OK;
   }
 };
 
 BackendServer service;
 }  // namespace
+
+PacketStreamClient::PacketStreamClient(
+    ::grpc::ServerReaderWriter<::netsim::packet::StreamPacketsResponse,
+                               ::netsim::packet::StreamPacketsRequest> *stream)
+    : stream(stream) {}
+
+void PacketStreamClient::Write(const std::string &response) const {
+  ::netsim::packet::StreamPacketsResponse response_proto;
+  google::protobuf::util::JsonStringToMessage(response, &response_proto);
+  stream->Write(response_proto);
+}
+std::unique_ptr<std::string> PacketStreamClient::Read() const {
+  ::netsim::packet::StreamPacketsRequest request_proto;
+  stream->Read(&request_proto);
+  std::string request;
+  google::protobuf::util::MessageToJsonString(request_proto, &request);
+  return std::make_unique<std::string>(request);
+}
 
 std::pair<std::unique_ptr<grpc::Server>, std::string> RunBackendServer() {
   grpc::ServerBuilder builder;
