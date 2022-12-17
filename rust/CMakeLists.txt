@@ -13,6 +13,8 @@ add_subdirectory(frontend-proto)
 # 3. cargo build
 # 4. bash scripts/format_code.sh
 
+add_subdirectory(http-server)
+
 add_library(netsim-rust-lib INTERFACE)
 target_link_libraries(
   netsim-rust-lib INTERFACE backend-cxx backend-cxx-generated frontend-proto
