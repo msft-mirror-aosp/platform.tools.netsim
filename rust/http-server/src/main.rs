@@ -1,8 +1,10 @@
-use http_server::ThreadPool;
+mod thread_pool;
+
 use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
+use thread_pool::ThreadPool;
 
 const BUFFER_SIZE: usize = 1024;
 const GET_RESOURCE: &str = "GET /";

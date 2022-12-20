@@ -22,6 +22,8 @@ target_link_libraries(
 
 android_license(TARGET "backend-cxx" LIBNAME None SPDX None LICENSE None
                 LOCAL None)
+android_license(TARGET "backend-proto" LIBNAME None SPDX None LICENSE None
+                LOCAL None)
 android_license(TARGET "netsim-rust-lib" LIBNAME None SPDX None LICENSE None
                 LOCAL None)
 android_license(TARGET "ranging" LIBNAME None SPDX None LICENSE None LOCAL None)
