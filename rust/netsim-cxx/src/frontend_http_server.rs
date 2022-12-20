@@ -16,6 +16,7 @@ const RESPONSE_404: &str = "HTTP/1.1 404 NOT FOUND";
 pub fn run_frontend_http_server() {
     let listener = TcpListener::bind("127.0.0.1:7681").unwrap();
     let pool = ThreadPool::new(4);
+    println!("Frontend http server is listening on http://localhost:7681");
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
@@ -25,7 +26,7 @@ pub fn run_frontend_http_server() {
         });
     }
 
-    println!("Shutting down.");
+    println!("Shutting down frontend http server.");
 }
 
 fn handle_connection(mut stream: TcpStream) {
