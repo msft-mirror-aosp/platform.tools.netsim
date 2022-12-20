@@ -17,6 +17,14 @@ name = "http-server"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["staticlib", "lib"]
+doctest = false
+test = false
+path = "src/lib.rs"
+
+[[bin]]
+name = "http-server-bin" # lib and bin can't share the same name in corrosion.
+path = "src/main.rs"
 
 [dependencies]

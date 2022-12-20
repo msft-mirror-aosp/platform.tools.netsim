@@ -19,5 +19,3 @@ if(LINUX)
   corrosion_add_target_rustflags(
     "http-server" "-Clink-args=-Wl,-rpath,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 endif()
-
-corrosion_install(TARGETS http-server RUNTIME DESTINATION .)
