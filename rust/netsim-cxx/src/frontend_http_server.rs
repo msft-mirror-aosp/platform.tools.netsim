@@ -1,10 +1,10 @@
 mod thread_pool;
 
+use crate::frontend_http_server::thread_pool::ThreadPool;
 use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
-use thread_pool::ThreadPool;
 
 const BUFFER_SIZE: usize = 1024;
 const GET_RESOURCE: &str = "GET /";
