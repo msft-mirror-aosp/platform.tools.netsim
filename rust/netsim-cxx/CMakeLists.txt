@@ -11,23 +11,23 @@ if(WIN32)
   #    which is used by cc crate.
   # 3. This isn't needed in mac and Linux because corrosion doesn't pass
   #    -fno-exception flag.
-  corrosion_set_env_vars(backend-cxx CXXFLAGS=/DRUST_CXX_NO_EXCEPTIONS)
+  corrosion_set_env_vars(netsim-cxx CXXFLAGS=/DRUST_CXX_NO_EXCEPTIONS)
 endif()
 
 if(LINUX)
   # b/260271048
   corrosion_add_target_rustflags(
-    "backend-cxx" "-Clink-args=-Wl,-rpath,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    "netsim-cxx" "-Clink-args=-Wl,-rpath,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 endif()
 
 android_add_library(
-  TARGET backend-cxx-generated
+  TARGET netsim-cxx-generated
   LICENSE Apache-2.0
-  SRC ${CMAKE_CURRENT_LIST_DIR}/cxx/backend_cxx_generated.cc
-      ${CMAKE_CURRENT_LIST_DIR}/cxx/backend_cxx_generated.h
+  SRC ${CMAKE_CURRENT_LIST_DIR}/cxx/netsim_cxx_generated.cc
+      ${CMAKE_CURRENT_LIST_DIR}/cxx/netsim_cxx_generated.h
   DEPS frontend-grpc-lib grpc++ packet-streamer-server-lib)
 
 target_include_directories(
-  backend-cxx-generated PRIVATE ../../src # For backend/backend_server.h
-  . # For cxx/cxx.h
+  netsim-cxx-generated PRIVATE ../../src # For backend/backend_server.h
+                               . # For cxx/cxx.h
 )

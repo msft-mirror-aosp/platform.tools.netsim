@@ -30,12 +30,12 @@ android_add_library(
   TARGET packet-streamer-server-lib
   LICENSE Apache-2.0
   SRC backend_server.cc backend_server.h
-  DEPS backend-cxx backend-cxx-generated frontend-grpc-lib grpc++
+  DEPS frontend-grpc-lib grpc++ netsim-cxx netsim-cxx-generated
        protobuf::libprotobuf util-lib)
 
 target_include_directories(
-  packet-streamer-server-lib PRIVATE .. ../../rust/backend-cxx
-                                     ../../rust/backend-cxx/cxx)
+  packet-streamer-server-lib PRIVATE .. ../../rust/netsim-cxx
+                                     ../../rust/netsim-cxx/cxx)
 
 android_add_library(
   TARGET packet-streamer-client-lib
