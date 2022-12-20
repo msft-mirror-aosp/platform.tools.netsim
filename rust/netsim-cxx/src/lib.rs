@@ -1,6 +1,7 @@
 //! Netsim cxx libraries.
 
 mod frontend_http_server;
+use crate::frontend_http_server::run_frontend_http_server;
 
 #[cxx::bridge(namespace = "netsim")]
 mod ffi {
@@ -9,6 +10,9 @@ mod ffi {
 
         #[cxx_name = "StreamPacketHandler"]
         fn stream_packets_handler(packet_stream_client: UniquePtr<PacketStreamClient>);
+
+        #[cxx_name = "RunFrontendHttpServer"]
+        fn run_frontend_http_server();
     }
 
     unsafe extern "C++" {
