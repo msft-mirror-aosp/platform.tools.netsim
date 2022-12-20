@@ -1,4 +1,6 @@
-//! Backend server library.
+//! Netsim cxx libraries.
+
+mod frontend_http_server;
 
 #[cxx::bridge(namespace = "netsim")]
 mod ffi {
