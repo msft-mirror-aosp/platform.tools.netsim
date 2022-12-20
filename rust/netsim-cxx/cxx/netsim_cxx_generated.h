@@ -9,4 +9,6 @@ namespace netsim {
 
 namespace netsim {
 void StreamPacketHandler(::std::unique_ptr<::netsim::PacketStreamClient> packet_stream_client) noexcept;
+
+void RunFrontendHttpServer() noexcept;
 } // namespace netsim

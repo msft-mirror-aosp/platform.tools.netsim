@@ -16,10 +16,12 @@
 
 #include <iostream>
 #include <memory>
+#include <thread>
 
 #include "backend/backend_server.h"
 #include "backend/rpc_hal_transport.h"
 #include "frontend/frontend_server.h"
+#include "netsim_cxx_generated.h"
 #include "util/ini_file.h"
 #include "util/os_utils.h"
 
@@ -30,6 +32,9 @@ void StartWithGrpc(bool debug) {
   // Connect to all emulator grpc servers
   auto grpc_transport = RpcHalTransport::Create();
   grpc_transport->discover();
+
+  // Run frontend http server.
+  std::thread frontend_http_server(RunFrontendHttpServer);
 
   // Run frontend and backend grpc servers.
   auto [frontend_server, frontend_grpc_port] = netsim::RunFrontendServer();
@@ -45,6 +50,7 @@ void StartWithGrpc(bool debug) {
 
   frontend_server->Wait();
   backend_server->Wait();
+  frontend_http_server.join();
   // never happens
 }
 

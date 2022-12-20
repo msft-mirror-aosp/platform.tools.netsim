@@ -42,6 +42,8 @@ namespace netsim {
 extern "C" {
 void netsim$cxxbridge1$stream_packets_handler(::netsim::PacketStreamClient *packet_stream_client) noexcept;
 
+void netsim$cxxbridge1$run_frontend_http_server() noexcept;
+
 ::std::string *netsim$cxxbridge1$PacketStreamClient$read(::netsim::PacketStreamClient const &self) noexcept {
   ::std::unique_ptr<::std::string> (::netsim::PacketStreamClient::*read$)() const = &::netsim::PacketStreamClient::Read;
   return (self.*read$)().release();
@@ -55,6 +57,10 @@ void netsim$cxxbridge1$PacketStreamClient$write(::netsim::PacketStreamClient con
 
 void StreamPacketHandler(::std::unique_ptr<::netsim::PacketStreamClient> packet_stream_client) noexcept {
   netsim$cxxbridge1$stream_packets_handler(packet_stream_client.release());
+}
+
+void RunFrontendHttpServer() noexcept {
+  netsim$cxxbridge1$run_frontend_http_server();
 }
 } // namespace netsim
 
