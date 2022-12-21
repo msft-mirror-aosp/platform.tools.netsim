@@ -1,10 +1,10 @@
 mod thread_pool;
 
+use crate::frontend_http_server::thread_pool::ThreadPool;
 use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
-use thread_pool::ThreadPool;
 
 const BUFFER_SIZE: usize = 1024;
 const GET_RESOURCE: &str = "GET /";
@@ -13,9 +13,10 @@ const RESPONSE_200: &str = "HTTP/1.1 200 OK";
 const RESPONSE_200_JS: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/javascript";
 const RESPONSE_404: &str = "HTTP/1.1 404 NOT FOUND";
 
-fn main() {
+pub fn run_frontend_http_server() {
     let listener = TcpListener::bind("127.0.0.1:7681").unwrap();
     let pool = ThreadPool::new(4);
+    println!("Frontend http server is listening on http://localhost:7681");
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
@@ -25,7 +26,7 @@ fn main() {
         });
     }
 
-    println!("Shutting down.");
+    println!("Shutting down frontend http server.");
 }
 
 fn handle_connection(mut stream: TcpStream) {
