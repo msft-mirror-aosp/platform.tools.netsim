@@ -19,13 +19,13 @@
 #include <memory>
 #include <string>
 
-#include "backend_cxx_generated.h"
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
+#include "netsim_cxx_generated.h"
 #include "packet_streamer.grpc.pb.h"
 #include "packet_streamer.pb.h"
 #include "util/log.h"
