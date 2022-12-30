@@ -118,7 +118,7 @@ class FdHciForwarder : public rootcanal::HciTransport {
   }
 
   // Called by HCITransport (rootcanal)
-  void TimerTick() override {}
+  void Tick() override {}
 
  private:
   const int fd_in_, fd_out_;
