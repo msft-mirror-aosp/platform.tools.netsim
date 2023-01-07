@@ -34,8 +34,8 @@
 namespace netsim {
 namespace {
 
-using Stream = ::grpc::ServerReaderWriter<packet::PacketResponse,
-                                          packet::PacketRequest>;
+using Stream =
+    ::grpc::ServerReaderWriter<packet::PacketResponse, packet::PacketRequest>;
 
 // Service handles grpc requests
 //
@@ -53,8 +53,8 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
 
     // First packet must have initial_info describing the peer
     bool success = stream->Read(&request);
-    if (success || !request.has_initial_info()) {
-      BtsLog("ServiceImpl no initial information");
+    if (!success || !request.has_initial_info()) {
+      BtsLog("ServiceImpl no initial information or stream closed");
       return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
                           "Missing initial_info in first packet.");
     }

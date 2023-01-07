@@ -23,12 +23,13 @@
 #include "frontend/frontend_server.h"
 #include "netsim_cxx_generated.h"
 #include "util/ini_file.h"
+#include "util/log.h"
 #include "util/os_utils.h"
 
 namespace netsim {
 
 void StartWithGrpc(bool debug) {
-  std::cout << "netsim starting packet streamer\n";
+  BtsLog("starting packet streamer");
   // Connect to all emulator grpc servers
   auto grpc_transport = RpcHalTransport::Create();
   grpc_transport->discover();
