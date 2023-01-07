@@ -66,7 +66,7 @@ class BackendServerHciTransportImpl : public BackendServerHciTransport {
                          rootcanal::PacketCallback scoCallback,
                          rootcanal::PacketCallback isoCallback,
                          rootcanal::CloseCallback closeCallback) override {
-    std::cerr << "RegisterCallbacks ****" << std::endl;
+    BtsLog("RegisterCallbacks ****");
     mCommandCallback = commandCallback;
     mAclCallback = aclCallback;
     mScoCallback = scoCallback;
@@ -78,14 +78,17 @@ class BackendServerHciTransportImpl : public BackendServerHciTransport {
   void TimerTick() override {}
 
   // Close from Rootcanal
-  void Close() override { mDone = true; }
+  void Close() override {
+    BtsLog("Close on transport");
+    mDone = true;
+  }
 
   // Transport packets from grpc to rootcanal. Return when connection is closed.
   void Transport() override {
     packet::PacketRequest request;
     while (true) {
       bool reader_success = mStream->Read(&request);
-      if (reader_success || mDone) {
+      if (!reader_success || mDone) {
         break;
       }
       if (!request.has_hci_packet()) {
