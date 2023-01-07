@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
+
 #include "backend/packet_streamer_client.h"
 #include "packet_streamer.grpc.pb.h"
-
-#include <iostream>
 
 int main(int argc, char *argv[]) {
   // Finding the netsimd binary requires this env variable when run
