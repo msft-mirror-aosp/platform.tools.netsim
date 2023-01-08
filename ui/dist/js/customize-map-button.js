@@ -1,27 +1,12 @@
-import { __decorate } from "tslib";
-import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
-let CustomizeButton = class CustomizeButton extends LitElement {
-    constructor() {
-        super(...arguments);
-        this.disabled = false;
-        this.eventName = '';
-    }
-    render() {
-        return html `
+import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as i,LitElement as o,html as e}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as n,customElement as r}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";let l=class extends o{constructor(){super(...arguments),this.disabled=!1,this.eventName=""}render(){return e`
       <button
-        @click="${() => {
-            window.dispatchEvent(new CustomEvent(this.eventName));
-        }}"
+        @click="${()=>{window.dispatchEvent(new CustomEvent(this.eventName))}}"
         class="lit-button"
         ?disabled=${this.disabled}
       >
         <slot></slot>
       </button>
-    `;
-    }
-};
-CustomizeButton.styles = css `
+    `}};l.styles=i`
     :host {
       display: var(--lit-button-display, inline-block);
       box-sizing: inherit;
@@ -92,15 +77,4 @@ CustomizeButton.styles = css `
       --lit-button-min-width: 5rem;
       --lit-button-padding-horizontal: 0;
     }
-  `;
-__decorate([
-    property()
-], CustomizeButton.prototype, "disabled", void 0);
-__decorate([
-    property()
-], CustomizeButton.prototype, "eventName", void 0);
-CustomizeButton = __decorate([
-    customElement('ns-customize-button')
-], CustomizeButton);
-export { CustomizeButton };
-//# sourceMappingURL=customize-map-button.js.map
+  `,t([n()],l.prototype,"disabled",void 0),t([n()],l.prototype,"eventName",void 0),l=t([r("ns-customize-button")],l);export{l as CustomizeButton};
