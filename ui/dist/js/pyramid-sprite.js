@@ -1,15 +1,4 @@
-import { __decorate } from "tslib";
-import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
-let PyramidSprite = class PyramidSprite extends LitElement {
-    constructor() {
-        var _a, _b;
-        super();
-        (_a = this.color) !== null && _a !== void 0 ? _a : (this.color = css `red`);
-        (_b = this.size) !== null && _b !== void 0 ? _b : (this.size = css `30px`);
-    }
-    render() {
-        return html `
+import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,LitElement as i,html as o}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as r,customElement as s}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";let d=class extends i{constructor(){var t,i;super(),null!==(t=this.color)&&void 0!==t||(this.color=e`red`),null!==(i=this.size)&&void 0!==i||(this.size=e`30px`)}render(){return o`
       <style>
         :host {
           font-size: ${this.size};
@@ -22,10 +11,7 @@ let PyramidSprite = class PyramidSprite extends LitElement {
         <div class="face"></div>
         <div class="face"></div>
       </div>
-    `;
-    }
-};
-PyramidSprite.styles = css `
+    `}};d.styles=e`
     * {
       margin: 0;
       padding: 0;
@@ -68,15 +54,4 @@ PyramidSprite.styles = css `
     .pyramid > div:nth-child(4) {
       transform: translate3d(-0.25em, 0, -0.25em) rotateY(270deg) rotateX(30deg);
     }
-  `;
-__decorate([
-    property({ type: css, attribute: 'color' })
-], PyramidSprite.prototype, "color", void 0);
-__decorate([
-    property({ type: css, attribute: 'size' })
-], PyramidSprite.prototype, "size", void 0);
-PyramidSprite = __decorate([
-    customElement('ns-pyramid-sprite')
-], PyramidSprite);
-export { PyramidSprite };
-//# sourceMappingURL=pyramid-sprite.js.map
+  `,t([r({type:e,attribute:"color"})],d.prototype,"color",void 0),t([r({type:e,attribute:"size"})],d.prototype,"size",void 0),d=t([s("ns-pyramid-sprite")],d);export{d as PyramidSprite};
