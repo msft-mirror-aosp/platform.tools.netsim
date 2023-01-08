@@ -1,24 +1,4 @@
-import { __decorate } from "tslib";
-import { LitElement, html, css } from 'lit';
-import { customElement } from 'lit/decorators.js';
-let NavigationBar = class NavigationBar extends LitElement {
-    connectedCallback() {
-        super.connectedCallback(); // eslint-disable-line
-    }
-    disconnectedCallback() {
-        super.disconnectedCallback(); // eslint-disable-line
-    }
-    handleClick(ev) {
-        let mode = "main";
-        if (ev.target.id === "nav-trace-section") {
-            mode = "trace";
-        }
-        window.dispatchEvent(new CustomEvent('changeModeEvent', {
-            detail: { mode }
-        }));
-    }
-    render() {
-        return html `
+import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as o,LitElement as t,html as n}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{customElement as a}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";let i=class extends t{connectedCallback(){super.connectedCallback()}disconnectedCallback(){super.disconnectedCallback()}handleClick(e){let o="main";"nav-trace-section"===e.target.id&&(o="trace"),window.dispatchEvent(new CustomEvent("changeModeEvent",{detail:{mode:o}}))}render(){return n`
       <nav>
         <div id="nav-logo-section" class="nav-section">
           <a>
@@ -43,10 +23,7 @@ let NavigationBar = class NavigationBar extends LitElement {
           >
         </div>
       </nav>
-    `;
-    }
-};
-NavigationBar.styles = css `
+    `}};i.styles=o`
     :host {
       --border-color: rgb(255, 255, 255, 0.1);
       --background-color: #747474;
@@ -110,9 +87,4 @@ NavigationBar.styles = css `
       color: white;
       font-size: 25px;
     }
-  `;
-NavigationBar = __decorate([
-    customElement('ns-navigation-bar')
-], NavigationBar);
-export { NavigationBar };
-//# sourceMappingURL=navigation-bar.js.map
+  `,i=e([a("ns-navigation-bar")],i);export{i as NavigationBar};

@@ -1,4 +1,4 @@
-import{i as t,_ as e,s as d,y as a,e as i}from"./48895b41.js";import{e as o}from"./270e41ec.js";import{s as r}from"./a9eb0d1c.js";let l=class extends d{constructor(){super(...arguments),this.deviceData=[]}connectedCallback(){super.connectedCallback(),r.registerObserver(this)}disconnectedCallback(){r.removeObserver(this),super.disconnectedCallback()}onNotify(t){this.deviceData=t.devices,this.requestUpdate()}handleCapture(t){const e=t.target;r.updateCapture({deviceSerial:e.id,capture:e.checked}),this.requestUpdate()}render(){return a`
+import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,LitElement as d,html as a}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as i,customElement as o}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{simulationState as r}from"./device-observer.js";let l=class extends d{constructor(){super(...arguments),this.deviceData=[]}connectedCallback(){super.connectedCallback(),r.registerObserver(this)}disconnectedCallback(){r.removeObserver(this),super.disconnectedCallback()}onNotify(t){this.deviceData=t.devices,this.requestUpdate()}handleCapture(t){const e=t.target;r.updateCapture({deviceSerial:e.id,capture:e.checked}),this.requestUpdate()}render(){return a`
       <div class="panel">
         <div class="title">Packet Info</div>
         ${this.deviceData.map((t=>a`
@@ -88,7 +88,7 @@ import{i as t,_ as e,s as d,y as a,e as i}from"./48895b41.js";import{e as o}from
               `))}
         </table>
       </div>
-    `}};l.styles=t`
+    `}};l.styles=e`
     .panel {
       cursor: pointer;
       display: grid;
@@ -188,4 +188,4 @@ import{i as t,_ as e,s as d,y as a,e as i}from"./48895b41.js";import{e as o}from
     input[type='checkbox'].switch_1:checked:after {
       left: calc(100% - 1.5em);
     }
-  `,e([o()],l.prototype,"deviceData",void 0),l=e([i("ns-packet-info")],l);
+  `,t([i()],l.prototype,"deviceData",void 0),l=t([o("ns-packet-info")],l);export{l as PacketInformation};
