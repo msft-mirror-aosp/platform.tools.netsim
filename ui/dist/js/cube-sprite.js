@@ -1,4 +1,4 @@
-import{i as t,_ as e,s as i,y as o,e as r}from"./48895b41.js";import{e as s}from"./270e41ec.js";import{s as a}from"./a9eb0d1c.js";let d=class extends i{constructor(){super(...arguments),this.yaw=-15,this.pitch=-15,this.roll=0,this.posZ=0,this.color=t`red`,this.size=t`30px`,this.controls=!1,this.highlighted=!1,this.handleOrientationEvent=t=>{const{detail:e}=t;e.deviceSerial===this.id&&this.controls&&("yaw"===e.type?this.yaw=e.value:"pitch"===e.type?this.pitch=e.value:this.roll=e.value)}}connectedCallback(){super.connectedCallback(),a.registerObserver(this),window.addEventListener("orientationEvent",this.handleOrientationEvent)}disconnectedCallback(){window.removeEventListener("orientationEvent",this.handleOrientationEvent),a.removeObserver(this),super.disconnectedCallback()}onNotify(t){var e;this.highlighted=t.selectedSerial===this.id;for(const i of t.devices)if(i.deviceSerial===this.id)return void(this.posZ=100*(null!==(e=i.position.z)&&void 0!==e?e:0))}render(){return o`
+import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,LitElement as i,html as o}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as r,customElement as s}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{simulationState as d}from"./device-observer.js";let a=class extends i{constructor(){super(...arguments),this.yaw=-15,this.pitch=-15,this.roll=0,this.posZ=0,this.color=e`red`,this.size=e`30px`,this.controls=!1,this.highlighted=!1,this.handleOrientationEvent=t=>{const{detail:e}=t;e.deviceSerial===this.id&&this.controls&&("yaw"===e.type?this.yaw=e.value:"pitch"===e.type?this.pitch=e.value:this.roll=e.value)}}connectedCallback(){super.connectedCallback(),d.registerObserver(this),window.addEventListener("orientationEvent",this.handleOrientationEvent)}disconnectedCallback(){window.removeEventListener("orientationEvent",this.handleOrientationEvent),d.removeObserver(this),super.disconnectedCallback()}onNotify(t){var e;this.highlighted=t.selectedSerial===this.id;for(const i of t.devices)if(i.deviceSerial===this.id)return void(this.posZ=100*(null!==(e=i.position.z)&&void 0!==e?e:0))}render(){return o`
       <style>
         :host {
           font-size: ${this.size};
@@ -9,7 +9,7 @@ import{i as t,_ as e,s as i,y as o,e as r}from"./48895b41.js";import{e as s}from
           --posZ: ${this.controls?this.posZ:0};
         }
         .cube > div {
-          outline: ${this.highlighted&&this.controls?t`dashed`:t``};
+          outline: ${this.highlighted&&this.controls?e`dashed`:e``};
         }
       </style>
       <div class="cube">
@@ -24,7 +24,7 @@ import{i as t,_ as e,s as i,y as o,e as r}from"./48895b41.js";import{e as s}from
             <div class="line"></div>
             <div class="base"></div>
           `:o``}
-    `}};d.styles=t`
+    `}};a.styles=e`
     :host {
       /** all sizes are relative to font-size **/
       display: block;
@@ -102,4 +102,4 @@ import{i as t,_ as e,s as i,y as o,e as r}from"./48895b41.js";import{e as s}from
       left: 50%;
       transform: translate3d(-50%, -50%, calc(var(--posZ) * -1px));
     }
-  `,e([s({type:Number})],d.prototype,"yaw",void 0),e([s({type:Number})],d.prototype,"pitch",void 0),e([s({type:Number})],d.prototype,"roll",void 0),e([s({type:Number})],d.prototype,"posZ",void 0),e([s({type:t,attribute:"color"})],d.prototype,"color",void 0),e([s({type:t,attribute:"size"})],d.prototype,"size",void 0),e([s({type:Boolean})],d.prototype,"controls",void 0),e([s({type:Boolean})],d.prototype,"highlighted",void 0),d=e([r("ns-cube-sprite")],d);
+  `,t([r({type:Number})],a.prototype,"yaw",void 0),t([r({type:Number})],a.prototype,"pitch",void 0),t([r({type:Number})],a.prototype,"roll",void 0),t([r({type:Number})],a.prototype,"posZ",void 0),t([r({type:e,attribute:"color"})],a.prototype,"color",void 0),t([r({type:e,attribute:"size"})],a.prototype,"size",void 0),t([r({type:Boolean})],a.prototype,"controls",void 0),t([r({type:Boolean})],a.prototype,"highlighted",void 0),a=t([s("ns-cube-sprite")],a);export{a as CubeSprite};
