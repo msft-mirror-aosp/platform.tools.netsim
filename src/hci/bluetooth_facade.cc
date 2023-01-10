@@ -239,12 +239,11 @@ class BluetoothChip : public controller::Chip {
   }
 
   void Remove() override {
+    auto &model = DeviceModel();
+    BtsLog("Removing HCI chip for %s", model.device_serial().c_str());
+    // NOTE: OnConnectionClosed removes the device from the rootcanal testmodel,
+    // so the only cleanup is in the Chip class.
     controller::Chip::Remove();
-    std::cerr << "Deleting bluetooth chip." << std::endl;
-    SetPacketCapture(false);
-    sniffer.reset();
-    chip_emulator->Remove(device_index);
-    chip_emulator = nullptr;
   }
 
   void IncrTx(rootcanal::Phy::Type phy_type) {
@@ -313,7 +312,7 @@ void BluetoothChipEmulatorImpl::AddHciConnection(
   transport = rootcanal::HciSniffer::Create(transport);
   auto hci_device =
       std::make_shared<rootcanal::HciDevice>(transport, controller_properties_);
-  std::cerr << "creating device: " << std::endl;
+  BtsLog("Creating HCI for %s", serial.c_str());
   auto device_id = mTestModel.AddHciConnection(hci_device);
 
   auto sniffer = std::static_pointer_cast<rootcanal::HciSniffer>(transport);
