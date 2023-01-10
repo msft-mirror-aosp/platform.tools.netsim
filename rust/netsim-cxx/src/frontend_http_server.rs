@@ -11,6 +11,8 @@ const GET_RESOURCE: &str = "GET /";
 const GET_ROOT: &str = "GET / HTTP/1.1\r\n";
 const RESPONSE_200: &str = "HTTP/1.1 200 OK";
 const RESPONSE_200_JS: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/javascript";
+const RESPONSE_200_SVG: &str = "HTTP/1.1 200 OK\r\nContent-Type: image/svg+xml";
+const RESPONSE_200_PNG: &str = "HTTP/1.1 200 OK\r\nContent-Type: image/png";
 const RESPONSE_404: &str = "HTTP/1.1 404 NOT FOUND";
 
 pub fn run_frontend_http_server() {
@@ -57,8 +59,12 @@ fn handle_connection(mut stream: TcpStream) {
         filepath.push(filename_slices.0);
         if !filepath.exists() {
             (RESPONSE_404, None)
-        } else if filename_slices.0.contains(".js") {
+        } else if filename_slices.0.ends_with(".js") {
             (RESPONSE_200_JS, Some(fs::read_to_string(filepath.as_path()).unwrap()))
+        } else if filename_slices.0.ends_with(".svg") {
+            (RESPONSE_200_SVG, Some(fs::read_to_string(filepath.as_path()).unwrap()))
+        } else if filename_slices.0.ends_with(".png") {
+            (RESPONSE_200_PNG, Some(fs::read_to_string(filepath.as_path()).unwrap()))
         } else {
             (RESPONSE_200, Some(fs::read_to_string(filepath.as_path()).unwrap()))
         }
