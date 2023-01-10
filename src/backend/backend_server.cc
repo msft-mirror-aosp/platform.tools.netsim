@@ -20,6 +20,7 @@
 #include <string>
 
 #include "backend/backend_server_hci_transport.h"
+#include "controller/scene_controller.h"
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
@@ -47,7 +48,7 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
                                Stream *stream) override {
     // Now connected to a peer issuing a bi-directional streaming grpc
     auto peer = context->peer();
-    BtsLog("Streaming packets");
+    BtsLog("backend_server new packet_stream for peer %s", peer.c_str());
 
     packet::PacketRequest request;
 
@@ -69,6 +70,13 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     // Add a new HCI device for this RpcHciTransport
     hci::BluetoothChipEmulator::Get().AddHciConnection(serial, transport);
     bs_hci_transport->Transport();
+
+    // TODO: chip information in initial_info should match model
+    controller::SceneController::Singleton().RemoveChip(
+        serial, model::Chip::ChipCase::kBt, request.initial_info().chip().id());
+
+    BtsLog("backend_server drop packet_stream for peer %s", peer.c_str());
+
     return ::grpc::Status::OK;
   }
 };

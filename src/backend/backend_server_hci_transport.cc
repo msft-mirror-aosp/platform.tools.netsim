@@ -66,7 +66,7 @@ class BackendServerHciTransportImpl : public BackendServerHciTransport {
                          rootcanal::PacketCallback scoCallback,
                          rootcanal::PacketCallback isoCallback,
                          rootcanal::CloseCallback closeCallback) override {
-    BtsLog("RegisterCallbacks ****");
+    BtsLog("hci_transport RegisterCallbacks");
     mCommandCallback = commandCallback;
     mAclCallback = aclCallback;
     mScoCallback = scoCallback;
@@ -79,7 +79,7 @@ class BackendServerHciTransportImpl : public BackendServerHciTransport {
 
   // Close from Rootcanal
   void Close() override {
-    BtsLog("Close on transport");
+    BtsLog("hci_transport close from rootcanal");
     mDone = true;
   }
 
@@ -92,7 +92,7 @@ class BackendServerHciTransportImpl : public BackendServerHciTransport {
         break;
       }
       if (!request.has_hci_packet()) {
-        BtsLog("Unknown packet type");
+        BtsLog("hci_transport Unknown packet type");
         continue;
       }
       auto str = request.mutable_hci_packet()->mutable_packet();
@@ -112,7 +112,7 @@ class BackendServerHciTransportImpl : public BackendServerHciTransport {
           mIsoCallback(std::move(packet));
           break;
         default:
-          BtsLog("Ignoring unknown packet.");
+          BtsLog("hci_transport Ignoring unknown packet.");
           break;
       }
     }
@@ -135,7 +135,7 @@ class BackendServerHciTransportImpl : public BackendServerHciTransport {
 
   // Called when grpc read or write fails
   void Done() {
-    BtsLog("Done %s", mPeer.c_str());
+    BtsLog("hci_transport done for peer %s", mPeer.c_str());
     mDone = true;
     if (mCloseCallback) {
       mCloseCallback();
