@@ -161,6 +161,28 @@ cc_binary_host {
     ldflags: ["-Wl,--allow-multiple-definition"]
 }
 
+netsim_ui_modules = [
+    "netsim_ui_index.html",
+    "netsim_ui_js_cube-sprite.js",
+    "netsim_ui_js_customize-map-button.js",
+    "netsim_ui_js_device-dragzone.js",
+    "netsim_ui_js_device-dropzone.js",
+    "netsim_ui_js_device-info.js",
+    "netsim_ui_js_device-list.js",
+    "netsim_ui_js_device-map.js",
+    "netsim_ui_js_device-observer.js",
+    "netsim_ui_js_navigation-bar.js",
+    "netsim_ui_js_netsim-app.js",
+    "netsim_ui_js_packet-info.js",
+    "netsim_ui_js_pyramid-sprite.js",
+    "netsim_ui_tslib",
+    "netsim_ui_assets_grid-background.svg",
+    "netsim_ui_assets_hexagonal-background.png",
+    "netsim_ui_assets_netsim-logo-b.svg",
+    "netsim_ui_assets_netsim-logo.svg",
+    "netsim_ui_assets_polar-background.svg",
+]
+
 cc_binary_host {
     name: "netsimd",
     defaults: ["netsim_defaults"],
@@ -191,7 +213,8 @@ cc_binary_host {
         "libnetsim_cxx_rust",
         "libbt-rootcanal",
     ],
-    ldflags: ["-Wl,--allow-multiple-definition"]
+    ldflags: ["-Wl,--allow-multiple-definition"],
+    required: netsim_ui_modules,
 }
 
 cc_test_host {
