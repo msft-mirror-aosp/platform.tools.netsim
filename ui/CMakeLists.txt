@@ -16,5 +16,4 @@
 
 SET(INSTALL_NETSIM_UI_DIR "${CMAKE_INSTALL_PREFIX}/netsim-ui" CACHE PATH "The directory the netsim web UI is installed in")
 
-# TODO: License Reviews before building.
-# install(DIRECTORY dist/ DESTINATION ${INSTALL_NETSIM_UI_DIR})
+install(DIRECTORY dist/ DESTINATION ${INSTALL_NETSIM_UI_DIR})

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use clap::{arg_enum, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use frontend_proto::frontend;
 use frontend_proto::model;
 
@@ -86,20 +86,16 @@ pub struct Radio {
     pub device_serial: String,
 }
 
-arg_enum! {
-    #[derive(Debug, PartialEq, Eq)]
-    pub enum BtType {
-        Ble,
-        Classic,
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum BtType {
+    Ble,
+    Classic,
 }
 
-arg_enum! {
-    #[derive(Debug, PartialEq, Eq)]
-    pub enum UpDownStatus {
-        Up,
-        Down,
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum UpDownStatus {
+    Up,
+    Down,
 }
 
 #[derive(Debug, Args)]
@@ -122,10 +118,10 @@ pub struct Capture {
     pub device_serial: String,
 }
 
-arg_enum! {
-    #[derive(Debug, PartialEq, Eq)]
-    pub enum BoolState {
-        True,
-        False,
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+pub enum BoolState {
+    #[value(alias("True"), alias("TRUE"))]
+    True,
+    #[value(alias("False"), alias("FALSE"))]
+    False,
 }
