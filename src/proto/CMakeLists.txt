@@ -44,18 +44,3 @@ android_add_library(TARGET packet-streamer-client-grpc-lib LICENSE Apache-2.0 SR
 
 target_include_directories(packet-streamer-client-grpc-lib PRIVATE ${PROTOBUF_INCLUDE_DIR} ..
                     PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-
-protobuf_generate_grpc_cpp(
-  SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
-  SOURCES emulated_bluetooth_packets.proto
-          emulated_bluetooth_vhci.proto
-  OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}
-  GENERATED BLUETOOTH_CLIENT_GRPC_SRC)
-
-android_add_library(
-  TARGET vhci-lib LICENSE Apache-2.0 SRC ${BLUETOOTH_CLIENT_GRPC_SRC}
-  DEPS grpc++ protobuf::libprotobuf)
-
-target_include_directories(
-  vhci-lib PRIVATE ${PROTOBUF_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
