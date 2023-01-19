@@ -173,6 +173,7 @@ netsim_ui_modules = [
     "netsim_ui_js_device-list.js",
     "netsim_ui_js_device-map.js",
     "netsim_ui_js_device-observer.js",
+    "netsim_ui_js_license-info.js",
     "netsim_ui_js_navigation-bar.js",
     "netsim_ui_js_netsim-app.js",
     "netsim_ui_js_packet-info.js",
