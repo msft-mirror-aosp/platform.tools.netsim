@@ -15,6 +15,7 @@
 #include "hci/bluetooth_facade.h"
 
 #include <cassert>
+#include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -36,6 +37,53 @@
 namespace netsim {
 namespace hci {
 namespace {
+
+using namespace std::literals;
+using namespace rootcanal;
+
+/// Transport wrapper for transports that run on an auxiliary thread.
+/// Helps reschedule packet handling to the AsyncManager event thread
+/// to ensure synchronization with other RootCanal events.
+class SyncTransport : public HciTransport {
+ public:
+  SyncTransport(std::shared_ptr<HciTransport> transport,
+                AsyncManager& async_manager)
+      : mTransport(std::move(transport)), mAsyncManager(async_manager) {}
+  ~SyncTransport() = default;
+
+  void RegisterCallbacks(PacketCallback cmd_callback,
+                         PacketCallback acl_callback,
+                         PacketCallback sco_callback,
+                         PacketCallback iso_callback,
+                         CloseCallback close_callback) override {
+    mTransport->RegisterCallbacks(
+      [this, cmd_callback = std::move(cmd_callback)](const std::shared_ptr<std::vector<uint8_t>> cmd) {
+        mAsyncManager.Synchronize([cmd_callback, cmd = std::move(cmd)]() { cmd_callback(cmd); });
+      },
+      [this, acl_callback = std::move(acl_callback)](const std::shared_ptr<std::vector<uint8_t>> acl) {
+        mAsyncManager.Synchronize([acl_callback, acl = std::move(acl)]() { acl_callback(acl); });
+      },
+      [this, sco_callback = std::move(sco_callback)](const std::shared_ptr<std::vector<uint8_t>> sco) {
+        mAsyncManager.Synchronize([sco_callback, sco = std::move(sco)]() { sco_callback(sco); });
+      },
+      [this, iso_callback = std::move(iso_callback)](const std::shared_ptr<std::vector<uint8_t>> iso) {
+        mAsyncManager.Synchronize([iso_callback, iso = std::move(iso)]() { iso_callback(iso); });
+      },
+      close_callback);
+  }
+
+  void SendEvent(const std::vector<uint8_t>& packet) override { mTransport->SendEvent(packet); }
+  void SendAcl(const std::vector<uint8_t>& packet) override { mTransport->SendAcl(packet); }
+  void SendSco(const std::vector<uint8_t>& packet) override { mTransport->SendSco(packet); }
+  void SendIso(const std::vector<uint8_t>& packet) override { mTransport->SendIso(packet); }
+
+  void TimerTick() override { mTransport->TimerTick(); }
+  void Close() override { mTransport->Close(); }
+
+ private:
+  std::shared_ptr<HciTransport> mTransport;
+  AsyncManager& mAsyncManager;
+};
 
 int8_t ComputeRssi(int send_id, int recv_id, int8_t tx_power);
 void IncrTx(uint32_t send_id, rootcanal::Phy::Type phy_type);
@@ -279,6 +327,9 @@ void BluetoothChipEmulatorImpl::Remove(int device_id) {
 void BluetoothChipEmulatorImpl::AddHciConnection(
     const std::string &serial,
     std::shared_ptr<rootcanal::HciTransport> transport) {
+  // rewrap the transport to reschedule callbacks to the async manager
+  // event thread.
+  transport = std::make_shared<SyncTransport>(transport, mAsyncManager);
   // rewrap the transport to include a sniffer
   transport = rootcanal::HciSniffer::Create(transport);
   auto hci_device =
