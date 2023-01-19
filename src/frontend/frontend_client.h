@@ -20,6 +20,7 @@
 #include <memory>
 #include <string_view>
 
+#include "../rust/frontend-client-cxx/cxx/cxx.h"
 #include "frontend.grpc.pb.h"
 
 namespace netsim {
@@ -30,6 +31,11 @@ class ClientResult {
   ClientResult(bool is_ok, const std::string err, const std::string json)
       : is_ok_(is_ok), err_(err), json_(std::move(json)){};
 
+  bool IsOk() const { return is_ok_; };
+  rust::String Err() const { return err_; };
+  rust::String Json() const { return json_; };
+
+ private:
   bool is_ok_;
   std::string err_;
   std::string json_;
@@ -37,8 +43,9 @@ class ClientResult {
 
 class FrontendClient {
  public:
-  std::unique_ptr<ClientResult> GetVersion() const;
-  std::unique_ptr<ClientResult> GetDevices() const;
+  virtual ~FrontendClient(){};
+  virtual std::unique_ptr<ClientResult> GetVersion() const = 0;
+  virtual std::unique_ptr<ClientResult> GetDevices() const = 0;
 };
 
 std::unique_ptr<FrontendClient> NewFrontendClient();
