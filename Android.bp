@@ -62,7 +62,9 @@ cc_defaults {
 rust_ffi_host_static {
     name: "libnetsim_cxx_rust",
     crate_name: "netsim_cxx",
-    rlibs: ["libcxx"],
+    rlibs: ["libcxx",
+        "libserde_json",
+        "libfrontend_proto",],
     srcs: ["rust/netsim-cxx/src/lib.rs"],
 }
 
