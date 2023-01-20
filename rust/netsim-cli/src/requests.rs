@@ -24,7 +24,7 @@ impl args::Command {
             Command::Devices => GrpcMethod::GetDevices,
             Command::Capture(_) => GrpcMethod::SetPacketCapture,
             Command::Reset => GrpcMethod::Reset,
-            Command::Ui => {
+            Command::Gui => {
                 panic!("No GrpcMethod for Ui Command.");
             }
         }

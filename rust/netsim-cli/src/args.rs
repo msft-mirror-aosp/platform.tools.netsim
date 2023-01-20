@@ -37,7 +37,7 @@ pub enum Command {
     /// Reset Netsim device scene
     Reset,
     /// Open netsim Web UI
-    Ui,
+    Gui,
 }
 
 impl Command {
@@ -69,7 +69,7 @@ impl Command {
                 serde_json::to_string(&result).unwrap()
             }
             Command::Reset => String::from("{}"),
-            Command::Ui => {
+            Command::Gui => {
                 panic!("get_json is not implemented for Ui Command.");
             }
         }
