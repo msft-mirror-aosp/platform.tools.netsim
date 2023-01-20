@@ -15,10 +15,7 @@
 android_add_library(
   TARGET hci-lib
   LICENSE Apache-2.0
-  SRC bluetooth_facade.cc
-      bluetooth_facade.h
-      hci_debug.cc
-      hci_debug.h
+  SRC bluetooth_facade.cc bluetooth_facade.h hci_debug.cc hci_debug.h
   DEPS android-emu-base
        android-emu-base-headers
        controller-lib
