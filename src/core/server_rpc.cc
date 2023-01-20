@@ -19,7 +19,6 @@
 #include <thread>
 
 #include "backend/backend_server.h"
-#include "backend/rpc_hal_transport.h"
 #include "frontend/frontend_server.h"
 #include "netsim_cxx_generated.h"
 #include "util/ini_file.h"
@@ -30,9 +29,6 @@ namespace netsim {
 
 void StartWithGrpc(bool debug) {
   BtsLog("starting packet streamer");
-  // Connect to all emulator grpc servers
-  auto grpc_transport = RpcHalTransport::Create();
-  grpc_transport->discover();
 
   // Run frontend http server.
   std::thread frontend_http_server(RunFrontendHttpServer);

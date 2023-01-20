@@ -1,5 +1,9 @@
 mod thread_pool;
 
+extern crate frontend_proto;
+
+use frontend_proto::frontend::VersionResponse;
+
 use crate::frontend_http_server::thread_pool::ThreadPool;
 use std::fs;
 use std::io::prelude::*;
@@ -7,6 +11,7 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 
 const BUFFER_SIZE: usize = 1024;
+const GET_GET_VERSION: &[u8] = b"GET /get-version";
 const GET_RESOURCE: &str = "GET /";
 const GET_ROOT: &str = "GET / HTTP/1.1\r\n";
 const RESPONSE_200: &str = "HTTP/1.1 200 OK";
@@ -49,6 +54,10 @@ fn handle_connection(mut stream: TcpStream) {
         } else {
             (RESPONSE_200, Some(fs::read_to_string(filepath.as_path()).unwrap()))
         }
+    } else if buffer.starts_with(GET_GET_VERSION) {
+        let mut response: VersionResponse = VersionResponse::new();
+        response.set_version(String::from("123b"));
+        (RESPONSE_200, Some(serde_json::to_string(&response).unwrap()))
     } else if buffer.starts_with(GET_RESOURCE.as_bytes()) {
         let filename_slices = std::str::from_utf8(&buffer)
             .unwrap()

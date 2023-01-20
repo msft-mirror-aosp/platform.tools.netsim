@@ -29,7 +29,6 @@ target_link_libraries(
             backend-lib
             hci-lib
             util-lib
-            vhci-lib
             protobuf::libprotobuf)
 
 android_license(TARGET "netsim-lib" LIBNAME None SPDX None LICENSE None
