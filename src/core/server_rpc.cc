@@ -21,6 +21,7 @@
 #include "backend/backend_server.h"
 #include "frontend/frontend_server.h"
 #include "netsim_cxx_generated.h"
+#include "util/filesystem.h"
 #include "util/ini_file.h"
 #include "util/log.h"
 #include "util/os_utils.h"
@@ -38,7 +39,8 @@ void StartWithGrpc(bool debug) {
   auto [backend_server, backend_grpc_port] = netsim::RunBackendServer();
 
   // Writes grpc ports to ini file.
-  auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");
+  auto filepath = osutils::GetDiscoveryDirectory() + netsim::filesystem::slash +
+                  "netsim.ini";
   IniFile iniFile(filepath);
   iniFile.Read();
   iniFile.Set("grpc.port", frontend_grpc_port);
