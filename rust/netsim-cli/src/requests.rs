@@ -12,18 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate frontend_proto;
-
 use crate::args::{self, Command};
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum GrpcMethod {
-    GetVersion,
-    UpdateDevice,
-    GetDevices,
-    SetPacketCapture,
-    Reset,
-}
+use frontend_client_cxx::GrpcMethod;
 
 impl args::Command {
     pub fn grpc_method(&self) -> GrpcMethod {

@@ -30,3 +30,27 @@ android_license(TARGET "frontend-client-cxx" LIBNAME None SPDX None LICENSE None
 # For netsim rust libraries development.
 android_add_executable(TARGET netsim-rust-dev LICENSE Apache-2.0 SRC main.cc
                        DEPS netsim-rust-lib)
+
+add_library(netsim-cli-rust-lib INTERFACE)
+
+target_link_libraries(
+  netsim-cli-rust-lib INTERFACE frontend-proto frontend-client-cxx netsim-cli)
+
+android_license(
+  TARGET netsim-cli-rust-lib LIBNAME None SPDX None LICENSE None LOCAL None)
+
+android_add_executable(
+  TARGET netsim-cl
+  LICENSE Apache-2.0
+  INSTALL .
+  SRC netsim-cl.cc
+  DEPS
+  grpc++
+  protobuf::libprotobuf
+  frontend_client_cxx_generated
+  frontend-client
+  util-lib
+  frontend-grpc-lib
+  protobuf::libprotobuf
+  netsim-cli-rust-lib
+)
