@@ -17,12 +17,13 @@ endif()
 if(LINUX)
   # b/260271048
   corrosion_add_target_rustflags(
-    frontend-client-cxx "-Clink-args=-Wl,-rpath,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    frontend-client-cxx
+    "-Clink-args=-Wl,-rpath,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 endif()
 
 # Link C/C++ libraries with your Rust target
-corrosion_link_libraries(frontend-client-cxx frontend_client_cxx_generated frontend-client)
-
+corrosion_link_libraries(frontend-client-cxx frontend_client_cxx_generated
+                         frontend-client)
 
 android_add_library(
   TARGET frontend_client_cxx_generated LICENSE Apache-2.0
@@ -30,4 +31,3 @@ android_add_library(
   DEPS frontend-grpc-lib grpc++ protobuf::libprotobuf)
 
 target_include_directories(frontend_client_cxx_generated PRIVATE ../../src)
-
