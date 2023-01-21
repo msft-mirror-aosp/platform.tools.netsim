@@ -15,22 +15,38 @@
  */
 
 #pragma once
-// OS specific utility functions.
 
-#include <optional>
+#include <sys/stat.h>
+
+#include <fstream>
 #include <string>
 
 namespace netsim {
-namespace osutils {
+namespace filesystem {
+
+#ifdef _WIN32
+static const std::string slash = "\\";
+#else
+static const std::string slash = "/";
+#endif
 
 /**
- * Return the path containing runtime user files.
+ * Return if a path exists.
  */
-std::string GetDiscoveryDirectory();
+inline bool exists(const std::string &name) {
+  struct stat stat_buffer;
+  return stat(name.c_str(), &stat_buffer) == 0;
+}
 
 /**
- * Return the frontend grpc port.
+ * Return if a file exists.
  */
-std::optional<std::string> GetServerAddress(bool frontend_server = true);
-}  // namespace osutils
+inline bool is_regular_file(const std::string &name) {
+  // NOTE: Use fstream instead because 'S_ISREG'is undeclared identifier in
+  // windows.
+  std::ifstream f(name.c_str());
+  return f.good();
+}
+
+}  // namespace filesystem
 }  // namespace netsim
