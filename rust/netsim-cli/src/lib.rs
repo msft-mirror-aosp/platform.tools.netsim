@@ -17,6 +17,8 @@
 mod args;
 mod browser;
 mod requests;
+mod response;
+
 use args::NetsimArgs;
 use clap::Parser;
 
@@ -29,11 +31,11 @@ pub extern "C" fn rust_main() {
         return;
     }
     let grpc_method = args.command.grpc_method();
-    let json_string = args.command.request_json();
+    let request = args.command.get_request_bytes();
     let client = frontend_client_cxx::ffi::new_frontend_client();
-    let client_result = frontend_client_cxx::send_grpc(client, grpc_method, json_string);
+    let client_result = frontend_client_cxx::send_grpc(client, grpc_method, request.as_slice());
     if client_result.is_ok() {
-        println!("Grpc Response Json: {}", client_result.json());
+        args.command.print_response(client_result.byte_str().as_bytes());
     } else {
         println!("Grpc call error: {}", client_result.err());
     }

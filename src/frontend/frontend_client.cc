@@ -72,7 +72,8 @@ class FrontendClientImpl : public FrontendClient {
     std::string json_string;
     google::protobuf::util::JsonPrintOptions options;
     MessageToJsonString(message, &json_string, options);
-    return std::make_unique<ClientResult>(true, "", json_string);
+    return std::make_unique<ClientResult>(true, "",
+                                          message.SerializeAsString());
   }
 
   // Gets the version of the network simulator service.

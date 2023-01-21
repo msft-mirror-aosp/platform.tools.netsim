@@ -12,7 +12,7 @@ test = false
 [dependencies]
 cxx = { version = "=1.0.42", features = ["c++17"] }
 frontend-proto = { path = "../frontend-proto" }
-serde_json = "1.0"
+protobuf = "2.28.0"
 
 [build-dependencies]
 cxx-build = "1.0"
