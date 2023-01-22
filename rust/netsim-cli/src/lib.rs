@@ -24,8 +24,8 @@ use clap::Parser;
 /// main function for netsim CLI to be called by C wrapper netsim-cl
 pub extern "C" fn rust_main() {
     let args = NetsimArgs::parse();
-    if matches!(args.command, args::Command::Ui) {
-        browser::open("https://google.com"); //TODO: update to open netsim ui directly
+    if matches!(args.command, args::Command::Gui) {
+        browser::open("http://localhost:7681/");
         return;
     }
     let grpc_method = args.command.grpc_method();
