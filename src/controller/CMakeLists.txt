@@ -19,6 +19,8 @@ android_add_library(
   LICENSE Apache-2.0
   SRC chip.cc
       chip.h
+      controller.cc
+      controller.h
       device.cc
       device.h
       device_notify_manager.cc
