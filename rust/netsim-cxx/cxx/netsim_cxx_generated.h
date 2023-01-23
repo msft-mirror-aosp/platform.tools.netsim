@@ -1,5 +1,8 @@
 #pragma once
+#include "controller/controller.h"
 #include <cstdint>
+#include <memory>
+#include <string>
 
 namespace netsim {
 void RunFrontendHttpServer() noexcept;
