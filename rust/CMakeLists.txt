@@ -1,11 +1,18 @@
 message(STATUS "Adding rust libraries")
 
+# Use generated rust files because protobuf compiler is unavailable yet.
 add_subdirectory(netsim-cxx)
+# Steps to generate rust files are as follows:
+#
+# 1. sudo apt-get install protobuf-compiler
+# 2. Uncomment `build = "build_cargo.rs"` in rust/netsim-cxx/Cargo.toml.
+# 3. cd rust/netsim-cxx && cxxbridge.sh
+# 4. Comment `build = "build_cargo.rs"` in rust/netsim-cxx/Cargo.toml.
+
 add_subdirectory(netsim-cli)
 add_subdirectory(frontend-client-cxx)
 add_subdirectory(frontend-proto)
-# Use generated rust files because protobuf compiler is unavailable yet. Steps
-# to generate rust files are as follows:
+# Steps to generate rust files are as follows:
 #
 # 1. sudo apt-get install protobuf-compiler
 # 2. Uncomment `build = "build_cargo.rs"` in rust/frontend-proto/Cargo.toml.
