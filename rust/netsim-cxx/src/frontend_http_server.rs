@@ -2,8 +2,6 @@ mod thread_pool;
 
 extern crate frontend_proto;
 
-use frontend_proto::frontend::VersionResponse;
-
 use crate::frontend_http_server::thread_pool::ThreadPool;
 use std::fs;
 use std::io::prelude::*;
@@ -55,9 +53,7 @@ fn handle_connection(mut stream: TcpStream) {
             (RESPONSE_200, Some(fs::read_to_string(filepath.as_path()).unwrap()))
         }
     } else if buffer.starts_with(GET_GET_VERSION) {
-        let mut response: VersionResponse = VersionResponse::new();
-        response.set_version(String::from("123b"));
-        (RESPONSE_200, Some(serde_json::to_string(&response).unwrap()))
+        (RESPONSE_200, Some("{version: \"123b\"}".to_string()))
     } else if buffer.starts_with(GET_RESOURCE.as_bytes()) {
         let filename_slices = std::str::from_utf8(&buffer)
             .unwrap()
