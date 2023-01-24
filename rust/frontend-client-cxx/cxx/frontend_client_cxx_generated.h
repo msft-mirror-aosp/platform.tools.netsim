@@ -1,4 +1,5 @@
 #pragma once
+#include "frontend/frontend_client.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -10,9 +11,9 @@
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
-
-#include "frontend/frontend_client.h"
 
 namespace rust {
 inline namespace cxxbridge1 {
@@ -22,14 +23,14 @@ inline namespace cxxbridge1 {
 #define CXXBRIDGE1_PANIC
 template <typename Exception>
 void panic [[noreturn]] (const char *msg);
-#endif  // CXXBRIDGE1_PANIC
+#endif // CXXBRIDGE1_PANIC
 
 struct unsafe_bitcopy_t;
 
 namespace {
 template <typename T>
 class impl;
-}  // namespace
+} // namespace
 
 class Opaque;
 
@@ -41,7 +42,7 @@ template <typename T>
 #ifndef CXXBRIDGE1_RUST_STRING
 #define CXXBRIDGE1_RUST_STRING
 class String final {
- public:
+public:
   String() noexcept;
   String(const String &) noexcept;
   String(String &&) noexcept;
@@ -59,8 +60,8 @@ class String final {
   static String lossy(const char16_t *) noexcept;
   static String lossy(const char16_t *, std::size_t) noexcept;
 
-  String &operator=(const String &) & noexcept;
-  String &operator=(String &&) & noexcept;
+  String &operator=(const String &) &noexcept;
+  String &operator=(String &&) &noexcept;
 
   explicit operator std::string() const;
 
@@ -95,7 +96,7 @@ class String final {
 
   String(unsafe_bitcopy_t, const String &) noexcept;
 
- private:
+private:
   struct lossy_t;
   String(lossy_t, const char *, std::size_t) noexcept;
   String(lossy_t, const char16_t *, std::size_t) noexcept;
@@ -103,7 +104,7 @@ class String final {
 
   std::array<std::uintptr_t, 3> repr;
 };
-#endif  // CXXBRIDGE1_RUST_STRING
+#endif // CXXBRIDGE1_RUST_STRING
 
 #ifndef CXXBRIDGE1_RUST_SLICE
 #define CXXBRIDGE1_RUST_SLICE
@@ -115,22 +116,22 @@ template <>
 struct copy_assignable_if<false> {
   copy_assignable_if() noexcept = default;
   copy_assignable_if(const copy_assignable_if &) noexcept = default;
-  copy_assignable_if &operator=(const copy_assignable_if &) & noexcept = delete;
-  copy_assignable_if &operator=(copy_assignable_if &&) & noexcept = default;
+  copy_assignable_if &operator=(const copy_assignable_if &) &noexcept = delete;
+  copy_assignable_if &operator=(copy_assignable_if &&) &noexcept = default;
 };
-}  // namespace detail
+} // namespace detail
 
 template <typename T>
 class Slice final
     : private detail::copy_assignable_if<std::is_const<T>::value> {
- public:
+public:
   using value_type = T;
 
   Slice() noexcept;
   Slice(T *, std::size_t count) noexcept;
 
-  Slice &operator=(const Slice<T> &) & noexcept = default;
-  Slice &operator=(Slice<T> &&) & noexcept = default;
+  Slice &operator=(const Slice<T> &) &noexcept = default;
+  Slice &operator=(Slice<T> &&) &noexcept = default;
 
   T *data() const noexcept;
   std::size_t size() const noexcept;
@@ -151,7 +152,7 @@ class Slice final
 
   void swap(Slice &) noexcept;
 
- private:
+private:
   class uninit;
   Slice(uninit) noexcept;
   friend impl<Slice>;
@@ -164,7 +165,7 @@ class Slice final
 
 template <typename T>
 class Slice<T>::iterator final {
- public:
+public:
   using iterator_category = std::random_access_iterator_tag;
   using value_type = T;
   using difference_type = std::ptrdiff_t;
@@ -193,7 +194,7 @@ class Slice<T>::iterator final {
   bool operator>(const iterator &) const noexcept;
   bool operator>=(const iterator &) const noexcept;
 
- private:
+private:
   friend class Slice;
   void *pos;
   std::size_t stride;
@@ -262,14 +263,14 @@ T &Slice<T>::back() const noexcept {
 }
 
 template <typename T>
-typename Slice<T>::iterator::reference Slice<T>::iterator::operator*()
-    const noexcept {
+typename Slice<T>::iterator::reference
+Slice<T>::iterator::operator*() const noexcept {
   return *static_cast<T *>(this->pos);
 }
 
 template <typename T>
-typename Slice<T>::iterator::pointer Slice<T>::iterator::operator->()
-    const noexcept {
+typename Slice<T>::iterator::pointer
+Slice<T>::iterator::operator->() const noexcept {
   return static_cast<T *>(this->pos);
 }
 
@@ -337,8 +338,8 @@ typename Slice<T>::iterator Slice<T>::iterator::operator-(
 }
 
 template <typename T>
-typename Slice<T>::iterator::difference_type Slice<T>::iterator::operator-(
-    const iterator &other) const noexcept {
+typename Slice<T>::iterator::difference_type
+Slice<T>::iterator::operator-(const iterator &other) const noexcept {
   auto diff = std::distance(static_cast<char *>(other.pos),
                             static_cast<char *>(this->pos));
   return diff / this->stride;
@@ -393,20 +394,20 @@ template <typename T>
 void Slice<T>::swap(Slice &rhs) noexcept {
   std::swap(*this, rhs);
 }
-#endif  // CXXBRIDGE1_RUST_SLICE
+#endif // CXXBRIDGE1_RUST_SLICE
 
 #ifndef CXXBRIDGE1_RUST_BITCOPY_T
 #define CXXBRIDGE1_RUST_BITCOPY_T
 struct unsafe_bitcopy_t final {
   explicit unsafe_bitcopy_t() = default;
 };
-#endif  // CXXBRIDGE1_RUST_BITCOPY_T
+#endif // CXXBRIDGE1_RUST_BITCOPY_T
 
 #ifndef CXXBRIDGE1_RUST_VEC
 #define CXXBRIDGE1_RUST_VEC
 template <typename T>
 class Vec final {
- public:
+public:
   using value_type = T;
 
   Vec() noexcept;
@@ -415,7 +416,7 @@ class Vec final {
   Vec(Vec &&) noexcept;
   ~Vec() noexcept;
 
-  Vec &operator=(Vec &&) & noexcept;
+  Vec &operator=(Vec &&) &noexcept;
   Vec &operator=(const Vec &) &;
 
   std::size_t size() const noexcept;
@@ -456,7 +457,7 @@ class Vec final {
 
   Vec(unsafe_bitcopy_t, const Vec &) noexcept;
 
- private:
+private:
   void reserve_total(std::size_t new_cap) noexcept;
   void set_len(std::size_t len) noexcept;
   void drop() noexcept;
@@ -489,7 +490,7 @@ Vec<T>::~Vec() noexcept {
 }
 
 template <typename T>
-Vec<T> &Vec<T>::operator=(Vec &&other) & noexcept {
+Vec<T> &Vec<T>::operator=(Vec &&other) &noexcept {
   this->drop();
   this->repr = other.repr;
   new (&other) Vec();
@@ -638,7 +639,7 @@ void Vec<T>::swap(Vec &rhs) noexcept {
 
 template <typename T>
 Vec<T>::Vec(unsafe_bitcopy_t, const Vec &bits) noexcept : repr(bits.repr) {}
-#endif  // CXXBRIDGE1_RUST_VEC
+#endif // CXXBRIDGE1_RUST_VEC
 
 #ifndef CXXBRIDGE1_IS_COMPLETE
 #define CXXBRIDGE1_IS_COMPLETE
@@ -648,9 +649,9 @@ template <typename T, typename = std::size_t>
 struct is_complete : std::false_type {};
 template <typename T>
 struct is_complete<T, decltype(sizeof(T))> : std::true_type {};
-}  // namespace
-}  // namespace detail
-#endif  // CXXBRIDGE1_IS_COMPLETE
+} // namespace
+} // namespace detail
+#endif // CXXBRIDGE1_IS_COMPLETE
 
 #ifndef CXXBRIDGE1_LAYOUT
 #define CXXBRIDGE1_LAYOUT
@@ -706,13 +707,13 @@ template <typename T>
 std::size_t align_of() {
   return layout::align_of<T>();
 }
-#endif  // CXXBRIDGE1_LAYOUT
-}  // namespace cxxbridge1
-}  // namespace rust
+#endif // CXXBRIDGE1_LAYOUT
+} // namespace cxxbridge1
+} // namespace rust
 
 namespace netsim {
-namespace frontend {
-using FrontendClient = ::netsim::frontend::FrontendClient;
-using ClientResult = ::netsim::frontend::ClientResult;
-}  // namespace frontend
-}  // namespace netsim
+  namespace frontend {
+    using FrontendClient = ::netsim::frontend::FrontendClient;
+    using ClientResult = ::netsim::frontend::ClientResult;
+  }
+}
