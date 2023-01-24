@@ -120,29 +120,29 @@ extern "C" {
   return new_frontend_client$().release();
 }
 
-::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$get_version(const ::netsim::frontend::FrontendClient &self) noexcept {
+::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$get_version(::netsim::frontend::FrontendClient const &self) noexcept {
   ::std::unique_ptr<::netsim::frontend::ClientResult> (::netsim::frontend::FrontendClient::*get_version$)() const = &::netsim::frontend::FrontendClient::GetVersion;
   return (self.*get_version$)().release();
 }
 
-::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$get_devices(const ::netsim::frontend::FrontendClient &self) noexcept {
+::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$get_devices(::netsim::frontend::FrontendClient const &self) noexcept {
   ::std::unique_ptr<::netsim::frontend::ClientResult> (::netsim::frontend::FrontendClient::*get_devices$)() const = &::netsim::frontend::FrontendClient::GetDevices;
   return (self.*get_devices$)().release();
 }
 
-bool netsim$frontend$cxxbridge1$ClientResult$is_ok(const ::netsim::frontend::ClientResult &self) noexcept {
+bool netsim$frontend$cxxbridge1$ClientResult$is_ok(::netsim::frontend::ClientResult const &self) noexcept {
   bool (::netsim::frontend::ClientResult::*is_ok$)() const = &::netsim::frontend::ClientResult::IsOk;
   return (self.*is_ok$)();
 }
 
-void netsim$frontend$cxxbridge1$ClientResult$err(const ::netsim::frontend::ClientResult &self, ::rust::String *return$) noexcept {
+void netsim$frontend$cxxbridge1$ClientResult$err(::netsim::frontend::ClientResult const &self, ::rust::String *return$) noexcept {
   ::rust::String (::netsim::frontend::ClientResult::*err$)() const = &::netsim::frontend::ClientResult::Err;
   new (return$) ::rust::String((self.*err$)());
 }
 
-void netsim$frontend$cxxbridge1$ClientResult$json(const ::netsim::frontend::ClientResult &self, ::rust::String *return$) noexcept {
-  ::rust::String (::netsim::frontend::ClientResult::*json$)() const = &::netsim::frontend::ClientResult::Json;
-  new (return$) ::rust::String((self.*json$)());
+void netsim$frontend$cxxbridge1$ClientResult$byte_str(::netsim::frontend::ClientResult const &self, ::rust::String *return$) noexcept {
+  ::rust::String (::netsim::frontend::ClientResult::*byte_str$)() const = &::netsim::frontend::ClientResult::ByteStr;
+  new (return$) ::rust::String((self.*byte_str$)());
 }
 } // extern "C"
 } // namespace frontend
@@ -158,10 +158,10 @@ void cxxbridge1$unique_ptr$netsim$frontend$FrontendClient$null(::std::unique_ptr
 void cxxbridge1$unique_ptr$netsim$frontend$FrontendClient$raw(::std::unique_ptr<::netsim::frontend::FrontendClient> *ptr, ::netsim::frontend::FrontendClient *raw) noexcept {
   ::new (ptr) ::std::unique_ptr<::netsim::frontend::FrontendClient>(raw);
 }
-const ::netsim::frontend::FrontendClient *cxxbridge1$unique_ptr$netsim$frontend$FrontendClient$get(const ::std::unique_ptr<::netsim::frontend::FrontendClient>& ptr) noexcept {
+::netsim::frontend::FrontendClient const *cxxbridge1$unique_ptr$netsim$frontend$FrontendClient$get(::std::unique_ptr<::netsim::frontend::FrontendClient> const &ptr) noexcept {
   return ptr.get();
 }
-::netsim::frontend::FrontendClient *cxxbridge1$unique_ptr$netsim$frontend$FrontendClient$release(::std::unique_ptr<::netsim::frontend::FrontendClient>& ptr) noexcept {
+::netsim::frontend::FrontendClient *cxxbridge1$unique_ptr$netsim$frontend$FrontendClient$release(::std::unique_ptr<::netsim::frontend::FrontendClient> &ptr) noexcept {
   return ptr.release();
 }
 void cxxbridge1$unique_ptr$netsim$frontend$FrontendClient$drop(::std::unique_ptr<::netsim::frontend::FrontendClient> *ptr) noexcept {
@@ -177,10 +177,10 @@ void cxxbridge1$unique_ptr$netsim$frontend$ClientResult$null(::std::unique_ptr<:
 void cxxbridge1$unique_ptr$netsim$frontend$ClientResult$raw(::std::unique_ptr<::netsim::frontend::ClientResult> *ptr, ::netsim::frontend::ClientResult *raw) noexcept {
   ::new (ptr) ::std::unique_ptr<::netsim::frontend::ClientResult>(raw);
 }
-const ::netsim::frontend::ClientResult *cxxbridge1$unique_ptr$netsim$frontend$ClientResult$get(const ::std::unique_ptr<::netsim::frontend::ClientResult>& ptr) noexcept {
+::netsim::frontend::ClientResult const *cxxbridge1$unique_ptr$netsim$frontend$ClientResult$get(::std::unique_ptr<::netsim::frontend::ClientResult> const &ptr) noexcept {
   return ptr.get();
 }
-::netsim::frontend::ClientResult *cxxbridge1$unique_ptr$netsim$frontend$ClientResult$release(::std::unique_ptr<::netsim::frontend::ClientResult>& ptr) noexcept {
+::netsim::frontend::ClientResult *cxxbridge1$unique_ptr$netsim$frontend$ClientResult$release(::std::unique_ptr<::netsim::frontend::ClientResult> &ptr) noexcept {
   return ptr.release();
 }
 void cxxbridge1$unique_ptr$netsim$frontend$ClientResult$drop(::std::unique_ptr<::netsim::frontend::ClientResult> *ptr) noexcept {
