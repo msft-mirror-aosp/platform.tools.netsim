@@ -45,8 +45,8 @@ pub mod ffi {
         pub fn Err(self: &ClientResult) -> String;
 
         #[allow(dead_code)]
-        #[rust_name = "json"]
-        pub fn Json(self: &ClientResult) -> String;
+        #[rust_name = "byte_str"]
+        pub fn ByteStr(self: &ClientResult) -> String;
 
     }
 }
@@ -56,14 +56,14 @@ use crate::ffi::{ClientResult, FrontendClient};
 pub fn send_grpc(
     client: cxx::UniquePtr<FrontendClient>,
     grpc_method: GrpcMethod,
-    json_string: String,
+    request: &[u8],
 ) -> cxx::UniquePtr<ClientResult> {
     match grpc_method {
         GrpcMethod::GetVersion => client.get_version(),
         GrpcMethod::GetDevices => client.get_devices(),
         _ => panic!(
-            "Grpc method is not implemented. grpc_method: {:#?}, json_string: {:?}",
-            grpc_method, json_string
+            "Grpc method is not implemented. grpc_method: {:#?}, request (bytes): {:?}",
+            grpc_method, request
         ),
     }
 }
