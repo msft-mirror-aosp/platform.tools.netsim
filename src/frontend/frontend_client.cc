@@ -66,14 +66,13 @@ class FrontendClientImpl : public FrontendClient {
   std::unique_ptr<ClientResult> make_result(
       const grpc::Status &status,
       const google::protobuf::Message &message) const {
+    std::vector<unsigned char> message_vec(message.ByteSizeLong());
+    message.SerializeToArray(message_vec.data(), message_vec.size());
     if (!status.ok()) {
-      return std::make_unique<ClientResult>(false, status.error_message(), "");
+      return std::make_unique<ClientResult>(false, status.error_message(),
+                                            message_vec);
     }
-    std::string json_string;
-    google::protobuf::util::JsonPrintOptions options;
-    MessageToJsonString(message, &json_string, options);
-    return std::make_unique<ClientResult>(true, "",
-                                          message.SerializeAsString());
+    return std::make_unique<ClientResult>(true, "", message_vec);
   }
 
   // Gets the version of the network simulator service.
