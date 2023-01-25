@@ -54,6 +54,7 @@ impl Router {
                 return handler(request, captures);
             }
         }
+        println!("netsim: HttpRouter unknown uri {}", request.uri);
         HttpResponse::new_404()
     }
 }
@@ -61,9 +62,10 @@ impl Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frontend_http_server::http_response::HttpHeaders;
 
     fn handle_index(_request: &HttpRequest, _captures: Captures) -> HttpResponse {
-        HttpResponse::new_200("text/plain", b"Hello, world!".to_vec())
+        HttpResponse::new_200("text/html", b"Hello, world!".to_vec())
     }
 
     fn handle_user(_request: &HttpRequest, captures: Captures) -> HttpResponse {
@@ -83,26 +85,29 @@ mod tests {
             method: "GET".to_string(),
             uri: "/".to_string(),
             version: "HTTP/1.1".to_string(),
-            headers: vec![],
+            headers: HttpHeaders::new(),
             body: vec![],
         };
         let response = router.handle_request(&request);
         assert_eq!(response.status_code, 200);
-        assert_eq!(response.headers[0].0, "Content-Type".to_string());
-        assert_eq!(response.headers[0].1, "text/plain".to_string());
+        let content_type = response.headers.get("Content-Type");
+        println!("headers are {:?}", response.headers);
+        assert!(content_type.is_some());
+        assert_eq!(content_type.unwrap(), "text/html");
         assert_eq!(response.body, b"Hello, world!".to_vec());
 
         let request = HttpRequest {
             method: "GET".to_string(),
             uri: "/user/1920".to_string(),
             version: "HTTP/1.1".to_string(),
-            headers: vec![],
+            headers: HttpHeaders::new(),
             body: vec![],
         };
         let response = router.handle_request(&request);
         assert_eq!(response.status_code, 200);
         assert_eq!(response.body, b"Hello, 1920!".to_vec());
-        assert_eq!(response.headers[0].0, "Content-Type".to_string());
-        assert_eq!(response.headers[0].1, "application/json".to_string());
+        let content_type = response.headers.get("Content-Type");
+        assert!(content_type.is_some());
+        assert_eq!(content_type.unwrap(), "application/json");
     }
 }
