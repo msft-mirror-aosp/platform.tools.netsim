@@ -63,8 +63,9 @@ rust_ffi_host_static {
     name: "libnetsim_cxx",
     crate_name: "netsim_cxx",
     rlibs: ["libcxx",
-        "libserde_json",
-        "libfrontend_proto",],
+        "libfrontend_proto",
+        "libprotobuf",
+],
     srcs: ["rust/netsim-cxx/src/lib.rs"],
 }
 
@@ -272,10 +273,8 @@ rust_library_host {
     name: "libfrontend_proto",
     crate_name: "frontend_proto",
     srcs: ["rust/frontend-proto/src/lib.rs"],
-    features: ["serde", "serde_derive", "with-serde"],
     rustlibs: [
-        "libprotobuf_with_serde",
-        "libserde",
+        "libprotobuf"
     ],
 }
 
@@ -307,9 +306,9 @@ rust_ffi_host_static {
     srcs: ["rust/netsim-cli/src/lib.rs"],
     rustlibs: [
         "libclap",
-        "libserde_json",
         "libfrontend_proto",
         "libfrontend_client_cxx",
+        "libprotobuf",
     ],
 }
 
