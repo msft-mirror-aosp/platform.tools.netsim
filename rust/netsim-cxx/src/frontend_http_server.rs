@@ -1,22 +1,20 @@
 mod http_request;
+mod http_response;
 mod thread_pool;
 
 extern crate frontend_proto;
 
 use crate::frontend_http_server::http_request::HttpRequest;
+use crate::frontend_http_server::http_response::HttpResponse;
+
 use crate::frontend_http_server::thread_pool::ThreadPool;
 
+use std::ffi::OsStr;
 use std::fs;
-use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::TcpListener;
 use std::net::TcpStream;
-
-const RESPONSE_200: &str = "HTTP/1.1 200 OK";
-const RESPONSE_200_JS: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/javascript";
-const RESPONSE_200_SVG: &str = "HTTP/1.1 200 OK\r\nContent-Type: image/svg+xml";
-const RESPONSE_200_PNG: &str = "HTTP/1.1 200 OK\r\nContent-Type: image/png";
-const RESPONSE_404: &str = "HTTP/1.1 404 NOT FOUND";
+use std::path::Path;
 
 pub fn run_frontend_http_server() {
     let listener = TcpListener::bind("127.0.0.1:7681").unwrap();
@@ -34,47 +32,49 @@ pub fn run_frontend_http_server() {
     println!("Shutting down frontend http server.");
 }
 
+fn to_content_type(file_path: &Path) -> &str {
+    match file_path.extension().and_then(OsStr::to_str) {
+        Some("html") => "text/html",
+        Some("txt") => "text/plain",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("png") => "image/png",
+        Some("js") => "application/javascript",
+        _ => "application/octet-stream",
+    }
+}
+
 fn handle_connection(mut stream: TcpStream) {
     let mut filepath = std::env::current_exe().unwrap();
     filepath.pop();
     filepath.push("netsim-ui");
 
-    if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {
+    let http_response = if let Ok(request) =
+        HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream))
+    {
         if request.method == "GET" {
-            let (status_line, mut contents) = if request.uri == "/" {
-                filepath.push("index.html");
-                if !filepath.exists() {
-                    (RESPONSE_404, None)
-                } else {
-                    (RESPONSE_200, Some(fs::read_to_string(filepath.as_path()).unwrap()))
-                }
-            } else if request.uri == "/get-version" {
-                (RESPONSE_200, Some("{version: \"123b\"}".to_string()))
+            if request.uri == "/get-version" {
+                HttpResponse::new_200("application/json", "{version: \"123b\"}".as_bytes().to_vec())
             } else {
-                filepath.push(&request.uri);
-                if !filepath.exists() {
-                    (RESPONSE_404, None)
-                } else if request.uri.ends_with(".js") {
-                    (RESPONSE_200_JS, Some(fs::read_to_string(filepath.as_path()).unwrap()))
-                } else if request.uri.ends_with(".svg") {
-                    (RESPONSE_200_SVG, Some(fs::read_to_string(filepath.as_path()).unwrap()))
-                } else if request.uri.ends_with(".png") {
-                    (RESPONSE_200_PNG, Some(fs::read_to_string(filepath.as_path()).unwrap()))
+                if request.uri == "/" {
+                    filepath.push("index.html")
                 } else {
-                    (RESPONSE_200, Some(fs::read_to_string(filepath.as_path()).unwrap()))
+                    filepath.push(&request.uri)
                 }
-            };
-            if contents.is_none() {
-                contents = Some(String::from(include_str!("404.html")));
+                if let Ok(body) = fs::read(&filepath) {
+                    HttpResponse::new_200(to_content_type(&filepath), body)
+                } else {
+                    HttpResponse::new_404()
+                }
             }
-            let response = format!(
-                "{}\r\nContent-Length: {}\r\n\r\n{}",
-                status_line,
-                contents.as_ref().unwrap().len(),
-                contents.unwrap().as_str()
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-            stream.flush().unwrap();
+        } else {
+            // POST, PATCH etc.
+            HttpResponse::new_404()
         }
+    } else {
+        // Request parse error
+        HttpResponse::new_404()
+    };
+    if let Err(e) = http_response.write_to(&mut stream) {
+        println!("handle_connection: error {e}");
     }
 }
