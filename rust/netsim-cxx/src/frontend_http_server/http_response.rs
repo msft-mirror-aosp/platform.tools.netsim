@@ -24,9 +24,9 @@
 use std::io::Write;
 
 pub struct HttpResponse {
-    status_code: u16,
-    headers: Vec<(String, String)>,
-    body: Vec<u8>,
+    pub status_code: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
 }
 
 impl HttpResponse {
