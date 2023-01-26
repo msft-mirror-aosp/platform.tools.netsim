@@ -56,6 +56,7 @@ fn handle_file(method: &str, path: &str) -> HttpResponse {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
     }
+    println!("netsim: handle_file with unknown path {path}");
     HttpResponse::new_404()
 }
 
@@ -82,9 +83,10 @@ fn handle_connection(mut stream: TcpStream) {
         if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {
             router.handle_request(&request)
         } else {
+            println!("netsim: parse header failed");
             HttpResponse::new_404()
         };
     if let Err(e) = response.write_to(&mut stream) {
-        println!("handle_connection: error {e}");
+        println!("netsim: handle_connection error {e}");
     }
 }
