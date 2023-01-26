@@ -65,7 +65,7 @@ rust_ffi_host_static {
     rlibs: ["libcxx",
         "libfrontend_proto",
         "libprotobuf",
-],
+        "libregex"],
     srcs: ["rust/netsim-cxx/src/lib.rs"],
 }
 
