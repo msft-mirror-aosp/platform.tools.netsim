@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::args::{self, Command};
+use crate::args::{self, BtType, Command, UpDownStatus};
 use frontend_proto::model::State;
 use frontend_proto::{
     frontend::{GetDevicesResponse, VersionResponse},
@@ -27,11 +27,22 @@ impl args::Command {
             Command::Version => {
                 Self::print_version_response(VersionResponse::parse_from_bytes(response).unwrap());
             }
-            Command::Radio(_) => {
-                todo!();
+            Command::Radio(cmd) => {
+                println!(
+                    "Radio {} is {} for {}",
+                    if cmd.bt_type == BtType::Ble { "ble" } else { "classic" },
+                    if cmd.status == UpDownStatus::Up { "up" } else { "down" },
+                    cmd.device_serial.to_owned()
+                );
             }
-            Command::Move(_) => {
-                todo!();
+            Command::Move(cmd) => {
+                println!(
+                    "Moved device:{} to x: {:.2}, y: {:.2}, z: {:.2}",
+                    cmd.device_serial,
+                    cmd.x,
+                    cmd.y,
+                    cmd.z.unwrap_or_default()
+                )
             }
             Command::Devices => {
                 Self::print_device_response(
@@ -59,7 +70,7 @@ impl args::Command {
                 match &chip.chip {
                     Some(Chip_oneof_chip::bt(bt)) => {
                         print!(
-                            "ble: {}\t",
+                            "ble: {}    \t",
                             Self::bt_state_to_string(bt.get_low_energy().get_state())
                         );
                         print!(
@@ -71,7 +82,7 @@ impl args::Command {
                 }
             }
             let pos = device.get_position();
-            println!("position ({:.2}, {:.2}, {:.2})", pos.get_x(), pos.get_y(), pos.get_z());
+            println!("position: ({:.2}, {:.2}, {:.2})", pos.get_x(), pos.get_y(), pos.get_z());
         }
     }
 
