@@ -99,14 +99,9 @@ impl HttpRequest {
         let (method, uri, version) = parse_request_line::<T>(reader)?;
         let headers = parse_header_section::<T>(reader)?;
         let mut body = Vec::new();
-        match get_content_length(&headers) {
-            Some(len) => {
-                body.resize(len, 0);
-                reader.read_exact(&mut body).map_err(|e| format!("Failed to read body: {e}"))?;
-            }
-            None => {
-                reader.read_to_end(&mut body).map_err(|e| format!("Failed to read body: {e}"))?;
-            }
+        if let Some(len) = get_content_length(&headers) {
+            body.resize(len, 0);
+            reader.read_exact(&mut body).map_err(|e| format!("Failed to read body: {e}"))?;
         }
         Ok(HttpRequest { method, uri, version, headers, body })
     }

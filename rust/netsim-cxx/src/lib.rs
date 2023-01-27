@@ -28,8 +28,8 @@ mod ffi {
         #[namespace = "netsim::scene_controller"]
         fn GetDevices(
             request: &CxxString,
-            response: UniquePtr<CxxString>,
-            error_message: UniquePtr<CxxString>,
+            response: Pin<&mut CxxString>,
+            error_message: Pin<&mut CxxString>,
         ) -> u32;
 
         #[allow(dead_code)]
@@ -37,8 +37,8 @@ mod ffi {
         #[namespace = "netsim::scene_controller"]
         fn UpdateDevice(
             request: &CxxString,
-            response: UniquePtr<CxxString>,
-            error_message: UniquePtr<CxxString>,
+            response: Pin<&mut CxxString>,
+            error_message: Pin<&mut CxxString>,
         ) -> u32;
     }
 }
