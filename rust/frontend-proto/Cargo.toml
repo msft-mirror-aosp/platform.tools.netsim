@@ -8,9 +8,9 @@ name = "frontend-proto"
 protobuf = "2.27.1"
 
 [build-dependencies]
-protobuf = "2.27.1"
-protoc-rust = "2.27"
-protobuf-codegen = "2.27"
+# protobuf = "2.27.1"
+# protoc-rust = "2.27"
+# protobuf-codegen = "2.27"
 
 [lib]
 path = "src/lib.rs"
