@@ -23,16 +23,18 @@
 
 use std::io::Write;
 
+pub use crate::frontend_http_server::http_request::HttpHeaders;
+
 pub struct HttpResponse {
     pub status_code: u16,
-    pub headers: Vec<(String, String)>,
+    pub headers: HttpHeaders,
     pub body: Vec<u8>,
 }
 
 impl HttpResponse {
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
         let mut buffer = format!("HTTP/1.1 {}\r\n", self.status_code).into_bytes();
-        for (name, value) in &self.headers {
+        for (name, value) in self.headers.iter() {
             buffer.extend_from_slice(format!("{name}: {value}\r\n").as_bytes());
         }
         buffer.extend_from_slice(b"\r\n");
@@ -43,10 +45,10 @@ impl HttpResponse {
     pub fn new_200(content_type: &str, body: Vec<u8>) -> HttpResponse {
         HttpResponse {
             status_code: 200,
-            headers: vec![
-                ("Content-Type".to_owned(), content_type.to_owned()),
-                ("Content-Length".to_owned(), body.len().to_string()),
-            ],
+            headers: HttpHeaders::new_with_headers(&[
+                ("Content-Type", content_type),
+                ("Content-Length", &body.len().to_string()),
+            ]),
             body,
         }
     }
@@ -54,7 +56,7 @@ impl HttpResponse {
     pub fn new_404() -> HttpResponse {
         HttpResponse {
             status_code: 404,
-            headers: vec![("Content-Type".to_owned(), "text/plain".to_owned())],
+            headers: HttpHeaders::new_with_headers(&[("Content-Type", "text/plain")]),
             body: b"404 Not Found".to_vec(),
         }
     }

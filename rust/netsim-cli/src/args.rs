@@ -99,8 +99,10 @@ impl Command {
 #[derive(Debug, Args)]
 pub struct Radio {
     /// Radio type
+    #[clap(value_enum)]
     pub bt_type: BtType,
     /// Radio status (up/down)
+    #[clap(value_enum)]
     pub status: UpDownStatus,
     /// Device serial
     pub device_serial: String,
@@ -133,6 +135,7 @@ pub struct Move {
 #[derive(Debug, Args)]
 pub struct Capture {
     /// Capture state (true/false)
+    #[clap(value_enum)]
     pub state: BoolState,
     /// Device serial
     pub device_serial: String,
@@ -140,8 +143,9 @@ pub struct Capture {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
 pub enum BoolState {
-    #[value(alias("True"), alias("TRUE"))]
+    // NOTE: Temporarily disable this attribute because clap-3.2.22 is used.
+    // #[value(alias("True"), alias("TRUE"))]
     True,
-    #[value(alias("False"), alias("FALSE"))]
+    // #[value(alias("False"), alias("FALSE"))]
     False,
 }

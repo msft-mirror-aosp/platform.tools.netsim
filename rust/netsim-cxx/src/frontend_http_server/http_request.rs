@@ -31,13 +31,35 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 
+#[derive(Debug)]
 pub struct HttpHeaders {
-    headers: Vec<(String, String)>,
+    pub headers: Vec<(String, String)>,
 }
 
 impl HttpHeaders {
     pub fn new() -> Self {
         Self { headers: Vec::new() }
+    }
+
+    #[allow(dead_code)]
+    pub fn get(&self, key: &str) -> Option<String> {
+        let key = key.to_ascii_lowercase();
+        for (name, value) in self.headers.iter() {
+            if name.to_ascii_lowercase() == key {
+                return Some(value.to_string());
+            }
+        }
+        None
+    }
+
+    #[allow(dead_code)]
+    pub fn new_with_headers(str_headers: &[(&str, &str)]) -> HttpHeaders {
+        HttpHeaders {
+            headers: str_headers
+                .iter()
+                .map(|(key, value)| -> (String, String) { (key.to_string(), value.to_string()) })
+                .collect(),
+        }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &(String, String)> {
@@ -47,15 +69,12 @@ impl HttpHeaders {
     pub fn add_header(&mut self, header_key: &str, header_value: &str) {
         self.headers.push((header_key.to_owned(), header_value.to_owned()));
     }
-}
 
-impl From<&[(&str, &str)]> for HttpHeaders {
-    fn from(hdrs: &[(&str, &str)]) -> HttpHeaders {
-        let mut headers = HttpHeaders::new();
-        for (k, v) in hdrs {
-            headers.add_header(k, v);
-        }
-        headers
+    // Same in an impl PartialEq does not work for assert_eq!
+    // so use a method for unit tests
+    #[allow(dead_code)]
+    pub fn eq(&self, other: &[(&str, &str)]) -> bool {
+        self.headers.iter().zip(other.iter()).all(|(a, b)| a.0 == b.0 && a.1 == b.1)
     }
 }
 
@@ -80,14 +99,9 @@ impl HttpRequest {
         let (method, uri, version) = parse_request_line::<T>(reader)?;
         let headers = parse_header_section::<T>(reader)?;
         let mut body = Vec::new();
-        match get_content_length(&headers) {
-            Some(len) => {
-                body.resize(len, 0);
-                reader.read_exact(&mut body).map_err(|e| format!("Failed to read body: {e}"))?;
-            }
-            None => {
-                reader.read_to_end(&mut body).map_err(|e| format!("Failed to read body: {e}"))?;
-            }
+        if let Some(len) = get_content_length(&headers) {
+            body.resize(len, 0);
+            reader.read_exact(&mut body).map_err(|e| format!("Failed to read body: {e}"))?;
         }
         Ok(HttpRequest { method, uri, version, headers, body })
     }
@@ -130,12 +144,10 @@ where
 }
 
 fn get_content_length(headers: &HttpHeaders) -> Option<usize> {
-    for (name, value) in headers.iter() {
-        if name.to_ascii_lowercase() == "content-length" {
-            match value.parse::<usize>() {
-                Ok(n) => return Some(n),
-                Err(_) => return None,
-            }
+    if let Some(value) = headers.get("Content-Length") {
+        match value.parse::<usize>() {
+            Ok(n) => return Some(n),
+            Err(_) => return None,
         }
     }
     None
@@ -157,10 +169,7 @@ mod tests {
         assert_eq!(http_request.method, "GET");
         assert_eq!(http_request.uri, "/index.html");
         assert_eq!(http_request.version, "HTTP/1.1");
-        assert_eq!(
-            http_request.headers,
-            HttpHeaders::new(&[("Host", "example.com"), ("Content-Length", "13")])
-        );
+        assert!(http_request.headers.eq(&[("Host", "example.com"), ("Content-Length", "13")]));
         assert_eq!(http_request.body, b"Hello World\r\n".to_vec());
     }
 
@@ -172,7 +181,7 @@ mod tests {
         assert_eq!(http_request.method, "GET");
         assert_eq!(http_request.uri, "/index.html");
         assert_eq!(http_request.version, "HTTP/1.1");
-        assert_eq!(http_request.headers, HttpHeaders::new(&[("Host", "example.com")]));
+        assert!(http_request.headers.eq(&[("Host", "example.com")]));
         assert_eq!(http_request.body, Vec::<u8>::new());
     }
 
@@ -185,7 +194,7 @@ mod tests {
         assert_eq!(http_request.method, "GET");
         assert_eq!(http_request.uri, "/index.html");
         assert_eq!(http_request.version, "HTTP/1.1");
-        assert_eq!(http_request.headers, HttpHeaders::new(&[("Host", "example.com")]));
+        assert!(http_request.headers.eq(&[("Host", "example.com")]));
         assert_eq!(http_request.body, b"Hello World\r\n".to_vec());
     }
 }
