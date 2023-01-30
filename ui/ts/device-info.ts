@@ -204,24 +204,12 @@ export class DeviceInformation extends LitElement implements Notifiable {
       for (const device of data.devices) {
         if (device.deviceSerial === data.selectedSerial) {
           this.selectedDevice = device;
-          if ("orientation" in device && device.orientation) {
-            this.yaw = device.orientation.yaw ?? 0;
-            this.pitch = device.orientation.pitch ?? 0;
-            this.roll = device.orientation.roll ?? 0;
-          } else {
-            this.yaw = 0;
-            this.pitch = 0;
-            this.roll = 0;
-          }
-          if ("position" in device && device.position) {
-            this.posX = Math.round((device.position.x ?? 0) * 100);
-            this.posY = Math.round((device.position.y ?? 0) * 100);
-            this.posZ = Math.round((device.position.z ?? 0) * 100);
-          } else {
-            this.posX = 0;
-            this.posY = 0;
-            this.posZ = 0;
-          }
+          this.yaw = device.orientation.yaw;
+          this.pitch = device.orientation.pitch;
+          this.roll = device.orientation.roll;
+          this.posX = device.position.x * 100;
+          this.posY = device.position.y * 100;
+          this.posZ = device.position.z * 100;
           break;
         }
       }
