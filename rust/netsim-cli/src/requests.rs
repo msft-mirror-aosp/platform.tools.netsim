@@ -23,7 +23,7 @@ impl args::Command {
             Command::Radio(_) => GrpcMethod::UpdateDevice,
             Command::Move(_) => GrpcMethod::UpdateDevice,
             Command::Devices => GrpcMethod::GetDevices,
-            Command::Capture(_) => GrpcMethod::SetPacketCapture,
+            Command::Capture(_) => GrpcMethod::UpdateDevice,
             Command::Reset => GrpcMethod::Reset,
             Command::Gui => {
                 panic!("No GrpcMethod for Ui Command.");
@@ -35,7 +35,7 @@ impl args::Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use args::NetsimArgs;
+    use args::{NetsimArgs, OnOffState};
     use clap::Parser;
     use frontend_proto::{
         frontend,
@@ -76,6 +76,7 @@ mod tests {
             bt_chip.set_classic(Chip_Radio { state: chip_state, ..Default::default() });
         }
         mutable_chips[0].set_bt(bt_chip);
+        mutable_chips[0].mut_bt();
         result.write_to_bytes().unwrap()
     }
 
@@ -161,54 +162,62 @@ mod tests {
         test_command("netsim-cli devices", GrpcMethod::GetDevices, Vec::new())
     }
 
-    fn get_expected_capture(device_serial: &str, set_capture: bool) -> Vec<u8> {
-        let mut result = frontend::SetPacketCaptureRequest::new();
-        result.set_device_serial(device_serial.to_owned());
-        result.set_capture(set_capture);
+    fn get_expected_capture(device_serial: &str, state: OnOffState) -> Vec<u8> {
+        let mut result = frontend::UpdateDeviceRequest::new();
+        let mutable_device = result.mut_device();
+        mutable_device.set_device_serial(device_serial.to_owned());
+        let mutable_chips = mutable_device.mut_chips();
+        mutable_chips.push_default();
+        let capture_state = match state {
+            OnOffState::On => State::ON,
+            OnOffState::Off => State::OFF,
+        };
+        mutable_chips[0].set_capture(capture_state);
         result.write_to_bytes().unwrap()
-    }
-
-    #[test]
-    fn test_capture_mixed_case() {
-        test_command(
-            "netsim-cli capture True 10",
-            GrpcMethod::SetPacketCapture,
-            get_expected_capture("10", true),
-        );
-        test_command(
-            "netsim-cli capture False 1000",
-            GrpcMethod::SetPacketCapture,
-            get_expected_capture("1000", false),
-        )
-    }
-
-    #[test]
-    fn test_capture_uppercase() {
-        test_command(
-            "netsim-cli capture TRUE 1000",
-            GrpcMethod::SetPacketCapture,
-            get_expected_capture("1000", true),
-        );
-        test_command(
-            "netsim-cli capture FALSE 1000",
-            GrpcMethod::SetPacketCapture,
-            get_expected_capture("1000", false),
-        )
     }
 
     #[test]
     fn test_capture_lowercase() {
         test_command(
-            "netsim-cli capture true 1000",
-            GrpcMethod::SetPacketCapture,
-            get_expected_capture("1000", true),
+            "netsim-cli capture on test_device",
+            GrpcMethod::UpdateDevice,
+            get_expected_capture("test_device", OnOffState::On),
         );
         test_command(
-            "netsim-cli capture false 1000",
-            GrpcMethod::SetPacketCapture,
-            get_expected_capture("1000", false),
+            "netsim-cli capture off 1000",
+            GrpcMethod::UpdateDevice,
+            get_expected_capture("1000", OnOffState::Off),
         )
     }
+
+    // NOTE: Temporarily disable alias tests because clap-3.2.22 is used which does not support aliasing.
+    // #[test]
+    // fn test_capture_mixed_case() {
+    //     test_command(
+    //         "netsim-cli capture On 10",
+    //         GrpcMethod::UpdateDevice,
+    //         get_expected_capture("10", OnOffState::On),
+    //     );
+    //     test_command(
+    //         "netsim-cli capture Off 1000",
+    //         GrpcMethod::UpdateDevice,
+    //         get_expected_capture("1000", OnOffState::Off),
+    //     )
+    // }
+
+    // #[test]
+    // fn test_capture_uppercase() {
+    //     test_command(
+    //         "netsim-cli capture ON 1000",
+    //         GrpcMethod::UpdateDevice,
+    //         get_expected_capture("1000", OnOffState::On),
+    //     );
+    //     test_command(
+    //         "netsim-cli capture OFF 1000",
+    //         GrpcMethod::UpdateDevice,
+    //         get_expected_capture("1000", OnOffState::Off),
+    //     )
+    // }
 
     #[test]
     fn test_reset() {

@@ -83,9 +83,17 @@ impl Command {
             }
             Command::Devices => Vec::new(),
             Command::Capture(cmd) => {
-                let mut result = frontend::SetPacketCaptureRequest::new();
-                result.set_device_serial(cmd.device_serial.to_owned());
-                result.set_capture(cmd.state == BoolState::True);
+                let mut result = frontend::UpdateDeviceRequest::new();
+                let mutable_device = result.mut_device();
+                mutable_device.set_device_serial(cmd.device_serial.to_owned());
+                let mutable_chips = mutable_device.mut_chips();
+                mutable_chips.push_default();
+                let capture_state = match cmd.state {
+                    OnOffState::On => State::ON,
+                    OnOffState::Off => State::OFF,
+                };
+                mutable_chips[0].set_capture(capture_state);
+                mutable_chips[0].mut_bt();
                 result.write_to_bytes().unwrap()
             }
             Command::Reset => Vec::new(),
@@ -136,16 +144,16 @@ pub struct Move {
 pub struct Capture {
     /// Capture state
     #[clap(value_enum)]
-    pub state: BoolState,
+    pub state: OnOffState,
     /// Device serial
     pub device_serial: String,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
-pub enum BoolState {
+pub enum OnOffState {
     // NOTE: Temporarily disable this attribute because clap-3.2.22 is used.
-    // #[value(alias("True"), alias("TRUE"))]
-    True,
-    // #[value(alias("False"), alias("FALSE"))]
-    False,
+    // #[value(alias("On"), alias("ON"))]
+    On,
+    // #[value(alias("Off"), alias("OFF"))]
+    Off,
 }
