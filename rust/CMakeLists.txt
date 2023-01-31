@@ -1,4 +1,11 @@
-message(STATUS "Adding rust libraries")
+message(STATUS "Adding rust ${CMAKE_CURRENT_LIST_DIR}/Cargo.toml")
+
+# This will automatically register all the tests as well.
+corrosion_import_crate(MANIFEST_PATH Cargo.toml FLAGS --offline --verbose)
+corrosion_set_env_vars(netsim-cxx CARGO_HOME=${Rust_CARGO_HOME})
+corrosion_set_env_vars(netsim-cli CARGO_HOME=${Rust_CARGO_HOME})
+corrosion_set_env_vars(frontend-proto CARGO_HOME=${Rust_CARGO_HOME})
+corrosion_set_env_vars(frontend-client-cxx CARGO_HOME=${Rust_CARGO_HOME})
 
 # Use generated rust files because protobuf compiler is unavailable yet.
 add_subdirectory(netsim-cxx)
