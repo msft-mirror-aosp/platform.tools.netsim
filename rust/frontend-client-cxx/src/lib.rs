@@ -45,8 +45,8 @@ pub mod ffi {
         pub fn Err(self: &ClientResult) -> String;
 
         #[allow(dead_code)]
-        #[rust_name = "byte_str"]
-        pub fn ByteStr(self: &ClientResult) -> String;
+        #[rust_name = "byte_vec"]
+        pub fn ByteVec(self: &ClientResult) -> &CxxVector<u8>;
 
     }
 }

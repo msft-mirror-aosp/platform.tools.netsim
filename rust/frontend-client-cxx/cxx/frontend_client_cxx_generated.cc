@@ -7,6 +7,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace rust {
 inline namespace cxxbridge1 {
@@ -140,9 +141,9 @@ void netsim$frontend$cxxbridge1$ClientResult$err(::netsim::frontend::ClientResul
   new (return$) ::rust::String((self.*err$)());
 }
 
-void netsim$frontend$cxxbridge1$ClientResult$byte_str(::netsim::frontend::ClientResult const &self, ::rust::String *return$) noexcept {
-  ::rust::String (::netsim::frontend::ClientResult::*byte_str$)() const = &::netsim::frontend::ClientResult::ByteStr;
-  new (return$) ::rust::String((self.*byte_str$)());
+::std::vector<::std::uint8_t> const *netsim$frontend$cxxbridge1$ClientResult$byte_vec(::netsim::frontend::ClientResult const &self) noexcept {
+  ::std::vector<::std::uint8_t> const &(::netsim::frontend::ClientResult::*byte_vec$)() const = &::netsim::frontend::ClientResult::ByteVec;
+  return &(self.*byte_vec$)();
 }
 } // extern "C"
 } // namespace frontend
