@@ -28,17 +28,18 @@ namespace frontend {
 
 class ClientResult {
  public:
-  ClientResult(bool is_ok, const std::string &err, const std::string &byte_str)
-      : is_ok_(is_ok), err_(err), byte_str_(byte_str){};
+  ClientResult(bool is_ok, const std::string &err,
+               const std::vector<unsigned char> &byte_vec)
+      : is_ok_(is_ok), err_(err), byte_vec_(byte_vec){};
 
   bool IsOk() const { return is_ok_; };
   rust::String Err() const { return err_; };
-  rust::String ByteStr() const { return byte_str_; };
+  const std::vector<unsigned char> &ByteVec() const { return byte_vec_; };
 
  private:
   bool is_ok_;
   std::string err_;
-  std::string byte_str_;
+  const std::vector<unsigned char> byte_vec_;
 };
 
 class FrontendClient {

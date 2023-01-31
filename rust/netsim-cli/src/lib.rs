@@ -35,7 +35,7 @@ pub extern "C" fn rust_main() {
     let client = frontend_client_cxx::ffi::new_frontend_client();
     let client_result = frontend_client_cxx::send_grpc(client, grpc_method, request.as_slice());
     if client_result.is_ok() {
-        args.command.print_response(client_result.byte_str().as_bytes());
+        args.command.print_response(client_result.byte_vec().as_slice());
     } else {
         println!("Grpc call error: {}", client_result.err());
     }
