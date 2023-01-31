@@ -111,7 +111,10 @@ class FrontendClientImpl : public FrontendClient {
 }  // namespace
 
 std::unique_ptr<FrontendClient> NewFrontendClient() {
-  return std::make_unique<FrontendClientImpl>(NewFrontendStub());
+  auto stub = NewFrontendStub();
+  return (stub == nullptr
+              ? nullptr
+              : std::make_unique<FrontendClientImpl>(std::move(stub)));
 }
 
 }  // namespace frontend
