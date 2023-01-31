@@ -40,7 +40,7 @@ interface Chip {
  * Data structure of Device.
  * Used as a reference for subscribed observers to get proper attributes.
  */
-export interface Device {
+export interface IDevice {
   deviceSerial: string;
   name?: string;
   position?: {
@@ -55,6 +55,84 @@ export interface Device {
   };
   chips?: Chip[];
   visible?: boolean;
+}
+
+export class Device {
+  device: IDevice;
+
+  constructor(device: IDevice) {
+    this.device = device;
+  }
+
+  public get deviceSerial() {
+    return this.device.deviceSerial;
+  }
+
+  public get name() : string {
+    return this.device.name ?? "";
+  }
+
+  public set name(value: string) {
+    this.device.name = value;
+  }
+
+  public get position() : {x: number; y: number; z: number} {
+    let result = {x: 0, y: 0, z: 0}
+    if ("position" in this.device && this.device.position && typeof this.device.position === 'object') {
+      if ("x" in this.device.position && typeof this.device.position.x === 'number') {
+        result.x = this.device.position.x;
+      }
+      if ("y" in this.device.position && typeof this.device.position.y === 'number') {
+        result.y = this.device.position.y;
+      }
+      if ("z" in this.device.position && typeof this.device.position.z === 'number') {
+        result.z = this.device.position.z;
+      }
+    }
+    return result;
+  }
+
+  public set position(pos: {x?: number; y?: number; z?: number}) {
+    this.device.position = pos;
+  }
+
+  public get orientation() : {yaw: number; pitch: number; roll: number} {
+    let result = {yaw: 0, pitch: 0, roll: 0};
+    if ("orientation" in this.device && this.device.orientation && typeof this.device.orientation === 'object') {
+      if ("yaw" in this.device.orientation && typeof this.device.orientation.yaw === 'number') {
+        result.yaw = this.device.orientation.yaw;
+      }
+      if ("pitch" in this.device.orientation && typeof this.device.orientation.pitch === 'number') {
+        result.pitch = this.device.orientation.pitch;
+      }
+      if ("roll" in this.device.orientation && typeof this.device.orientation.roll === 'number') {
+        result.roll = this.device.orientation.roll;
+      }
+    }
+    return result;
+  }
+
+  public set orientation(ori: {yaw?: number; pitch?: number; roll?: number}) {
+    this.device.orientation = ori;
+  }
+
+  // TODO modularize getters and setters for Chip Interface
+  public get chips() : Chip[] {
+    return this.device.chips ?? [];
+  }
+
+  // TODO modularize getters and setters for Chip Interface
+  public set chips(value: Chip[]) {
+    this.device.chips = value;
+  }
+
+  public get visible() : boolean {
+    return this.device.visible ?? true;
+  }
+
+  public set visible(value: boolean) {
+    this.device.visible = value;
+  }
 }
 
 /**
@@ -98,8 +176,10 @@ class SimulationState implements Observable {
       });
   }
 
-  fetchDevice(devices: Device[]) {
-    this.simulationInfo.devices = devices;
+  fetchDevice(devices: IDevice[]) {
+    for (const device of devices) {
+      this.simulationInfo.devices.push(new Device(device));
+    }
     this.notifyObservers();
   }
 
@@ -111,12 +191,8 @@ class SimulationState implements Observable {
   handleDrop(serial: string, x: number, y: number) {
     for (const device of this.simulationInfo.devices) {
       if (serial === device.deviceSerial) {
-        if ("position" in device && device.position) {
           device.position.x = x;
           device.position.y = y;
-        } else {
-          device.position = {x: x, y: y, z: 0};
-        }
         this.updateDevice({
           device: {
             deviceSerial: serial,
