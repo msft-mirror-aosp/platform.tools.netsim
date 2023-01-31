@@ -44,11 +44,26 @@ export class DeviceInformation extends LitElement implements Notifiable {
   @property({ type: Boolean })
   editMode = false;
 
-  posX: number = 0;
+  /**
+   * the x value in position for ns-cube-sprite
+   * unit: cm
+   */
+  @property({ type: Number })
+  posX = 0;
 
-  posY: number = 0;
+  /**
+   * the y value in position for ns-cube-sprite
+   * unit: cm
+   */
+  @property({ type: Number })
+  posY = 0;
 
-  posZ: number = 0;
+  /**
+   * the z value in position for ns-cube-sprite
+   * unit: cm
+   */
+  @property({ type: Number })
+  posZ = 0;
 
   static styles = css`
     :host {
@@ -207,9 +222,9 @@ export class DeviceInformation extends LitElement implements Notifiable {
           this.yaw = device.orientation.yaw;
           this.pitch = device.orientation.pitch;
           this.roll = device.orientation.roll;
-          this.posX = device.position.x * 100;
-          this.posY = device.position.y * 100;
-          this.posZ = device.position.z * 100;
+          this.posX = Math.floor(device.position.x * 100);
+          this.posY = Math.floor(device.position.y * 100);
+          this.posZ = Math.floor(device.position.z * 100);
           break;
         }
       }
@@ -239,10 +254,11 @@ export class DeviceInformation extends LitElement implements Notifiable {
   private updateOrientation() {
     console.assert(this.selectedDevice !== undefined); // eslint-disable-line
     if (this.selectedDevice === undefined) return;
+    this.selectedDevice.orientation = {yaw: this.yaw, pitch: this.pitch, roll: this.roll};
     simulationState.updateDevice({
       device: {
         deviceSerial: this.selectedDevice.deviceSerial,
-        orientation: { yaw: this.yaw, pitch: this.pitch, roll: this.roll },
+        orientation: this.selectedDevice.orientation,
       },
     });
   }
@@ -298,71 +314,131 @@ export class DeviceInformation extends LitElement implements Notifiable {
         }
       }
     });
+    this.selectedDevice.name = obj.name;
+    this.selectedDevice.position = obj.position;
+    this.selectedDevice.orientation = obj.orientation;
+    this.handleEditForm();
     simulationState.updateDevice({
       device: obj,
     });
-    this.handleEditForm();
   }
 
   private handleGetChips() {
-    let chipInfo = html``;
     let lowEnergyCheckbox = html``;
     let classicCheckbox = html``;
+    let wifiCheckbox = html``;
+    let uwbCheckbox = html``;
+    const disabledCheckbox = html`
+      <input type="checkbox" disabled />
+        <span
+          class="slider round"
+          style=${styleMap({ opacity: '0.7' })}
+        ></span>
+    `;
     if (this.selectedDevice) {
       if ("chips" in this.selectedDevice && this.selectedDevice.chips) {
         for (const chip of this.selectedDevice.chips) {
           if ('bt' in chip && chip.bt) {
             if ("lowEnergy" in chip.bt && chip.bt.lowEnergy && 'state' in chip.bt.lowEnergy) {
               lowEnergyCheckbox = html `
-                <label class="switch">
-                  <input
-                    id="lowEnergy"
-                    type="checkbox"
-                    .checked=${live(chip.bt.lowEnergy.state === 'ON')}
-                    @click=${(chip: { bt: { lowEnergy: { state: string; }; }; }) => {
-                      // eslint-disable-next-line
-                      chip.bt.lowEnergy.state =
-                        chip.bt.lowEnergy.state === 'ON' ? 'OFF' : 'ON';
-                      this.updateRadio();
-                    }}
-                  />
-                  <span class="slider round"></span>
-                </label>
-              `
+                <input
+                  id="lowEnergy"
+                  type="checkbox"
+                  .checked=${live(chip.bt.lowEnergy.state === 'ON')}
+                  @click=${() => {
+                    // eslint-disable-next-line
+                    this.selectedDevice?.toggleChipState(chip, "lowEnergy");
+                    this.updateRadio();
+                  }}
+                />
+                <span class="slider round"></span>
+              `;
+            } else {
+              lowEnergyCheckbox = disabledCheckbox;
             }
             if ("classic" in chip.bt && chip.bt.classic && 'state' in chip.bt.classic) {
               classicCheckbox = html`
-                <label class="switch">
-                  <input
-                    id="classic"
-                    type="checkbox"
-                    .checked=${live(chip.bt.classic.state === 'ON')}
-                    @click=${(chip: { bt: { classic: { state: string; }; }; }) => {
-                      // eslint-disable-next-line
-                      chip.bt.classic.state =
-                        chip.bt.classic.state === 'ON' ? 'OFF' : 'ON';
-                      this.updateRadio();
-                    }}
-                  />
-                  <span class="slider round"></span>
-                </label>
-              `
+                <input
+                  id="classic"
+                  type="checkbox"
+                  .checked=${live(chip.bt.classic.state === 'ON')}
+                  @click=${() => {
+                    // eslint-disable-next-line
+                    this.selectedDevice?.toggleChipState(chip, "classic");
+                    this.updateRadio();
+                  }}
+                />
+                <span class="slider round"></span>
+              `;
+            } else {
+              classicCheckbox = disabledCheckbox;
             }
           }
+
+          if ('wifi' in chip && chip.wifi) {
+            wifiCheckbox = html`
+              <input
+                id="wifi"
+                type="checkbox"
+                .checked=${live(chip.wifi.state === 'ON')}
+                @click=${() => {
+                  // eslint-disable-next-line
+                  this.selectedDevice?.toggleChipState(chip);
+                  this.updateRadio();
+                }}
+              />
+              <span class="slider round"></span>
+            `;
+          } else {
+            wifiCheckbox = disabledCheckbox;
+          }
+
+          if ('uwb' in chip && chip.uwb) {
+            uwbCheckbox = html`
+              <input
+                id="uwb"
+                type="checkbox"
+                .checked=${live(chip.uwb.state === 'ON')}
+                @click=${() => {
+                  // eslint-disable-next-line
+                  this.selectedDevice?.toggleChipState(chip);
+                  this.updateRadio();
+                }}
+              />
+              <span class="slider round"></span>
+            `;
+          } else {
+            uwbCheckbox = disabledCheckbox;
+          }
         }
-        chipInfo = html`
-          <div class="label">BLE</div>
-          <div class="info">
-            ${lowEnergyCheckbox}
-          </div>
-          <div class="label">Classic</div>
-          <div class="info">
-            ${classicCheckbox}
-          </div>
-        `
       }
     }
-    return chipInfo
+    return html`
+      <div class="label">BLE</div>
+      <div class="info">
+        <label class="switch">
+          ${lowEnergyCheckbox}
+        </label>
+      </div>
+      <div class="label">Classic</div>
+      <div class="info">
+        <label class="switch">
+          ${classicCheckbox}
+        </label>
+      </div>
+      <div class="label">WIFI</div>
+      <div class="info">
+        <label class="switch">
+          ${wifiCheckbox}
+        </label>
+      </div>
+      <div class="label">UWB</div>
+      <div class="info">
+        <label class="switch">
+          ${uwbCheckbox}
+        </label>
+      </div>
+    `;
   }
 
   render() {
@@ -503,39 +579,6 @@ export class DeviceInformation extends LitElement implements Notifiable {
           <div class="setting">
             <div class="name">Radio States</div>
             ${this.handleGetChips()}
-            <!--Hard coded and disabled Radio States-->
-            <div class="label" style=${styleMap({ opacity: '0.7' })}>WIFI</div>
-            <div class="info">
-              <label class="switch">
-                <input type="checkbox" disabled />
-                <span
-                  class="slider round"
-                  style=${styleMap({ opacity: '0.7' })}
-                ></span>
-              </label>
-            </div>
-            <div class="label" style=${styleMap({ opacity: '0.7' })}>UWB</div>
-            <div class="info">
-              <label class="switch">
-                <input type="checkbox" disabled />
-                <span
-                  class="slider round"
-                  style=${styleMap({ opacity: '0.7' })}
-                ></span>
-              </label>
-            </div>
-            <div class="label" style=${styleMap({ opacity: '0.7' })}>
-              WIFI_RTT
-            </div>
-            <div class="info">
-              <label class="switch">
-                <input type="checkbox" disabled />
-                <span
-                  class="slider round"
-                  style=${styleMap({ opacity: '0.7' })}
-                ></span>
-              </label>
-            </div>
           </div>
         `
       : html`<div class="title">Device Info</div>`}`;
