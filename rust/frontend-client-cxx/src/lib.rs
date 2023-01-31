@@ -37,6 +37,10 @@ pub mod ffi {
         pub fn GetDevices(self: &FrontendClient) -> UniquePtr<ClientResult>;
 
         #[allow(dead_code)]
+        #[rust_name = "update_device"]
+        pub fn UpdateDevice(self: &FrontendClient, request: Vec<u8>) -> UniquePtr<ClientResult>;
+
+        #[allow(dead_code)]
         #[rust_name = "is_ok"]
         pub fn IsOk(self: &ClientResult) -> bool;
 
@@ -56,11 +60,12 @@ use crate::ffi::{ClientResult, FrontendClient};
 pub fn send_grpc(
     client: cxx::UniquePtr<FrontendClient>,
     grpc_method: GrpcMethod,
-    request: &[u8],
+    request: Vec<u8>,
 ) -> cxx::UniquePtr<ClientResult> {
     match grpc_method {
         GrpcMethod::GetVersion => client.get_version(),
         GrpcMethod::GetDevices => client.get_devices(),
+        GrpcMethod::UpdateDevice => client.update_device(request),
         _ => panic!(
             "Grpc method is not implemented. grpc_method: {:#?}, request (bytes): {:?}",
             grpc_method, request
