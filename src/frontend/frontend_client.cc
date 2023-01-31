@@ -28,9 +28,11 @@
 #include <string_view>
 
 #include "frontend.grpc.pb.h"
+#include "frontend.pb.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
 #include "grpcpp/support/status_code_enum.h"
+#include "model.pb.h"
 #include "util/ini_file.h"
 #include "util/os_utils.h"
 #include "util/string_utils.h"
@@ -83,10 +85,23 @@ class FrontendClientImpl : public FrontendClient {
     return make_result(status, response);
   }
 
+  // Gets the list of device information
   std::unique_ptr<ClientResult> GetDevices() const override {
     frontend::GetDevicesResponse response;
     grpc::ClientContext context_;
     auto status = stub_->GetDevices(&context_, {}, &response);
+    return make_result(status, response);
+  }
+
+  // Updates the information of the device
+  std::unique_ptr<ClientResult> UpdateDevice(
+      rust::Vec<::rust::u8> request_byte_vec) const override {
+    ::google::protobuf::Empty response;
+    grpc::ClientContext context_;
+    frontend::UpdateDeviceRequest request;
+    request.ParsePartialFromArray(request_byte_vec.data(),
+                                  request_byte_vec.size());
+    auto status = stub_->UpdateDevice(&context_, request, &response);
     return make_result(status, response);
   }
 
