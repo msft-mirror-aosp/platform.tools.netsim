@@ -37,6 +37,10 @@ pub mod ffi {
         pub fn GetDevices(self: &FrontendClient) -> UniquePtr<ClientResult>;
 
         #[allow(dead_code)]
+        #[rust_name = "reset"]
+        pub fn Reset(self: &FrontendClient) -> UniquePtr<ClientResult>;
+
+        #[allow(dead_code)]
         #[rust_name = "update_device"]
         pub fn UpdateDevice(self: &FrontendClient, request: Vec<u8>) -> UniquePtr<ClientResult>;
 
@@ -65,6 +69,7 @@ pub fn send_grpc(
     match grpc_method {
         GrpcMethod::GetVersion => client.get_version(),
         GrpcMethod::GetDevices => client.get_devices(),
+        GrpcMethod::Reset => client.reset(),
         GrpcMethod::UpdateDevice => client.update_device(request),
         _ => panic!(
             "Grpc method is not implemented. grpc_method: {:#?}, request (bytes): {:?}",
