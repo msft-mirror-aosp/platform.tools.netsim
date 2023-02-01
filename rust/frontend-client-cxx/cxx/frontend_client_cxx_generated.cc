@@ -750,6 +750,11 @@ extern "C" {
   return (self.*get_devices$)().release();
 }
 
+::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$reset(::netsim::frontend::FrontendClient const &self) noexcept {
+  ::std::unique_ptr<::netsim::frontend::ClientResult> (::netsim::frontend::FrontendClient::*reset$)() const = &::netsim::frontend::FrontendClient::Reset;
+  return (self.*reset$)().release();
+}
+
 ::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$update_device(::netsim::frontend::FrontendClient const &self, ::rust::Vec<::std::uint8_t> const *request) noexcept {
   ::std::unique_ptr<::netsim::frontend::ClientResult> (::netsim::frontend::FrontendClient::*update_device$)(::rust::Vec<::std::uint8_t>) const = &::netsim::frontend::FrontendClient::UpdateDevice;
   return (self.*update_device$)(::rust::Vec<::std::uint8_t>(::rust::unsafe_bitcopy, *request)).release();

@@ -29,6 +29,7 @@
 
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
+#include "google/protobuf/empty.pb.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
 #include "grpcpp/support/status_code_enum.h"
@@ -90,6 +91,13 @@ class FrontendClientImpl : public FrontendClient {
     frontend::GetDevicesResponse response;
     grpc::ClientContext context_;
     auto status = stub_->GetDevices(&context_, {}, &response);
+    return make_result(status, response);
+  }
+
+  std::unique_ptr<ClientResult> Reset() const override {
+    grpc::ClientContext context_;
+    google::protobuf::Empty response;
+    auto status = stub_->Reset(&context_, {}, &response);
     return make_result(status, response);
   }
 
