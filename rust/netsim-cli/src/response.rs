@@ -53,7 +53,7 @@ impl args::Command {
                 todo!();
             }
             Command::Reset => {
-                todo!();
+                println!("All devices have been reset.");
             }
             Command::Gui => {
                 unimplemented!("No Grpc Response for Gui Command.");
