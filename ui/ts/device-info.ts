@@ -65,6 +65,8 @@ export class DeviceInformation extends LitElement implements Notifiable {
   @property({ type: Number })
   posZ = 0;
 
+  holdRange = false;
+
   static styles = css`
     :host {
       cursor: pointer;
@@ -214,14 +216,15 @@ export class DeviceInformation extends LitElement implements Notifiable {
   }
 
   onNotify(data: SimulationInfo) {
-    this.editMode = false;
-    if (data.selectedSerial) {
+    if (data.selectedSerial && this.editMode === false) {
       for (const device of data.devices) {
         if (device.deviceSerial === data.selectedSerial) {
           this.selectedDevice = device;
-          this.yaw = device.orientation.yaw;
-          this.pitch = device.orientation.pitch;
-          this.roll = device.orientation.roll;
+          if (!this.holdRange){
+            this.yaw = device.orientation.yaw;
+            this.pitch = device.orientation.pitch;
+            this.roll = device.orientation.roll;
+          }
           this.posX = Math.floor(device.position.x * 100);
           this.posY = Math.floor(device.position.y * 100);
           this.posZ = Math.floor(device.position.z * 100);
@@ -232,6 +235,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
   }
 
   private changeRange(ev: InputEvent) {
+    this.holdRange = true;
     console.assert(this.selectedDevice !== null); // eslint-disable-line
     const range = ev.target as HTMLInputElement;
     const event = new CustomEvent('orientationEvent', {
@@ -252,6 +256,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
   }
 
   private updateOrientation() {
+    this.holdRange = false;
     console.assert(this.selectedDevice !== undefined); // eslint-disable-line
     if (this.selectedDevice === undefined) return;
     this.selectedDevice.orientation = {yaw: this.yaw, pitch: this.pitch, roll: this.roll};
@@ -275,7 +280,12 @@ export class DeviceInformation extends LitElement implements Notifiable {
   }
 
   private handleEditForm() {
-    this.editMode = !this.editMode;
+    if (this.editMode) {
+      simulationState.invokeGetDevice();
+      this.editMode = false;
+    } else {
+      this.editMode = true;
+    }
   }
 
   static checkPositionBound(value: number) {

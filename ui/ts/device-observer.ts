@@ -1,6 +1,5 @@
 // URL for netsim
 const GET_DEVICES_URL = 'http://localhost:7681/get-devices';
-const REGISTER_UPDATE_URL = 'http://localhost:7681/netsim/register-updates';
 const UPDATE_DEVICE_URL = 'http://localhost:7681/update-device';
 const SET_PACKET_CAPTURE_URL =
   'http://localhost:7681/netsim/set-packet-capture';
@@ -211,6 +210,10 @@ class SimulationState implements Observable {
 
   constructor() {
     // initial GET
+    this.invokeGetDevice();
+  }
+
+  invokeGetDevice() {
     fetch(GET_DEVICES_URL)
       .then(response => response.json())
       .then(data => {
@@ -223,6 +226,7 @@ class SimulationState implements Observable {
   }
 
   fetchDevice(devices: ProtoDevice[]) {
+    this.simulationInfo.devices = [];
     for (const device of devices) {
       this.simulationInfo.devices.push(new Device(device));
     }
@@ -305,31 +309,10 @@ class SimulationState implements Observable {
 export const simulationState = new SimulationState();
 
 async function subscribe() {
-  // net::ERR_EMPTY_RESPONSE --> subscribe rightaway
-  // net::ERR_CONNECTION_REFUSED --> subscribe after 15 seconds
-  // eslint-disable-next-line
-  let request = 0;
-  let start = new Date().getTime();
+  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
   while (true) {
-    await fetch(REGISTER_UPDATE_URL) // eslint-disable-line
-      .then(response => response.json())
-      .then(data => {
-        simulationState.fetchDevice(data.devices);
-      })
-      .catch(error => {
-        console.log(error); // eslint-disable-line
-        request += 1;
-      });
-    // Send out Fail to connect when 3 requests fail in 1 second
-    if (request >= 3) {
-      if ((new Date().getTime() - start) < 1000) {
-        alert("Failed to subscribe to netsim");
-        return;
-      } else {
-        request = 0;
-        start = new Date().getTime();
-      }
-    }
+    simulationState.invokeGetDevice();
+    await delay(1000);
   }
 }
 
