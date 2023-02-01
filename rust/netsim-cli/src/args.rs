@@ -101,7 +101,7 @@ pub struct Radio {
     /// Radio type
     #[clap(value_enum)]
     pub bt_type: BtType,
-    /// Radio status (up/down)
+    /// Radio status
     #[clap(value_enum)]
     pub status: UpDownStatus,
     /// Device serial
@@ -134,7 +134,7 @@ pub struct Move {
 
 #[derive(Debug, Args)]
 pub struct Capture {
-    /// Capture state (true/false)
+    /// Capture state
     #[clap(value_enum)]
     pub state: BoolState,
     /// Device serial
