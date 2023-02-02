@@ -12,6 +12,7 @@ use crate::frontend_http_server::http_router::Router;
 use crate::frontend_http_server::thread_pool::ThreadPool;
 
 use crate::ffi::get_devices;
+use crate::ffi::update_device;
 use cxx::let_cxx_string;
 use regex::Captures;
 use std::ffi::OsStr;
@@ -84,7 +85,19 @@ fn handle_get_device(_request: &HttpRequest, _capture: Captures) -> HttpResponse
     let_cxx_string!(request = "");
     let_cxx_string!(response = "");
     let_cxx_string!(error_message = "");
-    let status = get_devices(&request, response.as_mut(), error_message); // call cxx method for get device
+    let status = get_devices(&request, response.as_mut(), error_message);
+    if status == 200 {
+        HttpResponse::new_200("text/plain", response.to_string().into_bytes())
+    } else {
+        HttpResponse::new_404()
+    }
+}
+
+fn handle_update_device(request: &HttpRequest, _capture: Captures) -> HttpResponse {
+    let_cxx_string!(new_request = &request.body);
+    let_cxx_string!(response = "");
+    let_cxx_string!(error_message = "");
+    let status = update_device(&new_request, response.as_mut(), error_message);
     if status == 200 {
         HttpResponse::new_200("text/plain", response.to_string().into_bytes())
     } else {
@@ -97,6 +110,7 @@ fn handle_connection(mut stream: TcpStream) {
     router.add_route("/", handle_index);
     router.add_route("/get-version", handle_version);
     router.add_route("/get-devices", handle_get_device);
+    router.add_route("/update-device", handle_update_device);
     router.add_route("/(.+)", handle_static);
     let response =
         if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {
