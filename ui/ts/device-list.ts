@@ -79,7 +79,7 @@ export class DeviceList extends LitElement implements Notifiable {
         (device, idx) => html`
           <li>
             <center>
-              ${!("visible" in device) || device.visible === true
+              ${device.visible === true
                 ? html`<ns-cube-sprite
                       id=${device.deviceSerial}
                       color=${rainbow[idx % rainbow.length]}
