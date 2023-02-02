@@ -86,7 +86,7 @@ if(TARGET Rust::Rustc)
     add_dependencies(netsim-test emulator) # For PacketStreamerClientTest.
   endif()
 
-  target_include_directories(netsim-test PRIVATE src)
+  target_include_directories(netsim-test PRIVATE src rust/netsim-cxx/cxx)
 
   add_subdirectory(ui)
 endif()
