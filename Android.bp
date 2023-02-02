@@ -149,7 +149,7 @@ cc_library_host_static {
 }
 
 cc_binary_host {
-    name: "netsim",
+    name: "netsim-cc",
     defaults: ["netsim_defaults"],
     srcs: [
         "src/netsim.cc",
@@ -314,9 +314,9 @@ rust_ffi_host_static {
 }
 
 cc_binary_host {
-    name: "netsim-cl",
+    name: "netsim",
     defaults: ["netsim_defaults"],
-    srcs: ["rust/netsim-cl.cc"],
+    srcs: ["rust/netsim.cc"],
     generated_headers: ["cxx-bridge-header"],
     shared_libs: ["libgrpc++"],
     static_libs: [
