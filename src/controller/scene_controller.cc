@@ -46,7 +46,7 @@ std::shared_ptr<Device> SceneController::GetOrCreate(
   if (device != nullptr) {
     return device;
   }
-  device = std::make_shared<Device>(serial);
+  device = CreateDevice(serial);
   devices_.push_back(device);
   return device;
 }
