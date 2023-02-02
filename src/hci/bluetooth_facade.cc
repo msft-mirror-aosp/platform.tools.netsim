@@ -123,8 +123,9 @@ class SimPhyLayerFactory : public rootcanal::PhyLayerFactory {
     IncrTx(device_id, GetType());
     for (const auto &phy : phy_layers_) {
       if (id != phy->GetId()) {
-        IncrRx(phy->GetId(), GetType());
-        phy->Receive(packet, ComputeRssi(device_id, phy->GetId(), tx_power));
+        IncrRx(phy->GetDeviceId(), GetType());
+        phy->Receive(packet,
+                     ComputeRssi(device_id, phy->GetDeviceId(), tx_power));
       }
     }
   }

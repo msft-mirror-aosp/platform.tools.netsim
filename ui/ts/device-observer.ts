@@ -1,5 +1,5 @@
 // URL for netsim
-const GET_DEVICES_URL = 'http://localhost:7681/netsim/get-devices';
+const GET_DEVICES_URL = 'http://localhost:7681/get-devices';
 const REGISTER_UPDATE_URL = 'http://localhost:7681/netsim/register-updates';
 const UPDATE_DEVICE_URL = 'http://localhost:7681/netsim/update-device';
 const SET_PACKET_CAPTURE_URL =
@@ -15,46 +15,124 @@ export interface Notifiable {
 
 // TODO(b/255353541): import message interfaces in model.proto
 interface Radio {
-  state: string;
-  range: number;
-  txCount: number;
-  rxCount: number;
+  state?: string;
+  range?: number;
+  txCount?: number;
+  rxCount?: number;
 }
 
 interface Bluetooth {
-  lowEnergy: Radio;
-  classic: Radio;
+  lowEnergy?: Radio;
+  classic?: Radio;
 }
 
 interface Chip {
-  chipId: string;
-  manufacturer: string;
-  model: string;
-  capture: string;
-  bt: Bluetooth;
-  uwb: Radio;
-  wifi: Radio;
+  chipId?: string;
+  manufacturer?: string;
+  model?: string;
+  capture?: string;
+  bt?: Bluetooth;
+  uwb?: Radio;
+  wifi?: Radio;
 }
 
 /**
  * Data structure of Device.
  * Used as a reference for subscribed observers to get proper attributes.
  */
-export interface Device {
+export interface IDevice {
   deviceSerial: string;
-  name: string;
-  position: {
-    x: number;
-    y: number;
-    z: number;
+  name?: string;
+  position?: {
+    x?: number;
+    y?: number;
+    z?: number;
   };
-  orientation: {
-    yaw: number;
-    pitch: number;
-    roll: number;
+  orientation?: {
+    yaw?: number;
+    pitch?: number;
+    roll?: number;
   };
-  chips: Chip[];
-  visible: boolean;
+  chips?: Chip[];
+  visible?: boolean;
+}
+
+export class Device {
+  device: IDevice;
+
+  constructor(device: IDevice) {
+    this.device = device;
+  }
+
+  public get deviceSerial() {
+    return this.device.deviceSerial;
+  }
+
+  public get name() : string {
+    return this.device.name ?? "";
+  }
+
+  public set name(value: string) {
+    this.device.name = value;
+  }
+
+  public get position() : {x: number; y: number; z: number} {
+    let result = {x: 0, y: 0, z: 0}
+    if ("position" in this.device && this.device.position && typeof this.device.position === 'object') {
+      if ("x" in this.device.position && typeof this.device.position.x === 'number') {
+        result.x = this.device.position.x;
+      }
+      if ("y" in this.device.position && typeof this.device.position.y === 'number') {
+        result.y = this.device.position.y;
+      }
+      if ("z" in this.device.position && typeof this.device.position.z === 'number') {
+        result.z = this.device.position.z;
+      }
+    }
+    return result;
+  }
+
+  public set position(pos: {x?: number; y?: number; z?: number}) {
+    this.device.position = pos;
+  }
+
+  public get orientation() : {yaw: number; pitch: number; roll: number} {
+    let result = {yaw: 0, pitch: 0, roll: 0};
+    if ("orientation" in this.device && this.device.orientation && typeof this.device.orientation === 'object') {
+      if ("yaw" in this.device.orientation && typeof this.device.orientation.yaw === 'number') {
+        result.yaw = this.device.orientation.yaw;
+      }
+      if ("pitch" in this.device.orientation && typeof this.device.orientation.pitch === 'number') {
+        result.pitch = this.device.orientation.pitch;
+      }
+      if ("roll" in this.device.orientation && typeof this.device.orientation.roll === 'number') {
+        result.roll = this.device.orientation.roll;
+      }
+    }
+    return result;
+  }
+
+  public set orientation(ori: {yaw?: number; pitch?: number; roll?: number}) {
+    this.device.orientation = ori;
+  }
+
+  // TODO modularize getters and setters for Chip Interface
+  public get chips() : Chip[] {
+    return this.device.chips ?? [];
+  }
+
+  // TODO modularize getters and setters for Chip Interface
+  public set chips(value: Chip[]) {
+    this.device.chips = value;
+  }
+
+  public get visible() : boolean {
+    return this.device.visible ?? true;
+  }
+
+  public set visible(value: boolean) {
+    this.device.visible = value;
+  }
 }
 
 /**
@@ -98,8 +176,10 @@ class SimulationState implements Observable {
       });
   }
 
-  fetchDevice(devices: Device[]) {
-    this.simulationInfo.devices = devices;
+  fetchDevice(devices: IDevice[]) {
+    for (const device of devices) {
+      this.simulationInfo.devices.push(new Device(device));
+    }
     this.notifyObservers();
   }
 
@@ -111,8 +191,8 @@ class SimulationState implements Observable {
   handleDrop(serial: string, x: number, y: number) {
     for (const device of this.simulationInfo.devices) {
       if (serial === device.deviceSerial) {
-        device.position.x = x;
-        device.position.y = y;
+          device.position.x = x;
+          device.position.y = y;
         this.updateDevice({
           device: {
             deviceSerial: serial,
