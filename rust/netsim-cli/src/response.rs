@@ -67,30 +67,47 @@ impl args::Command {
 
     /// Helper function to format and print GetDevicesResponse
     fn print_device_response(response: GetDevicesResponse) {
-        println!("List of devices attached");
+        if response.devices.is_empty() {
+            println!("No attached devices found.");
+        }
         for device in response.devices {
-            print!("{}\t", device.device_serial);
+            let pos = device.get_position();
+            println!(
+                "{:15}\tposition: {:.2}, {:.2}, {:.2}",
+                device.device_serial,
+                pos.get_x(),
+                pos.get_y(),
+                pos.get_z()
+            );
             for chip in &device.chips {
                 match &chip.chip {
                     Some(Chip_oneof_chip::bt(bt)) => {
-                        print!(
-                            "ble: {}    \t",
-                            Self::bt_state_to_string(bt.get_low_energy().get_state())
-                        );
-                        print!(
-                            "classic: {}\t",
-                            Self::bt_state_to_string(bt.get_classic().get_state())
-                        );
+                        if bt.has_low_energy() {
+                            let ble_chip = bt.get_low_energy();
+                            println!(
+                                "\tble:     {:5}| rx_count: {:9?} | tx_count: {:9?}",
+                                Self::bt_state_to_string(ble_chip.get_state()),
+                                ble_chip.get_rx_count(),
+                                ble_chip.get_tx_count()
+                            );
+                        }
+                        if bt.has_classic() {
+                            let classic_chip = bt.get_classic();
+                            println!(
+                                "\tclassic: {:5}| rx_count: {:9?} | tx_count: {:9?}",
+                                Self::bt_state_to_string(classic_chip.get_state()),
+                                classic_chip.get_rx_count(),
+                                classic_chip.get_tx_count()
+                            );
+                        }
                     }
-                    _ => print!("Unknown: down/t"),
+                    _ => print!("\tUnknown chip: down\t"),
                 }
-                print!(
-                    "packet-capture: {}\t",
+                println!(
+                    "\tpacket-capture: {}\t",
                     if chip.capture == State::ON { "on" } else { "off" }
                 );
             }
-            let pos = device.get_position();
-            println!("position: ({:.2}, {:.2}, {:.2})", pos.get_x(), pos.get_y(), pos.get_z());
         }
     }
 
