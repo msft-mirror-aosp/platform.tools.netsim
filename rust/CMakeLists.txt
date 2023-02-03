@@ -12,9 +12,10 @@ add_subdirectory(netsim-cxx)
 # Steps to generate rust files are as follows:
 #
 # 1. sudo apt-get install protobuf-compiler
-# 2. Uncomment `build = "build_cargo.rs"` in rust/netsim-cxx/Cargo.toml.
-# 3. cd rust/netsim-cxx && cxxbridge.sh
-# 4. Comment `build = "build_cargo.rs"` in rust/netsim-cxx/Cargo.toml.
+# 2. Uncomment `build = "build_cargo.rs"` and `cxx-build = "1.0"` in
+#    rust/netsim-cxx/Cargo.toml.
+# 3. cd rust && netsim-cxx/cxxbridge.sh
+# 4. Revert step 2.
 
 add_subdirectory(netsim-cli)
 add_subdirectory(frontend-client-cxx)

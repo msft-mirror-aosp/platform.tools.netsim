@@ -8,6 +8,7 @@ extern crate frontend_proto;
 use crate::frontend_http_server::http_request::HttpRequest;
 use crate::frontend_http_server::http_response::HttpResponse;
 use crate::frontend_http_server::http_router::Router;
+use crate::version::VERSION;
 
 use crate::frontend_http_server::thread_pool::ThreadPool;
 
@@ -78,7 +79,10 @@ fn handle_static(request: &HttpRequest, _capture: Captures) -> HttpResponse {
 }
 
 fn handle_version(_request: &HttpRequest, _capture: Captures) -> HttpResponse {
-    HttpResponse::new_200("text/plain", b"{version: \"123b\"}".to_vec())
+    HttpResponse::new_200(
+        "text/plain",
+        format!("{{version: \"{}\"}}", VERSION).into_bytes().to_vec(),
+    )
 }
 
 fn handle_get_device(_request: &HttpRequest, _capture: Captures) -> HttpResponse {
