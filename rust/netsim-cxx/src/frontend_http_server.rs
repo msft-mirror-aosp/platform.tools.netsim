@@ -15,7 +15,6 @@ use crate::frontend_http_server::thread_pool::ThreadPool;
 use crate::ffi::get_devices;
 use crate::ffi::update_device;
 use cxx::let_cxx_string;
-use regex::Captures;
 use std::ffi::OsStr;
 use std::fs;
 use std::io::BufReader;
@@ -69,15 +68,11 @@ fn handle_file(method: &str, path: &str) -> HttpResponse {
     HttpResponse::new_404()
 }
 
-fn handle_pcap_file(request: &HttpRequest, capture: Captures) -> HttpResponse {
+fn handle_pcap_file(request: &HttpRequest, serial: &str) -> HttpResponse {
     if &request.method == "GET" {
         let mut filepath = std::env::current_exe().unwrap();
         filepath.pop();
         filepath.push("/tmp");
-        let serial = match capture.get(1) {
-            Some(serial) => serial.as_str(),
-            None => return HttpResponse::new_404(),
-        };
         filepath.push(format!("{serial}-hci.pcap"));
         if let Ok(body) = fs::read(&filepath) {
             return HttpResponse::new_200(to_content_type(&filepath), body);
@@ -88,22 +83,22 @@ fn handle_pcap_file(request: &HttpRequest, capture: Captures) -> HttpResponse {
 }
 
 // TODO handlers accept additional "context" including filepath
-fn handle_index(request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_index(request: &HttpRequest, _param: &str) -> HttpResponse {
     handle_file(&request.method, "index.html")
 }
 
-fn handle_static(request: &HttpRequest, _capture: Captures) -> HttpResponse {
-    handle_file(&request.method, &request.uri)
+fn handle_static(request: &HttpRequest, path: &str) -> HttpResponse {
+    handle_file(&request.method, path)
 }
 
-fn handle_version(_request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_version(_request: &HttpRequest, _param: &str) -> HttpResponse {
     HttpResponse::new_200(
         "text/plain",
         format!("{{version: \"{}\"}}", VERSION).into_bytes().to_vec(),
     )
 }
 
-fn handle_get_device(_request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_get_device(_request: &HttpRequest, _param: &str) -> HttpResponse {
     let_cxx_string!(request = "");
     let_cxx_string!(response = "");
     let_cxx_string!(error_message = "");
@@ -115,7 +110,7 @@ fn handle_get_device(_request: &HttpRequest, _capture: Captures) -> HttpResponse
     }
 }
 
-fn handle_update_device(request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_update_device(request: &HttpRequest, _param: &str) -> HttpResponse {
     let_cxx_string!(new_request = &request.body);
     let_cxx_string!(response = "");
     let_cxx_string!(error_message = "");
@@ -133,8 +128,8 @@ fn handle_connection(mut stream: TcpStream) {
     router.add_route("/get-version", handle_version);
     router.add_route("/get-devices", handle_get_device);
     router.add_route("/update-device", handle_update_device);
-    router.add_route("/pcap/(.+)", handle_pcap_file);
-    router.add_route("/(.+)", handle_static);
+    router.add_route(r"/pcap/{id}", handle_pcap_file);
+    router.add_route(r"/{path}", handle_static);
     let response =
         if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {
             router.handle_request(&request)
