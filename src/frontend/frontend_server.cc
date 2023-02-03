@@ -28,6 +28,7 @@
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
+#include "netsim_cxx_generated.h"
 #include "util/log.h"
 
 namespace netsim {
@@ -37,7 +38,7 @@ class FrontendServer final : public frontend::FrontendService::Service {
   grpc::Status GetVersion(grpc::ServerContext *context,
                           const google::protobuf::Empty *empty,
                           frontend::VersionResponse *reply) {
-    reply->set_version("123b");
+    reply->set_version(std::string(netsim::GetVersion()));
     return grpc::Status::OK;
   }
 

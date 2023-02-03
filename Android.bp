@@ -250,6 +250,10 @@ cc_test_host {
         "src/util/os_utils_test.cc",
         "src/util/string_utils_test.cc",
     ],
+    generated_headers: [
+        "cxx-bridge-header",
+        "netsim_cxx_h"
+    ],
     shared_libs: [
         "libgrpc++",
         "libcrypto",
