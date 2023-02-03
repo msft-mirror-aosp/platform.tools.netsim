@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::args::{self, BtType, Command, UpDownStatus};
+use crate::args::{self, BtType, Command, OnOffState, UpDownStatus};
 use frontend_proto::model::State;
 use frontend_proto::{
     frontend::{GetDevicesResponse, VersionResponse},
@@ -49,8 +49,12 @@ impl args::Command {
                     GetDevicesResponse::parse_from_bytes(response).unwrap(),
                 );
             }
-            Command::Capture(_) => {
-                todo!();
+            Command::Capture(cmd) => {
+                println!(
+                    "Turned {} packet capture for {}",
+                    if cmd.state == OnOffState::On { "on" } else { "off" },
+                    cmd.device_serial.to_owned()
+                );
             }
             Command::Reset => {
                 println!("All devices have been reset.");
@@ -80,6 +84,10 @@ impl args::Command {
                     }
                     _ => print!("Unknown: down/t"),
                 }
+                print!(
+                    "packet-capture: {}\t",
+                    if chip.capture == State::ON { "on" } else { "off" }
+                );
             }
             let pos = device.get_position();
             println!("position: ({:.2}, {:.2}, {:.2})", pos.get_x(), pos.get_y(), pos.get_z());
