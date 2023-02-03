@@ -209,7 +209,7 @@ export class PacketInformation extends LitElement implements Notifiable {
             </td>
             <td>
               <a
-                href="http://localhost:3000/${device.deviceSerial}-hci.pcap"
+                href="http://localhost:7681/pcap/${device.deviceSerial}"
                 target="_blank"
                 type="application/vnd.tcpdump.pcap"
                 >Download PCAP</a
