@@ -69,6 +69,24 @@ fn handle_file(method: &str, path: &str) -> HttpResponse {
     HttpResponse::new_404()
 }
 
+fn handle_pcap_file(request: &HttpRequest, capture: Captures) -> HttpResponse {
+    if &request.method == "GET" {
+        let mut filepath = std::env::current_exe().unwrap();
+        filepath.pop();
+        filepath.push("/tmp");
+        let serial = match capture.get(1) {
+            Some(serial) => serial.as_str(),
+            None => return HttpResponse::new_404(),
+        };
+        filepath.push(format!("{serial}-hci.pcap"));
+        if let Ok(body) = fs::read(&filepath) {
+            return HttpResponse::new_200(to_content_type(&filepath), body);
+        }
+    }
+    println!("netsim: pcap file not exists for the device");
+    HttpResponse::new_404()
+}
+
 // TODO handlers accept additional "context" including filepath
 fn handle_index(request: &HttpRequest, _capture: Captures) -> HttpResponse {
     handle_file(&request.method, "index.html")
@@ -115,6 +133,7 @@ fn handle_connection(mut stream: TcpStream) {
     router.add_route("/get-version", handle_version);
     router.add_route("/get-devices", handle_get_device);
     router.add_route("/update-device", handle_update_device);
+    router.add_route("/pcap/(.+)", handle_pcap_file);
     router.add_route("/(.+)", handle_static);
     let response =
         if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {

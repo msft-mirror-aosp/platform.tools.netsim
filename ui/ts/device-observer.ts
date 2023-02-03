@@ -172,10 +172,10 @@ export class Device {
   toggleCapture(device: Device, chip: Chip) {
     if ("capture" in chip && chip.capture) {
       chip.capture = chip.capture === 'ON' ? 'OFF' : 'ON';
-      simulationState.updateDevice({
+      simulationState.updateDevice({device: {
         deviceSerial: device.deviceSerial,
         chips: device.chips,
-      });
+      }});
     }
   }
 }
