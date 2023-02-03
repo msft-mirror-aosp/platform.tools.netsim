@@ -2,9 +2,11 @@
 
 mod frontend_http_server;
 mod ranging;
+mod version;
 
 use crate::frontend_http_server::run_frontend_http_server;
 use crate::ranging::*;
+use crate::version::*;
 
 #[cxx::bridge(namespace = "netsim")]
 mod ffi {
@@ -18,6 +20,11 @@ mod ffi {
 
         #[cxx_name = "DistanceToRssi"]
         fn distance_to_rssi(tx_power: i8, distance: f32) -> i8;
+
+        // Version
+
+        #[cxx_name = "GetVersion"]
+        fn get_version() -> String;
     }
 
     unsafe extern "C++" {
