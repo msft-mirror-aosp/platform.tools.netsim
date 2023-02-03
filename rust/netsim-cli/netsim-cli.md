@@ -4,7 +4,7 @@ USAGE:
 * `netsim <SUBCOMMAND>`
 
 OPTIONS:
-* -`h, --help`:    Print help information
+* `-h, --help`:    Print help information
 
 ## SUBCOMMANDS:
 * ### `capture`:           Control the packet capture for one or all devices
@@ -12,7 +12,7 @@ OPTIONS:
         * `netsim capture <STATE> <DEVICE_SERIAL>`
 
     * ARGS:
-        * \<STATE\>:     Capture state [possible values: true, false]
+        * \<STATE\>:     Capture state [possible values: on, off]
         * \<DEVICE_SERIAL\>:    Device serial
 * ### `devices`:           Display device(s) information
     * USAGE:
@@ -21,7 +21,6 @@ OPTIONS:
 * ### `move`:              Set the device location
     * USAGE:
         * `netsim move <DEVICE_SERIAL> <X> <Y> [Z]`
-
     * ARGS:
         * \<DEVICE_SERIAL\>:    Device serial
         * \<X\>:         x position of device
