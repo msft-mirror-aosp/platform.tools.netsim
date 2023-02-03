@@ -16,7 +16,9 @@ OPTIONS:
         * \<DEVICE_SERIAL\>:    Device serial
 * ### `devices`:           Display device(s) information
     * USAGE:
-        * `netsim devices`
+        * `netsim devices [OPTIONS]`
+    * OPTIONS:
+        * `-c, --continuous`:    Continuously print device(s) information every second
 * ### `help`:              Print this message or the help of the given subcommand(s)
 * ### `move`:              Set the device location
     * USAGE:
