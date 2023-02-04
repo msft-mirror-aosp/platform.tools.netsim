@@ -12,9 +12,10 @@ add_subdirectory(netsim-cxx)
 # Steps to generate rust files are as follows:
 #
 # 1. sudo apt-get install protobuf-compiler
-# 2. Uncomment `build = "build_cargo.rs"` in rust/netsim-cxx/Cargo.toml.
-# 3. cd rust/netsim-cxx && cxxbridge.sh
-# 4. Comment `build = "build_cargo.rs"` in rust/netsim-cxx/Cargo.toml.
+# 2. Uncomment `build = "build_cargo.rs"` and `cxx-build = "1.0"` in
+#    rust/netsim-cxx/Cargo.toml.
+# 3. cd rust && netsim-cxx/cxxbridge.sh
+# 4. Revert step 2.
 
 add_subdirectory(netsim-cli)
 add_subdirectory(frontend-client-cxx)
@@ -52,16 +53,3 @@ target_link_libraries(netsim-cli-rust-lib
 
 android_license(TARGET netsim-cli-rust-lib LIBNAME None SPDX None LICENSE None
                 LOCAL None)
-
-android_add_executable(
-  TARGET netsim-cl
-  LICENSE Apache-2.0 INSTALL .
-  SRC netsim-cl.cc
-  DEPS frontend-client
-       frontend-grpc-lib
-       frontend_client_cxx_generated
-       grpc++
-       netsim-cli-rust-lib
-       protobuf::libprotobuf
-       protobuf::libprotobuf
-       util-lib)

@@ -10,7 +10,6 @@ pub enum GrpcMethod {
     GetVersion,
     UpdateDevice,
     GetDevices,
-    SetPacketCapture,
     Reset,
 }
 
@@ -71,9 +70,5 @@ pub fn send_grpc(
         GrpcMethod::GetDevices => client.get_devices(),
         GrpcMethod::Reset => client.reset(),
         GrpcMethod::UpdateDevice => client.update_device(request),
-        _ => panic!(
-            "Grpc method is not implemented. grpc_method: {:#?}, request (bytes): {:?}",
-            grpc_method, request
-        ),
     }
 }
