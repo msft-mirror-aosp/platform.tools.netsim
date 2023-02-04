@@ -1,31 +1,31 @@
-import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,LitElement as i,html as o}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as a,customElement as d}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{simulationState as l}from"./device-observer.js";let n=class extends i{constructor(){super(...arguments),this.deviceData=[]}connectedCallback(){super.connectedCallback(),l.registerObserver(this)}disconnectedCallback(){l.removeObserver(this),super.disconnectedCallback()}onNotify(t){this.deviceData=t.devices,this.requestUpdate()}handleGetChips(t){var e,i,a,d,l,n,r,s;let c=o``,p=o``,h=o``;if("chips"in t&&t.chips)for(const b of t.chips){if("bt"in b&&b.bt){let t=o``,l=o``;"lowEnergy"in b.bt&&b.bt.lowEnergy&&(t=o`
+import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,LitElement as i,html as o}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as a,customElement as d}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{simulationState as l}from"./device-observer.js";let n=class extends i{constructor(){super(...arguments),this.deviceData=[]}connectedCallback(){super.connectedCallback(),l.registerObserver(this)}disconnectedCallback(){l.removeObserver(this),super.disconnectedCallback()}onNotify(t){this.deviceData=t.devices,this.requestUpdate()}handleGetChips(t){var e,i,a,d,l,n,r,s;let c=o``,p=o``,b=o``;if("chips"in t&&t.chips)for(const h of t.chips){if("bt"in h&&h.bt){let t=o``,l=o``;"lowEnergy"in h.bt&&h.bt.lowEnergy&&(t=o`
               <tr>
                 <td>BLE</td>
-                <td>${null!==(e=b.bt.lowEnergy.rxCount)&&void 0!==e?e:0}</td>
-                <td>${null!==(i=b.bt.lowEnergy.txCount)&&void 0!==i?i:0}</td>
+                <td>${null!==(e=h.bt.lowEnergy.rxCount)&&void 0!==e?e:0}</td>
+                <td>${null!==(i=h.bt.lowEnergy.txCount)&&void 0!==i?i:0}</td>
               </tr>
-            `),"classic"in b.bt&&b.bt.classic&&(l=o`
+            `),"classic"in h.bt&&h.bt.classic&&(l=o`
               <tr>
                 <td>Bluetooth Classic</td>
-                <td>${null!==(a=b.bt.classic.rxCount)&&void 0!==a?a:0}</td>
-                <td>${null!==(d=b.bt.classic.txCount)&&void 0!==d?d:0}</td>
+                <td>${null!==(a=h.bt.classic.rxCount)&&void 0!==a?a:0}</td>
+                <td>${null!==(d=h.bt.classic.txCount)&&void 0!==d?d:0}</td>
               </tr>
-            `),c=o`${t} ${l}`}"uwb"in b&&b.uwb&&(p=o`
+            `),c=o`${t} ${l}`}"uwb"in h&&h.uwb&&(p=o`
             <tr>
               <td>UWB</td>
-              <td>${null!==(l=b.uwb.rxCount)&&void 0!==l?l:0}</td>
-              <td>${null!==(n=b.uwb.txCount)&&void 0!==n?n:0}</td>
+              <td>${null!==(l=h.uwb.rxCount)&&void 0!==l?l:0}</td>
+              <td>${null!==(n=h.uwb.txCount)&&void 0!==n?n:0}</td>
             </tr>
-          `),"wifi"in b&&b.wifi&&(h=o`
+          `),"wifi"in h&&h.wifi&&(b=o`
             <tr>
               <td>WIFI</td>
-              <td>${null!==(r=b.wifi.rxCount)&&void 0!==r?r:0}</td>
-              <td>${null!==(s=b.wifi.txCount)&&void 0!==s?s:0}</td>
+              <td>${null!==(r=h.wifi.rxCount)&&void 0!==r?r:0}</td>
+              <td>${null!==(s=h.wifi.txCount)&&void 0!==s?s:0}</td>
             </tr>
           `)}return o`
       ${c}
       ${p}
-      ${h}
+      ${b}
     `}handleGetCapture(t){let e=o``;if("chips"in t&&t.chips)for(const i of t.chips)e=o`
           ${e}
           <tr>
@@ -44,7 +44,7 @@ import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,
             </td>
             <td>
               <a
-                href="http://localhost:3000/${t.deviceSerial}-hci.pcap"
+                href="http://localhost:7681/pcap/${t.deviceSerial}"
                 target="_blank"
                 type="application/vnd.tcpdump.pcap"
                 >Download PCAP</a
