@@ -64,8 +64,8 @@ fn handle_file(method: &str, path: &str) -> HttpResponse {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
     }
-    println!("netsim: handle_file with unknown path {path}");
-    HttpResponse::new_404()
+    let body = format!("404 not found (netsim): handle_file with unknown path {path}");
+    HttpResponse::new_404(body.into_bytes())
 }
 
 fn handle_pcap_file(request: &HttpRequest, serial: &str) -> HttpResponse {
@@ -78,8 +78,8 @@ fn handle_pcap_file(request: &HttpRequest, serial: &str) -> HttpResponse {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
     }
-    println!("netsim: pcap file not exists for the device");
-    HttpResponse::new_404()
+    let body = "404 not found (netsim): pcap file not exists for the device".to_string();
+    HttpResponse::new_404(body.into_bytes())
 }
 
 // TODO handlers accept additional "context" including filepath
@@ -102,11 +102,12 @@ fn handle_get_device(_request: &HttpRequest, _param: &str) -> HttpResponse {
     let_cxx_string!(request = "");
     let_cxx_string!(response = "");
     let_cxx_string!(error_message = "");
-    let status = get_devices(&request, response.as_mut(), error_message);
+    let status = get_devices(&request, response.as_mut(), error_message.as_mut());
     if status == 200 {
         HttpResponse::new_200("text/plain", response.to_string().into_bytes())
     } else {
-        HttpResponse::new_404()
+        let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
+        HttpResponse::new_404(body.into_bytes())
     }
 }
 
@@ -114,11 +115,12 @@ fn handle_update_device(request: &HttpRequest, _param: &str) -> HttpResponse {
     let_cxx_string!(new_request = &request.body);
     let_cxx_string!(response = "");
     let_cxx_string!(error_message = "");
-    let status = update_device(&new_request, response.as_mut(), error_message);
+    let status = update_device(&new_request, response.as_mut(), error_message.as_mut());
     if status == 200 {
         HttpResponse::new_200("text/plain", response.to_string().into_bytes())
     } else {
-        HttpResponse::new_404()
+        let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
+        HttpResponse::new_404(body.into_bytes())
     }
 }
 
@@ -134,8 +136,8 @@ fn handle_connection(mut stream: TcpStream) {
         if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {
             router.handle_request(&request)
         } else {
-            println!("netsim: parse header failed");
-            HttpResponse::new_404()
+            let body = "404 not found (netsim): parse header failed".to_string();
+            HttpResponse::new_404(body.into_bytes())
         };
     if let Err(e) = response.write_to(&mut stream) {
         println!("netsim: handle_connection error {e}");
