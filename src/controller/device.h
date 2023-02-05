@@ -31,7 +31,7 @@ class Device {
  public:
   model::Device model;
 
-  void Update(const model::Device &request);
+  void Patch(const model::Device &request);
 
   bool RemoveChip(model::Chip::ChipCase chip_case, const std::string &chip_id);
 

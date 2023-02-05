@@ -47,8 +47,8 @@ class FrontendClient {
   virtual ~FrontendClient(){};
   virtual std::unique_ptr<ClientResult> GetVersion() const = 0;
   virtual std::unique_ptr<ClientResult> GetDevices() const = 0;
-  virtual std::unique_ptr<ClientResult> UpdateDevice(
-      rust::Vec<rust::u8> const &equest_byte_vec) const = 0;
+  virtual std::unique_ptr<ClientResult> PatchDevice(
+      rust::Vec<rust::u8> const &request_byte_vec) const = 0;
   virtual std::unique_ptr<ClientResult> Reset() const = 0;
 };
 

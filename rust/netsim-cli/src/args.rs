@@ -51,7 +51,7 @@ impl Command {
         match self {
             Command::Version => Vec::new(),
             Command::Radio(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
                 mutable_device.set_device_serial(cmd.device_serial.to_owned());
                 let mutable_chips = mutable_device.mut_chips();
@@ -70,7 +70,7 @@ impl Command {
                 result.write_to_bytes().unwrap()
             }
             Command::Move(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
                 mutable_device.set_device_serial(cmd.device_serial.to_owned());
                 mutable_device.set_position(model::Position {
@@ -83,7 +83,7 @@ impl Command {
             }
             Command::Devices => Vec::new(),
             Command::Capture(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
                 mutable_device.set_device_serial(cmd.device_serial.to_owned());
                 let mutable_chips = mutable_device.mut_chips();
