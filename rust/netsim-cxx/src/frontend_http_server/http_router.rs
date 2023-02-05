@@ -48,8 +48,8 @@ impl Router {
                 return handler(request, param);
             }
         }
-        println!("netsim: HttpRouter unknown uri {}", request.uri);
-        HttpResponse::new_404()
+        let body = format!("404 Not found (netsim): HttpRouter unknown uri {}", request.uri);
+        HttpResponse::new_404(body.into_bytes())
     }
 }
 
@@ -149,5 +149,26 @@ mod tests {
         let content_type = response.headers.get("Content-Type");
         assert!(content_type.is_some());
         assert_eq!(content_type.unwrap(), "application/json");
+    }
+
+    #[test]
+    fn test_mismatch_uri() {
+        let mut router = Router::new();
+        router.add_route("/user/{id}", handle_user);
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            uri: "/player/1920".to_string(),
+            version: "HTTP/1.1".to_string(),
+            headers: HttpHeaders::new(),
+            body: vec![],
+        };
+        let response = router.handle_request(&request);
+        assert_eq!(response.status_code, 404);
+        let expected_body =
+            format!("404 Not found (netsim): HttpRouter unknown uri {}", &request.uri);
+        assert_eq!(response.body, expected_body.as_bytes());
+        let content_type = response.headers.get("Content-Type");
+        assert!(content_type.is_some());
+        assert_eq!(content_type.unwrap(), "text/plain");
     }
 }
