@@ -15,7 +15,6 @@ use crate::frontend_http_server::thread_pool::ThreadPool;
 use crate::ffi::get_devices;
 use crate::ffi::update_device;
 use cxx::let_cxx_string;
-use regex::Captures;
 use std::ffi::OsStr;
 use std::fs;
 use std::io::BufReader;
@@ -65,65 +64,63 @@ fn handle_file(method: &str, path: &str) -> HttpResponse {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
     }
-    println!("netsim: handle_file with unknown path {path}");
-    HttpResponse::new_404()
+    let body = format!("404 not found (netsim): handle_file with unknown path {path}");
+    HttpResponse::new_404(body.into_bytes())
 }
 
-fn handle_pcap_file(request: &HttpRequest, capture: Captures) -> HttpResponse {
+fn handle_pcap_file(request: &HttpRequest, serial: &str) -> HttpResponse {
     if &request.method == "GET" {
         let mut filepath = std::env::current_exe().unwrap();
         filepath.pop();
         filepath.push("/tmp");
-        let serial = match capture.get(1) {
-            Some(serial) => serial.as_str(),
-            None => return HttpResponse::new_404(),
-        };
         filepath.push(format!("{serial}-hci.pcap"));
         if let Ok(body) = fs::read(&filepath) {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
     }
-    println!("netsim: pcap file not exists for the device");
-    HttpResponse::new_404()
+    let body = "404 not found (netsim): pcap file not exists for the device".to_string();
+    HttpResponse::new_404(body.into_bytes())
 }
 
 // TODO handlers accept additional "context" including filepath
-fn handle_index(request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_index(request: &HttpRequest, _param: &str) -> HttpResponse {
     handle_file(&request.method, "index.html")
 }
 
-fn handle_static(request: &HttpRequest, _capture: Captures) -> HttpResponse {
-    handle_file(&request.method, &request.uri)
+fn handle_static(request: &HttpRequest, path: &str) -> HttpResponse {
+    handle_file(&request.method, path)
 }
 
-fn handle_version(_request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_version(_request: &HttpRequest, _param: &str) -> HttpResponse {
     HttpResponse::new_200(
         "text/plain",
         format!("{{version: \"{}\"}}", VERSION).into_bytes().to_vec(),
     )
 }
 
-fn handle_get_device(_request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_get_device(_request: &HttpRequest, _param: &str) -> HttpResponse {
     let_cxx_string!(request = "");
     let_cxx_string!(response = "");
     let_cxx_string!(error_message = "");
-    let status = get_devices(&request, response.as_mut(), error_message);
+    let status = get_devices(&request, response.as_mut(), error_message.as_mut());
     if status == 200 {
         HttpResponse::new_200("text/plain", response.to_string().into_bytes())
     } else {
-        HttpResponse::new_404()
+        let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
+        HttpResponse::new_404(body.into_bytes())
     }
 }
 
-fn handle_update_device(request: &HttpRequest, _capture: Captures) -> HttpResponse {
+fn handle_update_device(request: &HttpRequest, _param: &str) -> HttpResponse {
     let_cxx_string!(new_request = &request.body);
     let_cxx_string!(response = "");
     let_cxx_string!(error_message = "");
-    let status = update_device(&new_request, response.as_mut(), error_message);
+    let status = update_device(&new_request, response.as_mut(), error_message.as_mut());
     if status == 200 {
         HttpResponse::new_200("text/plain", response.to_string().into_bytes())
     } else {
-        HttpResponse::new_404()
+        let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
+        HttpResponse::new_404(body.into_bytes())
     }
 }
 
@@ -133,14 +130,14 @@ fn handle_connection(mut stream: TcpStream) {
     router.add_route("/get-version", handle_version);
     router.add_route("/get-devices", handle_get_device);
     router.add_route("/update-device", handle_update_device);
-    router.add_route("/pcap/(.+)", handle_pcap_file);
-    router.add_route("/(.+)", handle_static);
+    router.add_route(r"/pcap/{id}", handle_pcap_file);
+    router.add_route(r"/{path}", handle_static);
     let response =
         if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {
             router.handle_request(&request)
         } else {
-            println!("netsim: parse header failed");
-            HttpResponse::new_404()
+            let body = "404 not found (netsim): parse header failed".to_string();
+            HttpResponse::new_404(body.into_bytes())
         };
     if let Err(e) = response.write_to(&mut stream) {
         println!("netsim: handle_connection error {e}");
