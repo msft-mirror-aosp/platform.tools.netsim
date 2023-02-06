@@ -103,7 +103,7 @@ class FrontendClientImpl : public FrontendClient {
 
   // Updates the information of the device
   std::unique_ptr<ClientResult> UpdateDevice(
-      rust::Vec<::rust::u8> request_byte_vec) const override {
+      rust::Vec<::rust::u8> const &request_byte_vec) const override {
     ::google::protobuf::Empty response;
     grpc::ClientContext context_;
     frontend::UpdateDeviceRequest request;
