@@ -8,7 +8,7 @@
 #[derive(Debug, PartialEq, Eq)]
 pub enum GrpcMethod {
     GetVersion,
-    UpdateDevice,
+    PatchDevice,
     GetDevices,
     Reset,
 }
@@ -40,8 +40,8 @@ pub mod ffi {
         pub fn Reset(self: &FrontendClient) -> UniquePtr<ClientResult>;
 
         #[allow(dead_code)]
-        #[rust_name = "update_device"]
-        pub fn UpdateDevice(self: &FrontendClient, request: &Vec<u8>) -> UniquePtr<ClientResult>;
+        #[rust_name = "patch_device"]
+        pub fn PatchDevice(self: &FrontendClient, request: &Vec<u8>) -> UniquePtr<ClientResult>;
 
         #[allow(dead_code)]
         #[rust_name = "is_ok"]
@@ -69,6 +69,6 @@ pub fn send_grpc(
         GrpcMethod::GetVersion => client.get_version(),
         GrpcMethod::GetDevices => client.get_devices(),
         GrpcMethod::Reset => client.reset(),
-        GrpcMethod::UpdateDevice => client.update_device(request),
+        GrpcMethod::PatchDevice => client.patch_device(request),
     }
 }
