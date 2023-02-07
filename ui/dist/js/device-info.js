@@ -1,42 +1,42 @@
-import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,LitElement as t,html as s}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as o,customElement as d}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{styleMap as l,live as a}from"https://cdn.jsdelivr.net/gh/lit/dist@2/all/lit-all.min.js";import{simulationState as n}from"./device-observer.js";var c;let r=c=class extends t{constructor(){super(...arguments),this.yaw=0,this.pitch=0,this.roll=0,this.editMode=!1,this.posX=0,this.posY=0,this.posZ=0,this.holdRange=!1}connectedCallback(){super.connectedCallback(),n.registerObserver(this)}disconnectedCallback(){n.removeObserver(this),super.disconnectedCallback()}onNotify(e){if(e.selectedSerial&&!1===this.editMode)for(const i of e.devices)if(i.deviceSerial===e.selectedSerial){this.selectedDevice=i,this.holdRange||(this.yaw=i.orientation.yaw,this.pitch=i.orientation.pitch,this.roll=i.orientation.roll),this.posX=Math.floor(100*i.position.x),this.posY=Math.floor(100*i.position.y),this.posZ=Math.floor(100*i.position.z);break}}changeRange(e){var i;this.holdRange=!0,console.assert(null!==this.selectedDevice);const t=e.target,s=new CustomEvent("orientationEvent",{detail:{deviceSerial:null===(i=this.selectedDevice)||void 0===i?void 0:i.deviceSerial,type:t.id,value:t.value}});window.dispatchEvent(s),"yaw"===t.id?this.yaw=Number(t.value):"pitch"===t.id?this.pitch=Number(t.value):this.roll=Number(t.value)}updateOrientation(){this.holdRange=!1,console.assert(void 0!==this.selectedDevice),void 0!==this.selectedDevice&&(this.selectedDevice.orientation={yaw:this.yaw,pitch:this.pitch,roll:this.roll},n.updateDevice({device:{deviceSerial:this.selectedDevice.deviceSerial,orientation:this.selectedDevice.orientation}}))}updateRadio(){console.assert(void 0!==this.selectedDevice),void 0!==this.selectedDevice&&n.updateDevice({device:{deviceSerial:this.selectedDevice.deviceSerial,chips:this.selectedDevice.chips}})}handleEditForm(){this.editMode?(n.invokeGetDevice(),this.editMode=!1):this.editMode=!0}static checkPositionBound(e){return e>10?10:e<0?0:e}static checkOrientationBound(e){return e>90?90:e<-90?-90:e}handleSave(){if(console.assert(void 0!==this.selectedDevice),void 0===this.selectedDevice)return;const e=this.renderRoot.querySelectorAll('[id^="edit"]'),i={deviceSerial:this.selectedDevice.deviceSerial,name:this.selectedDevice.name,position:this.selectedDevice.position,orientation:this.selectedDevice.orientation};e.forEach((e=>{const t=e;"editName"===t.id?i.name=t.value:t.id.startsWith("editPos")?Number.isNaN(Number(t.value))||(i.position[t.id.slice(7).toLowerCase()]=c.checkPositionBound(Number(t.value)/100)):t.id.startsWith("editOri")&&(Number.isNaN(Number(t.value))||(i.orientation[t.id.slice(7).toLowerCase()]=c.checkOrientationBound(Number(t.value))))})),this.selectedDevice.name=i.name,this.selectedDevice.position=i.position,this.selectedDevice.orientation=i.orientation,this.handleEditForm(),n.updateDevice({device:i})}handleGetChips(){let e=s``,i=s``,t=s``,o=s``;const d=s`
+import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,LitElement as t,html as s}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as o,customElement as l}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{styleMap as d,live as a}from"https://cdn.jsdelivr.net/gh/lit/dist@2/all/lit-all.min.js";import{simulationState as n}from"./device-observer.js";var c;let r=c=class extends t{constructor(){super(...arguments),this.yaw=0,this.pitch=0,this.roll=0,this.editMode=!1,this.posX=0,this.posY=0,this.posZ=0,this.holdRange=!1}connectedCallback(){super.connectedCallback(),n.registerObserver(this)}disconnectedCallback(){n.removeObserver(this),super.disconnectedCallback()}onNotify(e){if(e.selectedSerial&&!1===this.editMode)for(const i of e.devices)if(i.deviceSerial===e.selectedSerial){this.selectedDevice=i,this.holdRange||(this.yaw=i.orientation.yaw,this.pitch=i.orientation.pitch,this.roll=i.orientation.roll),this.posX=Math.floor(100*i.position.x),this.posY=Math.floor(100*i.position.y),this.posZ=Math.floor(100*i.position.z);break}}changeRange(e){var i;this.holdRange=!0,console.assert(null!==this.selectedDevice);const t=e.target,s=new CustomEvent("orientationEvent",{detail:{deviceSerial:null===(i=this.selectedDevice)||void 0===i?void 0:i.deviceSerial,type:t.id,value:t.value}});window.dispatchEvent(s),"yaw"===t.id?this.yaw=Number(t.value):"pitch"===t.id?this.pitch=Number(t.value):this.roll=Number(t.value)}patchOrientation(){this.holdRange=!1,console.assert(void 0!==this.selectedDevice),void 0!==this.selectedDevice&&(this.selectedDevice.orientation={yaw:this.yaw,pitch:this.pitch,roll:this.roll},n.patchDevice({device:{deviceSerial:this.selectedDevice.deviceSerial,orientation:this.selectedDevice.orientation}}))}patchRadio(){console.assert(void 0!==this.selectedDevice),void 0!==this.selectedDevice&&n.patchDevice({device:{deviceSerial:this.selectedDevice.deviceSerial,chips:this.selectedDevice.chips}})}handleEditForm(){this.editMode?(n.invokeGetDevice(),this.editMode=!1):this.editMode=!0}static checkPositionBound(e){return e>10?10:e<0?0:e}static checkOrientationBound(e){return e>90?90:e<-90?-90:e}handleSave(){if(console.assert(void 0!==this.selectedDevice),void 0===this.selectedDevice)return;const e=this.renderRoot.querySelectorAll('[id^="edit"]'),i={deviceSerial:this.selectedDevice.deviceSerial,name:this.selectedDevice.name,position:this.selectedDevice.position,orientation:this.selectedDevice.orientation};e.forEach((e=>{const t=e;"editName"===t.id?i.name=t.value:t.id.startsWith("editPos")?Number.isNaN(Number(t.value))||(i.position[t.id.slice(7).toLowerCase()]=c.checkPositionBound(Number(t.value)/100)):t.id.startsWith("editOri")&&(Number.isNaN(Number(t.value))||(i.orientation[t.id.slice(7).toLowerCase()]=c.checkOrientationBound(Number(t.value))))})),this.selectedDevice.name=i.name,this.selectedDevice.position=i.position,this.selectedDevice.orientation=i.orientation,this.handleEditForm(),n.patchDevice({device:i})}handleGetChips(){let e=s``,i=s``,t=s``,o=s``;const l=s`
       <input type="checkbox" disabled />
         <span
           class="slider round"
-          style=${l({opacity:"0.7"})}
+          style=${d({opacity:"0.7"})}
         ></span>
-    `;if(this.selectedDevice&&"chips"in this.selectedDevice&&this.selectedDevice.chips)for(const l of this.selectedDevice.chips)"bt"in l&&l.bt&&(e="lowEnergy"in l.bt&&l.bt.lowEnergy&&"state"in l.bt.lowEnergy?s`
+    `;if(this.selectedDevice&&"chips"in this.selectedDevice&&this.selectedDevice.chips)for(const d of this.selectedDevice.chips)"bt"in d&&d.bt&&(e="lowEnergy"in d.bt&&d.bt.lowEnergy&&"state"in d.bt.lowEnergy?s`
                 <input
                   id="lowEnergy"
                   type="checkbox"
-                  .checked=${a("ON"===l.bt.lowEnergy.state)}
-                  @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(l,"lowEnergy"),this.updateRadio()}}
+                  .checked=${a("ON"===d.bt.lowEnergy.state)}
+                  @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(d,"lowEnergy"),this.patchRadio()}}
                 />
                 <span class="slider round"></span>
-              `:d,i="classic"in l.bt&&l.bt.classic&&"state"in l.bt.classic?s`
+              `:l,i="classic"in d.bt&&d.bt.classic&&"state"in d.bt.classic?s`
                 <input
                   id="classic"
                   type="checkbox"
-                  .checked=${a("ON"===l.bt.classic.state)}
-                  @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(l,"classic"),this.updateRadio()}}
+                  .checked=${a("ON"===d.bt.classic.state)}
+                  @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(d,"classic"),this.patchRadio()}}
                 />
                 <span class="slider round"></span>
-              `:d),t="wifi"in l&&l.wifi?s`
+              `:l),t="wifi"in d&&d.wifi?s`
               <input
                 id="wifi"
                 type="checkbox"
-                .checked=${a("ON"===l.wifi.state)}
-                @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(l),this.updateRadio()}}
+                .checked=${a("ON"===d.wifi.state)}
+                @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(d),this.patchRadio()}}
               />
               <span class="slider round"></span>
-            `:d,o="uwb"in l&&l.uwb?s`
+            `:l,o="uwb"in d&&d.uwb?s`
               <input
                 id="uwb"
                 type="checkbox"
-                .checked=${a("ON"===l.uwb.state)}
-                @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(l),this.updateRadio()}}
+                .checked=${a("ON"===d.uwb.state)}
+                @click=${()=>{var e;null===(e=this.selectedDevice)||void 0===e||e.toggleChipState(d),this.patchRadio()}}
               />
               <span class="slider round"></span>
-            `:d;return s`
+            `:l;return s`
       <div class="label">BLE</div>
       <div class="info">
         <label class="switch">
@@ -80,7 +80,7 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,
           <div class="setting">
             <div class="name">Position</div>
             <div class="label">X</div>
-            <div class="info" style=${l({color:"red"})}>
+            <div class="info" style=${d({color:"red"})}>
               ${this.editMode?s`<input
                     type="text"
                     id="editPosX"
@@ -88,7 +88,7 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,
                   />`:s`${this.posX}`}
             </div>
             <div class="label">Y</div>
-            <div class="info" style=${l({color:"green"})}>
+            <div class="info" style=${d({color:"green"})}>
               ${this.editMode?s`<input
                     type="text"
                     id="editPosY"
@@ -96,7 +96,7 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,
                   />`:s`${this.posY}`}
             </div>
             <div class="label">Z</div>
-            <div class="info" style=${l({color:"blue"})}>
+            <div class="info" style=${d({color:"blue"})}>
               ${this.editMode?s`<input
                     type="text"
                     id="editPosZ"
@@ -116,7 +116,7 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,
                 .value=${this.yaw.toString()}
                 .disabled=${this.editMode}
                 @input=${this.changeRange}
-                @change=${this.updateOrientation}
+                @change=${this.patchOrientation}
               />
               ${this.editMode?s`<input
                     type="text"
@@ -135,7 +135,7 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,
                 .value=${this.pitch.toString()}
                 .disabled=${this.editMode}
                 @input=${this.changeRange}
-                @change=${this.updateOrientation}
+                @change=${this.patchOrientation}
               />
               ${this.editMode?s`<input
                     type="text"
@@ -154,7 +154,7 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,
                 .value=${this.roll.toString()}
                 .disabled=${this.editMode}
                 @input=${this.changeRange}
-                @change=${this.updateOrientation}
+                @change=${this.patchOrientation}
               />
               ${this.editMode?s`<input
                     type="text"
@@ -318,4 +318,4 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as i,
       font-size: inherit;
       max-width: 200px;
     }
-  `,e([o()],r.prototype,"selectedDevice",void 0),e([o({type:Number})],r.prototype,"yaw",void 0),e([o({type:Number})],r.prototype,"pitch",void 0),e([o({type:Number})],r.prototype,"roll",void 0),e([o({type:Boolean})],r.prototype,"editMode",void 0),e([o({type:Number})],r.prototype,"posX",void 0),e([o({type:Number})],r.prototype,"posY",void 0),e([o({type:Number})],r.prototype,"posZ",void 0),r=c=e([d("ns-device-info")],r);export{r as DeviceInformation};
+  `,e([o()],r.prototype,"selectedDevice",void 0),e([o({type:Number})],r.prototype,"yaw",void 0),e([o({type:Number})],r.prototype,"pitch",void 0),e([o({type:Number})],r.prototype,"roll",void 0),e([o({type:Boolean})],r.prototype,"editMode",void 0),e([o({type:Number})],r.prototype,"posX",void 0),e([o({type:Number})],r.prototype,"posY",void 0),e([o({type:Number})],r.prototype,"posZ",void 0),r=c=e([l("ns-device-info")],r);export{r as DeviceInformation};

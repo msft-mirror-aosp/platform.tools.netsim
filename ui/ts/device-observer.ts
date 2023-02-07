@@ -1,8 +1,6 @@
 // URL for netsim
 const GET_DEVICES_URL = 'http://localhost:7681/get-devices';
-const UPDATE_DEVICE_URL = 'http://localhost:7681/update-device';
-const SET_PACKET_CAPTURE_URL =
-  'http://localhost:7681/netsim/set-packet-capture';
+const PATCH_DEVICE_URL = 'http://localhost:7681/patch-device';
 
 /**
  * Interface for a method in notifying the subscribed observers.
@@ -172,7 +170,7 @@ export class Device {
   toggleCapture(device: Device, chip: Chip) {
     if ("capture" in chip && chip.capture) {
       chip.capture = chip.capture === 'ON' ? 'OFF' : 'ON';
-      simulationState.updateDevice({device: {
+      simulationState.patchDevice({device: {
         deviceSerial: device.deviceSerial,
         chips: device.chips,
       }});
@@ -181,8 +179,8 @@ export class Device {
 }
 
 /**
- * The most updated state of the simulation.
- * Subscribed observers must refer to this info and update accordingly.
+ * The most recent state of the simulation.
+ * Subscribed observers must refer to this info and patch accordingly.
  */
 export interface SimulationInfo {
   devices: Device[];
@@ -233,7 +231,7 @@ class SimulationState implements Observable {
     this.notifyObservers();
   }
 
-  updateSelected(serial: string) {
+  patchSelected(serial: string) {
     this.simulationInfo.selectedSerial = serial;
     this.notifyObservers();
   }
@@ -242,7 +240,7 @@ class SimulationState implements Observable {
     for (const device of this.simulationInfo.devices) {
       if (serial === device.deviceSerial) {
         device.position = {x, y, z: device.position.z};
-        this.updateDevice({
+        this.patchDevice({
           device: {
             deviceSerial: serial,
             position: device.position,
@@ -253,28 +251,15 @@ class SimulationState implements Observable {
     }
   }
 
-  updateDevice(obj: object) {
+  patchDevice(obj: object) {
     const jsonBody = JSON.stringify(obj);
-    fetch(UPDATE_DEVICE_URL, {
+    fetch(PATCH_DEVICE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': jsonBody.length.toString(),
       },
       body: jsonBody,
-    })
-      .then(response => response.json())
-      .catch(error => {
-        // eslint-disable-next-line
-        console.error('Error:', error);
-      });
-    this.notifyObservers();
-  }
-
-  updateCapture(obj: object) {
-    fetch(SET_PACKET_CAPTURE_URL, {
-      method: 'POST',
-      body: JSON.stringify(obj),
     })
       .then(response => response.json())
       .catch(error => {

@@ -62,7 +62,7 @@ export class DeviceDropZone extends LitElement {
         dropped.style.left = `${ev.clientX - rect.left}px`;
         dropped.style.top = `${ev.clientY - rect.top}px`;
         dropped.style.opacity = `1.0`;
-        // Update the position of a dropped element
+        // Patch the position of a dropped element
         let serial = dropped
           .getElementsByTagName('ns-cube-sprite')
           .item(0)
