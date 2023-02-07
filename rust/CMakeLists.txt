@@ -7,14 +7,13 @@ corrosion_set_env_vars(netsim-cli CARGO_HOME=${Rust_CARGO_HOME})
 corrosion_set_env_vars(frontend-proto CARGO_HOME=${Rust_CARGO_HOME})
 corrosion_set_env_vars(frontend-client-cxx CARGO_HOME=${Rust_CARGO_HOME})
 
-# Use generated rust files because protobuf compiler is unavailable yet.
-# Steps to generate rust and C++ source files for netsim-cxx / frontend-client-cxx:
+# Use generated rust files because cxx-build is unavailable yet. Steps to
+# generate rust and C++ source files for netsim-cxx / frontend-client-cxx:
 #
-# 1. sudo apt-get install protobuf-compiler
-# 2. Uncomment `build = "build_cargo.rs"` and `cxx-build = "1.0"` in
+# 1. Uncomment `build = "build_cargo.rs"` and `cxx-build = "1.0"` in
 #    rust/{netsim-cxx or frontend-client-cxx}/Cargo.toml.
-# 3. cd rust && {netsim-cxx or frontend-client-cxx}/cxxbridge.sh
-# 4. Revert step 2.
+# 2. cd rust && cargo build
+# 3. git restore *-cxx/Cargo.toml
 add_subdirectory(netsim-cxx)
 add_subdirectory(netsim-cli)
 add_subdirectory(frontend-client-cxx)
