@@ -255,12 +255,12 @@ export class DeviceInformation extends LitElement implements Notifiable {
     }
   }
 
-  private updateOrientation() {
+  private patchOrientation() {
     this.holdRange = false;
     console.assert(this.selectedDevice !== undefined); // eslint-disable-line
     if (this.selectedDevice === undefined) return;
     this.selectedDevice.orientation = {yaw: this.yaw, pitch: this.pitch, roll: this.roll};
-    simulationState.updateDevice({
+    simulationState.patchDevice({
       device: {
         deviceSerial: this.selectedDevice.deviceSerial,
         orientation: this.selectedDevice.orientation,
@@ -268,10 +268,10 @@ export class DeviceInformation extends LitElement implements Notifiable {
     });
   }
 
-  private updateRadio() {
+  private patchRadio() {
     console.assert(this.selectedDevice !== undefined); // eslint-disable-line
     if (this.selectedDevice === undefined) return;
-    simulationState.updateDevice({
+    simulationState.patchDevice({
       device: {
         deviceSerial: this.selectedDevice.deviceSerial,
         chips: this.selectedDevice.chips,
@@ -328,7 +328,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
     this.selectedDevice.position = obj.position;
     this.selectedDevice.orientation = obj.orientation;
     this.handleEditForm();
-    simulationState.updateDevice({
+    simulationState.patchDevice({
       device: obj,
     });
   }
@@ -358,7 +358,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
                   @click=${() => {
                     // eslint-disable-next-line
                     this.selectedDevice?.toggleChipState(chip, "lowEnergy");
-                    this.updateRadio();
+                    this.patchRadio();
                   }}
                 />
                 <span class="slider round"></span>
@@ -375,7 +375,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
                   @click=${() => {
                     // eslint-disable-next-line
                     this.selectedDevice?.toggleChipState(chip, "classic");
-                    this.updateRadio();
+                    this.patchRadio();
                   }}
                 />
                 <span class="slider round"></span>
@@ -394,7 +394,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
                 @click=${() => {
                   // eslint-disable-next-line
                   this.selectedDevice?.toggleChipState(chip);
-                  this.updateRadio();
+                  this.patchRadio();
                 }}
               />
               <span class="slider round"></span>
@@ -412,7 +412,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
                 @click=${() => {
                   // eslint-disable-next-line
                   this.selectedDevice?.toggleChipState(chip);
-                  this.updateRadio();
+                  this.patchRadio();
                 }}
               />
               <span class="slider round"></span>
@@ -516,7 +516,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
                 .value=${this.yaw.toString()}
                 .disabled=${this.editMode}
                 @input=${this.changeRange}
-                @change=${this.updateOrientation}
+                @change=${this.patchOrientation}
               />
               ${this.editMode
                 ? html`<input
@@ -537,7 +537,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
                 .value=${this.pitch.toString()}
                 .disabled=${this.editMode}
                 @input=${this.changeRange}
-                @change=${this.updateOrientation}
+                @change=${this.patchOrientation}
               />
               ${this.editMode
                 ? html`<input
@@ -558,7 +558,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
                 .value=${this.roll.toString()}
                 .disabled=${this.editMode}
                 @input=${this.changeRange}
-                @change=${this.updateOrientation}
+                @change=${this.patchOrientation}
               />
               ${this.editMode
                 ? html`<input
