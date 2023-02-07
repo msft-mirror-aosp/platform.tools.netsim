@@ -46,7 +46,7 @@ const std::string GetName(std::string_view device_serial) {
 }
 }  // namespace
 
-void Device::Update(const model::Device &request) {
+void Device::Patch(const model::Device &request) {
   if (request.has_position()) {
     this->model.mutable_position()->CopyFrom(request.position());
   }
@@ -60,7 +60,7 @@ void Device::Update(const model::Device &request) {
     auto found = false;
     for (auto &chip : chips) {
       if (chip->KeyComp(request_chip_model)) {
-        chip->Update(request_chip_model);
+        chip->Patch(request_chip_model);
         found = true;
         break;
       }

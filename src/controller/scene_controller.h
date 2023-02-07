@@ -46,7 +46,7 @@ class SceneController {
 
   const std::vector<std::shared_ptr<Device>> Copy();
 
-  bool UpdateDevice(const model::Device &);
+  bool PatchDevice(const model::Device &);
 
   float GetDistance(const Device &, const Device &);
 
