@@ -314,6 +314,7 @@ rust_ffi_host_static {
         "libfrontend_proto",
         "libfrontend_client_cxx",
         "libprotobuf",
+        "libcxx",
     ],
 }
 
