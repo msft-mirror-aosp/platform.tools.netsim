@@ -20,7 +20,7 @@
 
 #include "backend/fd_startup.h"
 #include "frontend/frontend_server.h"
-#include "frontend/http_server.h"
+#include "netsim_cxx_generated.h"
 
 namespace netsim {
 
@@ -28,10 +28,11 @@ void StartWithFds(const std::string &startup_str, bool debug) {
   std::unique_ptr<hci::FdStartup> fds = hci::FdStartup::Create();
   fds->Connect(startup_str);
 
-  std::thread http_server(netsim::http::RunHttpServer);
+  std::thread frontend_http_server(RunFrontendHttpServer);
 
   // running the frontend server blocks
   netsim::RunFrontendServer();
+  frontend_http_server.join();
 }
 
 }  // namespace netsim
