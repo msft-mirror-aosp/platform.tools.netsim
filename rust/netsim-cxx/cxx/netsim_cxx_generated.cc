@@ -117,9 +117,9 @@ extern "C" {
   return get_devices$(request, response, error_message);
 }
 
-::std::uint32_t netsim$scene_controller$cxxbridge1$update_device(::std::string const &request, ::std::string &response, ::std::string &error_message) noexcept {
-  ::std::uint32_t (*update_device$)(::std::string const &, ::std::string &, ::std::string &) = ::netsim::scene_controller::UpdateDevice;
-  return update_device$(request, response, error_message);
+::std::uint32_t netsim$scene_controller$cxxbridge1$patch_device(::std::string const &request, ::std::string &response, ::std::string &error_message) noexcept {
+  ::std::uint32_t (*patch_device$)(::std::string const &, ::std::string &, ::std::string &) = ::netsim::scene_controller::PatchDevice;
+  return patch_device$(request, response, error_message);
 }
 } // extern "C"
 } // namespace scene_controller

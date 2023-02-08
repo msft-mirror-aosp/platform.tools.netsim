@@ -101,15 +101,15 @@ class FrontendClientImpl : public FrontendClient {
     return make_result(status, response);
   }
 
-  // Updates the information of the device
-  std::unique_ptr<ClientResult> UpdateDevice(
-      rust::Vec<::rust::u8> request_byte_vec) const override {
+  // Patchs the information of the device
+  std::unique_ptr<ClientResult> PatchDevice(
+      rust::Vec<::rust::u8> const &request_byte_vec) const override {
     ::google::protobuf::Empty response;
     grpc::ClientContext context_;
-    frontend::UpdateDeviceRequest request;
+    frontend::PatchDeviceRequest request;
     request.ParsePartialFromArray(request_byte_vec.data(),
                                   request_byte_vec.size());
-    auto status = stub_->UpdateDevice(&context_, request, &response);
+    auto status = stub_->PatchDevice(&context_, request, &response);
     return make_result(status, response);
   }
 
