@@ -73,7 +73,7 @@ std::optional<std::string> GetServerAddress(bool frontend_server) {
   }
   IniFile iniFile(filepath);
   iniFile.Read();
-  return iniFile.Get(frontend_server ? "grpc.port" : "grpc.backend.port");
+  return iniFile.Get("grpc.port");
 }
 }  // namespace osutils
 }  // namespace netsim
