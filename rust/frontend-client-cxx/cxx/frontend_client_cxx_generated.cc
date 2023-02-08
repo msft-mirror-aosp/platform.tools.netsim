@@ -402,11 +402,6 @@ struct unsafe_bitcopy_t final {
 };
 #endif // CXXBRIDGE1_RUST_BITCOPY_T
 
-#ifndef CXXBRIDGE1_RUST_BITCOPY
-#define CXXBRIDGE1_RUST_BITCOPY
-constexpr unsafe_bitcopy_t unsafe_bitcopy{};
-#endif // CXXBRIDGE1_RUST_BITCOPY
-
 #ifndef CXXBRIDGE1_RUST_VEC
 #define CXXBRIDGE1_RUST_VEC
 template <typename T>
@@ -755,9 +750,9 @@ extern "C" {
   return (self.*reset$)().release();
 }
 
-::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$update_device(::netsim::frontend::FrontendClient const &self, ::rust::Vec<::std::uint8_t> const *request) noexcept {
-  ::std::unique_ptr<::netsim::frontend::ClientResult> (::netsim::frontend::FrontendClient::*update_device$)(::rust::Vec<::std::uint8_t>) const = &::netsim::frontend::FrontendClient::UpdateDevice;
-  return (self.*update_device$)(::rust::Vec<::std::uint8_t>(::rust::unsafe_bitcopy, *request)).release();
+::netsim::frontend::ClientResult *netsim$frontend$cxxbridge1$FrontendClient$patch_device(::netsim::frontend::FrontendClient const &self, ::rust::Vec<::std::uint8_t> const &request) noexcept {
+  ::std::unique_ptr<::netsim::frontend::ClientResult> (::netsim::frontend::FrontendClient::*patch_device$)(::rust::Vec<::std::uint8_t> const &) const = &::netsim::frontend::FrontendClient::PatchDevice;
+  return (self.*patch_device$)(request).release();
 }
 
 bool netsim$frontend$cxxbridge1$ClientResult$is_ok(::netsim::frontend::ClientResult const &self) noexcept {

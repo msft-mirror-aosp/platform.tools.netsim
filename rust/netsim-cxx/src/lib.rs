@@ -40,9 +40,9 @@ mod ffi {
         ) -> u32;
 
         #[allow(dead_code)]
-        #[rust_name = "update_device"]
+        #[rust_name = "patch_device"]
         #[namespace = "netsim::scene_controller"]
-        fn UpdateDevice(
+        fn PatchDevice(
             request: &CxxString,
             response: Pin<&mut CxxString>,
             error_message: Pin<&mut CxxString>,

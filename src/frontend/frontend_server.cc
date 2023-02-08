@@ -52,10 +52,10 @@ class FrontendServer final : public frontend::FrontendService::Service {
     return grpc::Status::OK;
   }
 
-  grpc::Status UpdateDevice(grpc::ServerContext *context,
-                            const frontend::UpdateDeviceRequest *request,
-                            google::protobuf::Empty *response) {
-    auto status = netsim::controller::SceneController::Singleton().UpdateDevice(
+  grpc::Status PatchDevice(grpc::ServerContext *context,
+                           const frontend::PatchDeviceRequest *request,
+                           google::protobuf::Empty *response) {
+    auto status = netsim::controller::SceneController::Singleton().PatchDevice(
         request->device());
     if (!status)
       return grpc::Status(
@@ -75,7 +75,7 @@ class FrontendServer final : public frontend::FrontendService::Service {
     chip.set_capture(request->capture() ? model::State::ON : model::State::OFF);
     chip.mutable_bt();
     device.mutable_chips()->Add()->CopyFrom(chip);
-    controller::SceneController::Singleton().UpdateDevice(device);
+    controller::SceneController::Singleton().PatchDevice(device);
     return grpc::Status::OK;
   }
 
