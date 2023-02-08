@@ -27,7 +27,7 @@
 use crate::frontend_http_server::http_request::HttpRequest;
 use crate::frontend_http_server::http_response::HttpResponse;
 
-type RequestHandler = fn(&HttpRequest, &str) -> HttpResponse;
+type RequestHandler = Box<dyn Fn(&HttpRequest, &str) -> HttpResponse>;
 
 pub struct Router {
     routes: Vec<(String, RequestHandler)>,
@@ -119,8 +119,8 @@ mod tests {
     #[test]
     fn test_handle_request() {
         let mut router = Router::new();
-        router.add_route("/", handle_index);
-        router.add_route("/user/{id}", handle_user);
+        router.add_route("/", Box::new(handle_index));
+        router.add_route("/user/{id}", Box::new(handle_user));
         let request = HttpRequest {
             method: "GET".to_string(),
             uri: "/".to_string(),
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn test_mismatch_uri() {
         let mut router = Router::new();
-        router.add_route("/user/{id}", handle_user);
+        router.add_route("/user/{id}", Box::new(handle_user));
         let request = HttpRequest {
             method: "GET".to_string(),
             uri: "/player/1920".to_string(),
