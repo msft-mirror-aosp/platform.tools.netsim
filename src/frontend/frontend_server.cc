@@ -23,13 +23,9 @@
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"
-#include "grpcpp/security/server_credentials.h"
-#include "grpcpp/server.h"
-#include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
 #include "netsim_cxx_generated.h"
-#include "util/log.h"
 
 namespace netsim {
 namespace {
@@ -86,21 +82,10 @@ class FrontendServer final : public frontend::FrontendService::Service {
     return grpc::Status::OK;
   }
 };
-
-FrontendServer service;
 }  // namespace
 
-std::pair<std::unique_ptr<grpc::Server>, std::string> RunFrontendServer() {
-  grpc::ServerBuilder builder;
-  int selected_port;
-  builder.AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(),
-                           &selected_port);
-  builder.RegisterService(&service);
-  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-
-  BtsLog("Frontend server listening on localhost: %s",
-         std::to_string(selected_port).c_str());
-  return std::make_pair(std::move(server), std::to_string(selected_port));
+std::unique_ptr<frontend::FrontendService::Service> GetFrontendService() {
+  return std::make_unique<FrontendServer>();
 }
 
 }  // namespace netsim
