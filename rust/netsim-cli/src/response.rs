@@ -44,7 +44,7 @@ impl args::Command {
                     cmd.z.unwrap_or_default()
                 )
             }
-            Command::Devices => {
+            Command::Devices(_) => {
                 Self::print_device_response(
                     GetDevicesResponse::parse_from_bytes(response).unwrap(),
                 );
@@ -69,6 +69,8 @@ impl args::Command {
     fn print_device_response(response: GetDevicesResponse) {
         if response.devices.is_empty() {
             println!("No attached devices found.");
+        } else {
+            println!("List of attached devices:");
         }
         for device in response.devices {
             let pos = device.get_position();

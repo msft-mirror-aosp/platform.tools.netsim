@@ -22,7 +22,7 @@ impl args::Command {
             Command::Version => GrpcMethod::GetVersion,
             Command::Radio(_) => GrpcMethod::PatchDevice,
             Command::Move(_) => GrpcMethod::PatchDevice,
-            Command::Devices => GrpcMethod::GetDevices,
+            Command::Devices(_) => GrpcMethod::GetDevices,
             Command::Capture(_) => GrpcMethod::PatchDevice,
             Command::Reset => GrpcMethod::Reset,
             Command::Gui => {

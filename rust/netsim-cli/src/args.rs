@@ -34,7 +34,7 @@ pub enum Command {
     /// Set the device location
     Move(Move),
     /// Display device(s) information
-    Devices,
+    Devices(Devices),
     /// Control the packet capture for one or all devices
     Capture(Capture),
     /// Reset Netsim device scene
@@ -81,7 +81,7 @@ impl Command {
                 });
                 result.write_to_bytes().unwrap()
             }
-            Command::Devices => Vec::new(),
+            Command::Devices(_) => Vec::new(),
             Command::Capture(cmd) => {
                 let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
@@ -138,6 +138,13 @@ pub struct Move {
     pub y: f32,
     /// Optional z position of device
     pub z: Option<f32>,
+}
+
+#[derive(Debug, Args)]
+pub struct Devices {
+    /// Continuously print device(s) information every second
+    #[clap(short, long)]
+    pub continuous: bool,
 }
 
 #[derive(Debug, Args)]
