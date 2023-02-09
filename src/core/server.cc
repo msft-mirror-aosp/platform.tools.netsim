@@ -15,6 +15,7 @@
 #include "core/server.h"
 
 #include <memory>
+#include <string>
 #include <thread>
 
 #ifdef NETSIM_ANDROID_EMULATOR
@@ -33,11 +34,11 @@
 namespace netsim::server {
 
 namespace {
-std::pair<std::unique_ptr<grpc::Server>, std::string> RunGrpcServer() {
+std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port) {
   grpc::ServerBuilder builder;
   int selected_port;
-  builder.AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(),
-                           &selected_port);
+  builder.AddListeningPort("0.0.0.0:" + std::to_string(netsim_grpc_port),
+                           grpc::InsecureServerCredentials(), &selected_port);
   static auto frontend_service = GetFrontendService();
   builder.RegisterService(frontend_service.get());
 #ifdef NETSIM_ANDROID_EMULATOR
@@ -57,18 +58,23 @@ std::pair<std::unique_ptr<grpc::Server>, std::string> RunGrpcServer() {
   iniFile.Set("grpc.port", std::to_string(selected_port));
   iniFile.Write();
 
-  return std::make_pair(std::move(server), std::to_string(selected_port));
+  return std::move(server);
 }
 }  // namespace
 
 void Run() {
+  // Environment variable "NETSIM_GRPC_PORT" is set in google3 forge. If set:
+  // 1. Use the fixed port for grpc server.
+  // 2. Don't start http server.
+  auto netsim_grpc_port = std::stoi(osutils::GetEnv("NETSIM_GRPC_PORT", "0"));
   // Run frontend and backend grpc servers.
-  auto [grpc_server, grpc_port] = RunGrpcServer();
-  // Run frontend http server.
-  std::thread frontend_http_server(RunFrontendHttpServer);
-
+  auto grpc_server = RunGrpcServer(netsim_grpc_port);
+  if (netsim_grpc_port == 0) {
+    // Run frontend http server.
+    std::thread frontend_http_server(RunFrontendHttpServer);
+    frontend_http_server.join();
+  }
   grpc_server->Wait();
-  frontend_http_server.join();
   // never happens
 }
 
