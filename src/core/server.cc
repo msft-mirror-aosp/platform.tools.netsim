@@ -15,24 +15,61 @@
 #include "core/server.h"
 
 #include <memory>
-#include <string>
 #include <thread>
 
-#include "backend/fd_startup.h"
+#ifdef NETSIM_ANDROID_EMULATOR
+#include "backend/backend_server.h"
+#endif
 #include "frontend/frontend_server.h"
+#include "grpcpp/security/server_credentials.h"
+#include "grpcpp/server.h"
+#include "grpcpp/server_builder.h"
 #include "netsim_cxx_generated.h"
+#include "util/filesystem.h"
+#include "util/ini_file.h"
+#include "util/log.h"
+#include "util/os_utils.h"
 
-namespace netsim {
+namespace netsim::server {
 
-void StartWithFds(const std::string &startup_str, bool debug) {
-  std::unique_ptr<hci::FdStartup> fds = hci::FdStartup::Create();
-  fds->Connect(startup_str);
+namespace {
+std::pair<std::unique_ptr<grpc::Server>, std::string> RunGrpcServer() {
+  grpc::ServerBuilder builder;
+  int selected_port;
+  builder.AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(),
+                           &selected_port);
+  static auto frontend_service = GetFrontendService();
+  builder.RegisterService(frontend_service.get());
+#ifdef NETSIM_ANDROID_EMULATOR
+  static auto backend_service = GetBackendService();
+  builder.RegisterService(backend_service.get());
+#endif
+  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
+  BtsLog("Grpc server listening on localhost: %s",
+         std::to_string(selected_port).c_str());
+
+  // Writes grpc port to ini file.
+  auto filepath = osutils::GetDiscoveryDirectory() + netsim::filesystem::slash +
+                  "netsim.ini";
+  IniFile iniFile(filepath);
+  iniFile.Read();
+  iniFile.Set("grpc.port", std::to_string(selected_port));
+  iniFile.Write();
+
+  return std::make_pair(std::move(server), std::to_string(selected_port));
+}
+}  // namespace
+
+void Run() {
+  // Run frontend and backend grpc servers.
+  auto [grpc_server, grpc_port] = RunGrpcServer();
+  // Run frontend http server.
   std::thread frontend_http_server(RunFrontendHttpServer);
 
-  // running the frontend server blocks
-  netsim::RunFrontendServer();
+  grpc_server->Wait();
   frontend_http_server.join();
+  // never happens
 }
 
-}  // namespace netsim
+}  // namespace netsim::server
