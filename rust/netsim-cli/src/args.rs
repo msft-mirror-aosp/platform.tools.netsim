@@ -34,7 +34,7 @@ pub enum Command {
     /// Set the device location
     Move(Move),
     /// Display device(s) information
-    Devices,
+    Devices(Devices),
     /// Control the packet capture for one or all devices
     Capture(Capture),
     /// Reset Netsim device scene
@@ -51,7 +51,7 @@ impl Command {
         match self {
             Command::Version => Vec::new(),
             Command::Radio(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
                 mutable_device.set_device_serial(cmd.device_serial.to_owned());
                 let mutable_chips = mutable_device.mut_chips();
@@ -70,7 +70,7 @@ impl Command {
                 result.write_to_bytes().unwrap()
             }
             Command::Move(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
                 mutable_device.set_device_serial(cmd.device_serial.to_owned());
                 mutable_device.set_position(model::Position {
@@ -81,11 +81,19 @@ impl Command {
                 });
                 result.write_to_bytes().unwrap()
             }
-            Command::Devices => Vec::new(),
+            Command::Devices(_) => Vec::new(),
             Command::Capture(cmd) => {
-                let mut result = frontend::SetPacketCaptureRequest::new();
-                result.set_device_serial(cmd.device_serial.to_owned());
-                result.set_capture(cmd.state == BoolState::True);
+                let mut result = frontend::PatchDeviceRequest::new();
+                let mutable_device = result.mut_device();
+                mutable_device.set_device_serial(cmd.device_serial.to_owned());
+                let mutable_chips = mutable_device.mut_chips();
+                mutable_chips.push_default();
+                let capture_state = match cmd.state {
+                    OnOffState::On => State::ON,
+                    OnOffState::Off => State::OFF,
+                };
+                mutable_chips[0].set_capture(capture_state);
+                mutable_chips[0].mut_bt();
                 result.write_to_bytes().unwrap()
             }
             Command::Reset => Vec::new(),
@@ -99,8 +107,10 @@ impl Command {
 #[derive(Debug, Args)]
 pub struct Radio {
     /// Radio type
+    #[clap(value_enum)]
     pub bt_type: BtType,
-    /// Radio status (up/down)
+    /// Radio status
+    #[clap(value_enum)]
     pub status: UpDownStatus,
     /// Device serial
     pub device_serial: String,
@@ -131,17 +141,26 @@ pub struct Move {
 }
 
 #[derive(Debug, Args)]
+pub struct Devices {
+    /// Continuously print device(s) information every second
+    #[clap(short, long)]
+    pub continuous: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct Capture {
-    /// Capture state (true/false)
-    pub state: BoolState,
+    /// Capture state
+    #[clap(value_enum)]
+    pub state: OnOffState,
     /// Device serial
     pub device_serial: String,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
-pub enum BoolState {
-    #[value(alias("True"), alias("TRUE"))]
-    True,
-    #[value(alias("False"), alias("FALSE"))]
-    False,
+pub enum OnOffState {
+    // NOTE: Temporarily disable this attribute because clap-3.2.22 is used.
+    // #[value(alias("On"), alias("ON"))]
+    On,
+    // #[value(alias("Off"), alias("OFF"))]
+    Off,
 }

@@ -46,7 +46,7 @@ std::shared_ptr<Device> SceneController::GetOrCreate(
   if (device != nullptr) {
     return device;
   }
-  device = std::make_shared<Device>(serial);
+  device = CreateDevice(serial);
   devices_.push_back(device);
   return device;
 }
@@ -97,14 +97,14 @@ std::shared_ptr<Device> SceneController::MatchDevice(const std::string &serial,
 }
 
 // UI requesting a change in device info
-bool SceneController::UpdateDevice(const netsim::model::Device &request) {
+bool SceneController::PatchDevice(const netsim::model::Device &request) {
   std::unique_lock<std::mutex> lock(this->mutex_);
   if (request.device_serial().empty()) {
     return false;
   }
   auto device = MatchDevice(request.device_serial(), request.name());
   if (device == nullptr) return false;
-  device->Update(request);
+  device->Patch(request);
   DeviceNotifyManager::Get().Notify();
   return true;
 }

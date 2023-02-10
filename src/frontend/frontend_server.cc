@@ -23,12 +23,9 @@
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"
-#include "grpcpp/security/server_credentials.h"
-#include "grpcpp/server.h"
-#include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
-#include "util/log.h"
+#include "netsim_cxx_generated.h"
 
 namespace netsim {
 namespace {
@@ -37,7 +34,7 @@ class FrontendServer final : public frontend::FrontendService::Service {
   grpc::Status GetVersion(grpc::ServerContext *context,
                           const google::protobuf::Empty *empty,
                           frontend::VersionResponse *reply) {
-    reply->set_version("123b");
+    reply->set_version(std::string(netsim::GetVersion()));
     return grpc::Status::OK;
   }
 
@@ -51,10 +48,10 @@ class FrontendServer final : public frontend::FrontendService::Service {
     return grpc::Status::OK;
   }
 
-  grpc::Status UpdateDevice(grpc::ServerContext *context,
-                            const frontend::UpdateDeviceRequest *request,
-                            google::protobuf::Empty *response) {
-    auto status = netsim::controller::SceneController::Singleton().UpdateDevice(
+  grpc::Status PatchDevice(grpc::ServerContext *context,
+                           const frontend::PatchDeviceRequest *request,
+                           google::protobuf::Empty *response) {
+    auto status = netsim::controller::SceneController::Singleton().PatchDevice(
         request->device());
     if (!status)
       return grpc::Status(
@@ -74,7 +71,7 @@ class FrontendServer final : public frontend::FrontendService::Service {
     chip.set_capture(request->capture() ? model::State::ON : model::State::OFF);
     chip.mutable_bt();
     device.mutable_chips()->Add()->CopyFrom(chip);
-    controller::SceneController::Singleton().UpdateDevice(device);
+    controller::SceneController::Singleton().PatchDevice(device);
     return grpc::Status::OK;
   }
 
@@ -85,21 +82,10 @@ class FrontendServer final : public frontend::FrontendService::Service {
     return grpc::Status::OK;
   }
 };
-
-FrontendServer service;
 }  // namespace
 
-std::pair<std::unique_ptr<grpc::Server>, std::string> RunFrontendServer() {
-  grpc::ServerBuilder builder;
-  int selected_port;
-  builder.AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(),
-                           &selected_port);
-  builder.RegisterService(&service);
-  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-
-  BtsLog("Frontend server listening on localhost: %s",
-         std::to_string(selected_port).c_str());
-  return std::make_pair(std::move(server), std::to_string(selected_port));
+std::unique_ptr<frontend::FrontendService::Service> GetFrontendService() {
+  return std::make_unique<FrontendServer>();
 }
 
 }  // namespace netsim

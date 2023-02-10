@@ -17,7 +17,6 @@
 #include <google/protobuf/empty.pb.h>
 #include <google/protobuf/util/json_util.h>
 
-#include <memory>
 #include <string>
 
 #include "controller/scene_controller.h"
@@ -25,34 +24,32 @@
 
 namespace netsim::scene_controller {
 
-unsigned int UpdateDevice(const std::string &request,
-                          std::unique_ptr<std::string> response,
-                          std::unique_ptr<std::string> error_message) {
-  frontend::UpdateDeviceRequest request_proto;
+unsigned int PatchDevice(const std::string &request, std::string &response,
+                         std::string &error_message) {
+  frontend::PatchDeviceRequest request_proto;
   google::protobuf::util::JsonStringToMessage(request, &request_proto);
   google::protobuf::Empty response_proto;
 
-  auto status = netsim::controller::SceneController::Singleton().UpdateDevice(
+  auto status = netsim::controller::SceneController::Singleton().PatchDevice(
       request_proto.device());
   if (!status) {
-    error_message.reset(new std::string(
-        "device_serial not found: " + request_proto.device().device_serial()));
+    error_message =
+        "device_serial not found: " + request_proto.device().device_serial();
     return HTTP_STATUS_BAD_REQUEST;
   }
 
-  google::protobuf::util::MessageToJsonString(response_proto, response.get());
+  google::protobuf::util::MessageToJsonString(response_proto, &response);
   return HTTP_STATUS_OK;
 }
 
-unsigned int GetDevices(const std::string &request,
-                        std::unique_ptr<std::string> response,
-                        std::unique_ptr<std::string> error_message) {
+unsigned int GetDevices(const std::string &request, std::string &response,
+                        std::string &error_message) {
   frontend::GetDevicesResponse response_proto;
   const auto &devices = netsim::controller::SceneController::Singleton().Copy();
   for (const auto &device : devices)
     response_proto.add_devices()->CopyFrom(device->model);
 
-  google::protobuf::util::MessageToJsonString(response_proto, response.get());
+  google::protobuf::util::MessageToJsonString(response_proto, &response);
   return HTTP_STATUS_OK;
 }
 

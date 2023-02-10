@@ -2,9 +2,11 @@
 
 mod frontend_http_server;
 mod ranging;
+mod version;
 
 use crate::frontend_http_server::run_frontend_http_server;
 use crate::ranging::*;
+use crate::version::*;
 
 #[cxx::bridge(namespace = "netsim")]
 mod ffi {
@@ -18,6 +20,11 @@ mod ffi {
 
         #[cxx_name = "DistanceToRssi"]
         fn distance_to_rssi(tx_power: i8, distance: f32) -> i8;
+
+        // Version
+
+        #[cxx_name = "GetVersion"]
+        fn get_version() -> String;
     }
 
     unsafe extern "C++" {
@@ -28,17 +35,17 @@ mod ffi {
         #[namespace = "netsim::scene_controller"]
         fn GetDevices(
             request: &CxxString,
-            response: UniquePtr<CxxString>,
-            error_message: UniquePtr<CxxString>,
+            response: Pin<&mut CxxString>,
+            error_message: Pin<&mut CxxString>,
         ) -> u32;
 
         #[allow(dead_code)]
-        #[rust_name = "update_device"]
+        #[rust_name = "patch_device"]
         #[namespace = "netsim::scene_controller"]
-        fn UpdateDevice(
+        fn PatchDevice(
             request: &CxxString,
-            response: UniquePtr<CxxString>,
-            error_message: UniquePtr<CxxString>,
+            response: Pin<&mut CxxString>,
+            error_message: Pin<&mut CxxString>,
         ) -> u32;
     }
 }

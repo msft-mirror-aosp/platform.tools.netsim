@@ -45,21 +45,21 @@ TEST_F(FrontendServerTest, VerifyVersion) {
   frontend::VersionResponse response;
   grpc::Status status = service_.GetVersion(&context_, {}, &response);
   ASSERT_TRUE(status.ok());
-  EXPECT_EQ(response.version(), "123b");
+  EXPECT_FALSE(response.version().empty());
 }
 
-TEST_F(FrontendServerTest, UpdateDevicePosition) {
+TEST_F(FrontendServerTest, PatchDevicePosition) {
   auto serial = "test-device-serial-for-set-position";
   auto device_to_add = controller::CreateDevice(serial);
   netsim::controller::SceneController::Singleton().Add(device_to_add);
 
   google::protobuf::Empty response;
-  frontend::UpdateDeviceRequest request;
+  frontend::PatchDeviceRequest request;
   request.mutable_device()->set_device_serial(serial);
   request.mutable_device()->mutable_position()->set_x(1.1);
   request.mutable_device()->mutable_position()->set_y(2.2);
   request.mutable_device()->mutable_position()->set_z(3.3);
-  grpc::Status status = service_.UpdateDevice(&context_, &request, &response);
+  grpc::Status status = service_.PatchDevice(&context_, &request, &response);
   ASSERT_TRUE(status.ok());
   const auto &scene = netsim::controller::SceneController::Singleton().Copy();
   // NOTE: Singleton won't be reset between tests. Need to either deprecate
@@ -78,7 +78,7 @@ TEST_F(FrontendServerTest, UpdateDevicePosition) {
   EXPECT_TRUE(found);
 }
 
-TEST_F(FrontendServerTest, UpdateDevice) {
+TEST_F(FrontendServerTest, PatchDevice) {
   auto serial = std::string("serial-for-update");
   auto name = std::string("name-for-update");
   auto device_to_add = controller::CreateDevice(serial);
@@ -89,7 +89,7 @@ TEST_F(FrontendServerTest, UpdateDevice) {
   }
   netsim::controller::SceneController::Singleton().Add(device_to_add);
 
-  frontend::UpdateDeviceRequest request;
+  frontend::PatchDeviceRequest request;
   google::protobuf::Empty response;
   request.mutable_device()->set_device_serial(serial);
   request.mutable_device()->set_name(name);
@@ -98,7 +98,7 @@ TEST_F(FrontendServerTest, UpdateDevice) {
     chip->mutable_bt()->mutable_classic()->set_state(model::State::ON);
   }
 
-  grpc::Status status = service_.UpdateDevice(&context_, &request, &response);
+  grpc::Status status = service_.PatchDevice(&context_, &request, &response);
   ASSERT_TRUE(status.ok());
   auto optional_device = GetDevice(serial);
   ASSERT_TRUE(optional_device != nullptr);
@@ -110,11 +110,11 @@ TEST_F(FrontendServerTest, UpdateDevice) {
               model::State::ON);
 }
 
-TEST_F(FrontendServerTest, UpdateDeviceNotFound) {
+TEST_F(FrontendServerTest, PatchDeviceNotFound) {
   google::protobuf::Empty response;
-  frontend::UpdateDeviceRequest request;
+  frontend::PatchDeviceRequest request;
   request.mutable_device()->set_device_serial("non-existing-device-serial");
-  grpc::Status status = service_.UpdateDevice(&context_, &request, &response);
+  grpc::Status status = service_.PatchDevice(&context_, &request, &response);
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.error_code(), grpc::StatusCode::NOT_FOUND);
 }

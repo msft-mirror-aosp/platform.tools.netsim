@@ -9,7 +9,8 @@ doctest = false
 test = false
 
 [dependencies]
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { version = "3.2.22", features = ["derive"] }
 frontend-proto = { path = "../frontend-proto" }
 frontend-client-cxx = { path = "../frontend-client-cxx" }
-protobuf = "2.28.0"
+protobuf = "2.27.1"
+cxx = { version = "=1.0.42", features = ["c++17"] }

@@ -1,5 +1,5 @@
 //
-//  Copyright 2023 Google, Inc.
+//  Copyright 2022 Google, Inc.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -23,23 +23,23 @@ fn main() {
     let generated_cpp_file = Path::new(&out_dir)
         .join("cxxbridge")
         .join("sources")
-        .join("netsim-cxx")
+        .join("frontend-client-cxx")
         .join("src")
         .join("lib.rs.cc");
     let generated_header_file = Path::new(&out_dir)
         .join("cxxbridge")
         .join("include")
-        .join("netsim-cxx")
+        .join("frontend-client-cxx")
         .join("src")
         .join("lib.rs.h");
     std::fs::copy(
         &generated_header_file,
-        &Path::new(&manifest_dir).join("cxx").join("netsim_cxx_generated.h"),
+        &Path::new(&manifest_dir).join("cxx").join("frontend_client_cxx_generated.h"),
     )
     .unwrap();
     std::fs::copy(
         &generated_cpp_file,
-        &Path::new(&manifest_dir).join("cxx").join("netsim_cxx_generated.cc"),
+        &Path::new(&manifest_dir).join("cxx").join("frontend_client_cxx_generated.cc"),
     )
     .unwrap();
 }
