@@ -47,6 +47,14 @@ DiscoveryDir discovery {
 
 }  // namespace
 
+std::string GetEnv(const std::string &name, const std::string &default_value) {
+  auto val = std::getenv(name.c_str());
+  if (!val) {
+    return default_value;
+  }
+  return val;
+}
+
 std::string GetDiscoveryDirectory() {
   // $TMPDIR is the temp directory on buildbots.
   const char *test_env_p = std::getenv("TMPDIR");
