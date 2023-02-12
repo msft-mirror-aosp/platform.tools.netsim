@@ -54,9 +54,8 @@ class FrontendServer final : public frontend::FrontendService::Service {
     auto status = netsim::controller::SceneController::Singleton().PatchDevice(
         request->device());
     if (!status)
-      return grpc::Status(
-          grpc::StatusCode::NOT_FOUND,
-          "device " + request->device().device_serial() + " not found.");
+      return grpc::Status(grpc::StatusCode::NOT_FOUND,
+                          "device " + request->device().name() + " not found.");
     return grpc::Status::OK;
   }
 
@@ -65,7 +64,6 @@ class FrontendServer final : public frontend::FrontendService::Service {
       const frontend::SetPacketCaptureRequest *request,
       google::protobuf::Empty *empty) {
     model::Device device;
-    device.set_device_serial(request->device_serial());
     model::Chip chip;
     // Turn on bt packet capture
     chip.set_capture(request->capture() ? model::State::ON : model::State::OFF);
