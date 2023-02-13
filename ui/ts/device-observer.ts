@@ -38,8 +38,7 @@ interface Chip {
  * TODO: use ts-proto to auto translate protobuf messaegs to TS interfaces
  */
 export interface ProtoDevice {
-  deviceSerial: string;
-  name?: string;
+  name: string;
   position?: {
     x?: number;
     y?: number;
@@ -65,12 +64,8 @@ export class Device {
     this.device = device;
   }
 
-  get deviceSerial() {
-    return this.device.deviceSerial;
-  }
-
   get name() : string {
-    return this.device.name ?? "";
+    return this.device.name;
   }
 
   set name(value: string) {
@@ -170,7 +165,7 @@ export class Device {
     if ("capture" in chip && chip.capture) {
       chip.capture = chip.capture === 'ON' ? 'OFF' : 'ON';
       simulationState.patchDevice({device: {
-        deviceSerial: device.deviceSerial,
+        name: device.name,
         chips: device.chips,
       }});
     }
@@ -183,7 +178,7 @@ export class Device {
  */
 export interface SimulationInfo {
   devices: Device[];
-  selectedSerial: string;
+  selectedId: string;
   dimension: {
     x: number;
     y: number;
@@ -201,7 +196,7 @@ class SimulationState implements Observable {
 
   private simulationInfo: SimulationInfo = {
     devices: [],
-    selectedSerial: '',
+    selectedId: '',
     dimension: { x: 10, y: 10, z: 0 },
   };
 
@@ -232,18 +227,18 @@ class SimulationState implements Observable {
     this.notifyObservers();
   }
 
-  patchSelected(serial: string) {
-    this.simulationInfo.selectedSerial = serial;
+  patchSelected(id: string) {
+    this.simulationInfo.selectedId = id;
     this.notifyObservers();
   }
 
-  handleDrop(serial: string, x: number, y: number) {
+  handleDrop(id: string, x: number, y: number) {
     for (const device of this.simulationInfo.devices) {
-      if (serial === device.deviceSerial) {
+      if (id === device.name) {
         device.position = {x, y, z: device.position.z};
         this.patchDevice({
           device: {
-            deviceSerial: serial,
+            name: device.name,
             position: device.position,
           },
         });
