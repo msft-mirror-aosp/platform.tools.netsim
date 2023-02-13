@@ -29,6 +29,7 @@ fn perform_request(
     client: cxx::UniquePtr<ffi::FrontendClient>,
     grpc_method: GrpcMethod,
     request: Vec<u8>,
+    verbose: bool,
 ) -> Result<(), String> {
     let continuous = match command {
         args::Command::Devices(ref cmd) => cmd.continuous,
@@ -37,7 +38,7 @@ fn perform_request(
     loop {
         let client_result = send_grpc(&client, &grpc_method, &request);
         if client_result.is_ok() {
-            command.print_response(client_result.byte_vec().as_slice());
+            command.print_response(client_result.byte_vec().as_slice(), verbose);
             if !continuous {
                 return Ok(());
             }
@@ -63,7 +64,7 @@ pub extern "C" fn rust_main() {
         eprintln!("Unable to create frontend client. Please ensure netsimd is running.");
         return;
     }
-    if let Err(e) = perform_request(args.command, client, grpc_method, request) {
+    if let Err(e) = perform_request(args.command, client, grpc_method, request, args.verbose) {
         eprintln!("{e}");
     }
 }
