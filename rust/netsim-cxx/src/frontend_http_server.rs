@@ -98,34 +98,28 @@ fn handle_version(_request: &HttpRequest, _param: &str) -> HttpResponse {
     )
 }
 
-fn handle_devices(request: &HttpRequest, _param: &str) -> HttpResponse {
-    if &request.method == "GET" {
-        let_cxx_string!(request = "");
-        let_cxx_string!(response = "");
-        let_cxx_string!(error_message = "");
-        let status = get_devices(&request, response.as_mut(), error_message.as_mut());
-        if status == 200 {
-            HttpResponse::new_200("text/plain", response.to_string().into_bytes())
-        } else {
-            let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
-            HttpResponse::new_404(body.into_bytes())
-        }
-    } else if &request.method == "PATCH" {
-        let_cxx_string!(new_request = &request.body);
-        let_cxx_string!(response = "");
-        let_cxx_string!(error_message = "");
-        let status = patch_device(&new_request, response.as_mut(), error_message.as_mut());
-        if status == 200 {
-            HttpResponse::new_200("text/plain", response.to_string().into_bytes())
-        } else {
-            let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
-            HttpResponse::new_404(body.into_bytes())
-        }
+fn handle_get_device(_request: &HttpRequest, _param: &str) -> HttpResponse {
+    let_cxx_string!(request = "");
+    let_cxx_string!(response = "");
+    let_cxx_string!(error_message = "");
+    let status = get_devices(&request, response.as_mut(), error_message.as_mut());
+    if status == 200 {
+        HttpResponse::new_200("text/plain", response.to_string().into_bytes())
     } else {
-        let body = format!(
-            "404 Not found (netsim): {:?} is not a valid method for this route",
-            request.method.to_string()
-        );
+        let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
+        HttpResponse::new_404(body.into_bytes())
+    }
+}
+
+fn handle_patch_device(request: &HttpRequest, _param: &str) -> HttpResponse {
+    let_cxx_string!(new_request = &request.body);
+    let_cxx_string!(response = "");
+    let_cxx_string!(error_message = "");
+    let status = patch_device(&new_request, response.as_mut(), error_message.as_mut());
+    if status == 200 {
+        HttpResponse::new_200("text/plain", response.to_string().into_bytes())
+    } else {
+        let body = format!("404 Not found (netsim): {:?}", error_message.to_string());
         HttpResponse::new_404(body.into_bytes())
     }
 }
@@ -134,7 +128,8 @@ fn handle_connection(mut stream: TcpStream) {
     let mut router = Router::new();
     router.add_route("/", handle_index);
     router.add_route("/get-version", handle_version);
-    router.add_route("/v1/devices", handle_devices);
+    router.add_route("/get-devices", handle_get_device);
+    router.add_route("/patch-device", handle_patch_device);
     router.add_route(r"/pcap/{id}", handle_pcap_file);
     router.add_route(r"/{path}", handle_static);
     let response =

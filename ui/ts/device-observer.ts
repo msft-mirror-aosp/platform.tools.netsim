@@ -1,5 +1,6 @@
 // URL for netsim
-const DEVICES_URL = 'http://localhost:7681/v1/devices';
+const GET_DEVICES_URL = 'http://localhost:7681/get-devices';
+const PATCH_DEVICE_URL = 'http://localhost:7681/patch-device';
 
 /**
  * Interface for a method in notifying the subscribed observers.
@@ -211,9 +212,7 @@ class SimulationState implements Observable {
   }
 
   invokeGetDevice() {
-    fetch(DEVICES_URL, {
-      method: 'GET',
-    })
+    fetch(GET_DEVICES_URL)
       .then(response => response.json())
       .then(data => {
         this.fetchDevice(data.devices);
@@ -254,8 +253,8 @@ class SimulationState implements Observable {
 
   patchDevice(obj: object) {
     const jsonBody = JSON.stringify(obj);
-    fetch(DEVICES_URL, {
-      method: 'PATCH',
+    fetch(PATCH_DEVICE_URL, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': jsonBody.length.toString(),
