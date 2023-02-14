@@ -32,6 +32,8 @@
 namespace netsim {
 namespace {
 
+using netsim::common::ChipKind;
+
 using Stream =
     ::grpc::ServerReaderWriter<packet::PacketResponse, packet::PacketRequest>;
 
@@ -55,7 +57,7 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
                           "Missing initial_info in first packet.");
     }
 
-    auto serial = request.initial_info().serial();
+    auto name = request.initial_info().name();
     auto kind = request.initial_info().chip().kind();
 
     auto bs_hci_transport =
@@ -63,12 +65,12 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     std::shared_ptr<rootcanal::HciTransport> transport = bs_hci_transport;
 
     // Add a new HCI device for this RpcHciTransport
-    hci::BluetoothChipEmulator::Get().AddHciConnection(serial, transport);
+    hci::BluetoothChipEmulator::Get().AddHciConnection(name, transport);
     bs_hci_transport->Transport();
 
     // TODO: chip information in initial_info should match model
     controller::SceneController::Singleton().RemoveChip(
-        serial, model::Chip::ChipCase::kBt, request.initial_info().chip().id());
+        name, ChipKind::BLUETOOTH, request.initial_info().chip().id());
 
     BtsLog("backend_server drop packet_stream for peer %s", peer.c_str());
 
