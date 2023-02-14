@@ -68,12 +68,12 @@ fn handle_file(method: &str, path: &str) -> HttpResponse {
     HttpResponse::new_404(body.into_bytes())
 }
 
-fn handle_pcap_file(request: &HttpRequest, serial: &str) -> HttpResponse {
+fn handle_pcap_file(request: &HttpRequest, id: &str) -> HttpResponse {
     if &request.method == "GET" {
         let mut filepath = std::env::current_exe().unwrap();
         filepath.pop();
         filepath.push("/tmp");
-        filepath.push(format!("{serial}-hci.pcap"));
+        filepath.push(format!("{id}-hci.pcap"));
         if let Ok(body) = fs::read(&filepath) {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
