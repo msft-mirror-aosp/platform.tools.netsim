@@ -216,9 +216,9 @@ export class DeviceInformation extends LitElement implements Notifiable {
   }
 
   onNotify(data: SimulationInfo) {
-    if (data.selectedSerial && this.editMode === false) {
+    if (data.selectedId && this.editMode === false) {
       for (const device of data.devices) {
-        if (device.deviceSerial === data.selectedSerial) {
+        if (device.name === data.selectedId) {
           this.selectedDevice = device;
           if (!this.holdRange){
             this.yaw = device.orientation.yaw;
@@ -240,7 +240,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
     const range = ev.target as HTMLInputElement;
     const event = new CustomEvent('orientationEvent', {
       detail: {
-        deviceSerial: this.selectedDevice?.deviceSerial,
+        name: this.selectedDevice?.name,
         type: range.id,
         value: range.value,
       },
@@ -262,7 +262,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
     this.selectedDevice.orientation = {yaw: this.yaw, pitch: this.pitch, roll: this.roll};
     simulationState.patchDevice({
       device: {
-        deviceSerial: this.selectedDevice.deviceSerial,
+        name: this.selectedDevice.name,
         orientation: this.selectedDevice.orientation,
       },
     });
@@ -273,7 +273,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
     if (this.selectedDevice === undefined) return;
     simulationState.patchDevice({
       device: {
-        deviceSerial: this.selectedDevice.deviceSerial,
+        name: this.selectedDevice.name,
         chips: this.selectedDevice.chips,
       },
     });
@@ -301,7 +301,6 @@ export class DeviceInformation extends LitElement implements Notifiable {
     if (this.selectedDevice === undefined) return;
     const elements = this.renderRoot.querySelectorAll(`[id^="edit"]`);
     const obj: Record<string, any> = {
-      deviceSerial: this.selectedDevice.deviceSerial,
       name: this.selectedDevice.name,
       position: this.selectedDevice.position,
       orientation: this.selectedDevice.orientation,
@@ -457,19 +456,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
           <div class="title">Device Info</div>
           <div class="setting">
             <div class="name">Name</div>
-            <div class="info">
-              ${this.editMode
-                ? html`<input
-                    type="text"
-                    id="editName"
-                    .value=${this.selectedDevice.name ?? ""}
-                  />`
-                : html`${this.selectedDevice.name ?? ""}`}
-            </div>
-          </div>
-          <div class="setting">
-            <div class="name">Serial</div>
-            <div class="info">${this.selectedDevice.deviceSerial}</div>
+            <div class="info">${this.selectedDevice.name}</div>
           </div>
           <div class="setting">
             <div class="name">Position</div>
