@@ -63,21 +63,21 @@ export class DeviceDropZone extends LitElement {
         dropped.style.top = `${ev.clientY - rect.top}px`;
         dropped.style.opacity = `1.0`;
         // Patch the position of a dropped element
-        let serial = dropped
+        let id = dropped
           .getElementsByTagName('ns-cube-sprite')
           .item(0)
           ?.getAttribute('id');
-        if (serial === undefined) {
-          serial = dropped
+        if (id === undefined) {
+          id = dropped
             .getElementsByTagName('ns-pyramid-sprite')
             .item(0)
             ?.getAttribute('id');
         }
-        if (serial === undefined || serial === null) {
-          serial = '';
+        if (id === undefined || id === null) {
+          id = '';
         }
         simulationState.handleDrop(
-          serial,
+          id,
           (ev.clientX - rect.left) / 100,
           (ev.clientY - rect.top) / 100
         );
