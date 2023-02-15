@@ -32,19 +32,19 @@ impl args::Command {
                     "Radio {} is {} for {}",
                     if cmd.bt_type == BtType::Ble { "ble" } else { "classic" },
                     if cmd.status == UpDownStatus::Up { "up" } else { "down" },
-                    cmd.device_serial.to_owned()
+                    cmd.name.to_owned()
                 );
             }
             Command::Move(cmd) => {
                 println!(
                     "Moved device:{} to x: {:.2}, y: {:.2}, z: {:.2}",
-                    cmd.device_serial,
+                    cmd.name,
                     cmd.x,
                     cmd.y,
                     cmd.z.unwrap_or_default()
                 )
             }
-            Command::Devices => {
+            Command::Devices(_) => {
                 Self::print_device_response(
                     GetDevicesResponse::parse_from_bytes(response).unwrap(),
                 );
@@ -53,7 +53,7 @@ impl args::Command {
                 println!(
                     "Turned {} packet capture for {}",
                     if cmd.state == OnOffState::On { "on" } else { "off" },
-                    cmd.device_serial.to_owned()
+                    cmd.name.to_owned()
                 );
             }
             Command::Reset => {
@@ -69,12 +69,14 @@ impl args::Command {
     fn print_device_response(response: GetDevicesResponse) {
         if response.devices.is_empty() {
             println!("No attached devices found.");
+        } else {
+            println!("List of attached devices:");
         }
         for device in response.devices {
             let pos = device.get_position();
             println!(
                 "{:15}\tposition: {:.2}, {:.2}, {:.2}",
-                device.device_serial,
+                device.name,
                 pos.get_x(),
                 pos.get_y(),
                 pos.get_z()

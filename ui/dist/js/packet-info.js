@@ -1,20 +1,20 @@
-import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,LitElement as i,html as o}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as a,customElement as d}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{simulationState as l}from"./device-observer.js";let n=class extends i{constructor(){super(...arguments),this.deviceData=[]}connectedCallback(){super.connectedCallback(),l.registerObserver(this)}disconnectedCallback(){l.removeObserver(this),super.disconnectedCallback()}onNotify(t){this.deviceData=t.devices,this.requestUpdate()}handleGetChips(t){var e,i,a,d,l,n,r,s;let c=o``,p=o``,b=o``;if("chips"in t&&t.chips)for(const h of t.chips){if("bt"in h&&h.bt){let t=o``,l=o``;"lowEnergy"in h.bt&&h.bt.lowEnergy&&(t=o`
+import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,LitElement as i,html as o}from"https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";import{property as a,customElement as n}from"https://cdn.skypack.dev/pin/lit@v2.5.0-jYRq0AKQogjUdUh7SCAE/mode=imports/optimized/lit/decorators.js";import{simulationState as d}from"./device-observer.js";let l=class extends i{constructor(){super(...arguments),this.deviceData=[]}connectedCallback(){super.connectedCallback(),d.registerObserver(this)}disconnectedCallback(){d.removeObserver(this),super.disconnectedCallback()}onNotify(t){this.deviceData=t.devices,this.requestUpdate()}handleGetChips(t){var e,i,a,n,d,l,r,s;let c=o``,p=o``,b=o``;if("chips"in t&&t.chips)for(const h of t.chips){if("bt"in h&&h.bt){let t=o``,d=o``;"lowEnergy"in h.bt&&h.bt.lowEnergy&&(t=o`
               <tr>
                 <td>BLE</td>
                 <td>${null!==(e=h.bt.lowEnergy.rxCount)&&void 0!==e?e:0}</td>
                 <td>${null!==(i=h.bt.lowEnergy.txCount)&&void 0!==i?i:0}</td>
               </tr>
-            `),"classic"in h.bt&&h.bt.classic&&(l=o`
+            `),"classic"in h.bt&&h.bt.classic&&(d=o`
               <tr>
                 <td>Bluetooth Classic</td>
                 <td>${null!==(a=h.bt.classic.rxCount)&&void 0!==a?a:0}</td>
-                <td>${null!==(d=h.bt.classic.txCount)&&void 0!==d?d:0}</td>
+                <td>${null!==(n=h.bt.classic.txCount)&&void 0!==n?n:0}</td>
               </tr>
-            `),c=o`${t} ${l}`}"uwb"in h&&h.uwb&&(p=o`
+            `),c=o`${t} ${d}`}"uwb"in h&&h.uwb&&(p=o`
             <tr>
               <td>UWB</td>
-              <td>${null!==(l=h.uwb.rxCount)&&void 0!==l?l:0}</td>
-              <td>${null!==(n=h.uwb.txCount)&&void 0!==n?n:0}</td>
+              <td>${null!==(d=h.uwb.rxCount)&&void 0!==d?d:0}</td>
+              <td>${null!==(l=h.uwb.txCount)&&void 0!==l?l:0}</td>
             </tr>
           `),"wifi"in h&&h.wifi&&(b=o`
             <tr>
@@ -30,7 +30,6 @@ import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,
           ${e}
           <tr>
             <td>${t.name}</td>
-            <td>${t.deviceSerial}</td>
             <td>
               ${i.bt?"Bluetooth":i.uwb?"UWB":i.wifi?"WIFI":"Unknown"}
             </td>
@@ -44,7 +43,7 @@ import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,
             </td>
             <td>
               <a
-                href="http://localhost:7681/pcap/${t.deviceSerial}"
+                href="http://localhost:7681/pcap/${t.name}"
                 target="_blank"
                 type="application/vnd.tcpdump.pcap"
                 >Download PCAP</a
@@ -55,7 +54,7 @@ import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,
       <div class="panel">
         <div class="title">Packet Info</div>
         ${this.deviceData.map((t=>o`
-              <div class="label">${t.name} | ${t.deviceSerial}</div>
+              <div class="label">${t.name}</div>
               <table class="styled-table">
                 <tr>
                   <th>Radio</th>
@@ -69,7 +68,6 @@ import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,
         <table class="styled-table">
           <tr>
             <th>Name</th>
-            <th>Serial</th>
             <th>Chip Type</th>
             <th>Capture ON/OFF</th>
             <th>Packet Trace</th>
@@ -77,7 +75,7 @@ import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,
           ${this.deviceData.map((t=>this.handleGetCapture(t)))}
         </table>
       </div>
-    `}};n.styles=e`
+    `}};l.styles=e`
     .panel {
       cursor: pointer;
       display: grid;
@@ -177,4 +175,4 @@ import{__decorate as t}from"../node_modules/tslib/tslib.es6.js";import{css as e,
     input[type='checkbox'].switch_1:checked:after {
       left: calc(100% - 1.5em);
     }
-  `,t([a()],n.prototype,"deviceData",void 0),n=t([d("ns-packet-info")],n);export{n as PacketInformation};
+  `,t([a()],l.prototype,"deviceData",void 0),l=t([n("ns-packet-info")],l);export{l as PacketInformation};

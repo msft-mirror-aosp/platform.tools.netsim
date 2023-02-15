@@ -34,7 +34,7 @@ pub enum Command {
     /// Set the device location
     Move(Move),
     /// Display device(s) information
-    Devices,
+    Devices(Devices),
     /// Control the packet capture for one or all devices
     Capture(Capture),
     /// Reset Netsim device scene
@@ -51,9 +51,9 @@ impl Command {
         match self {
             Command::Version => Vec::new(),
             Command::Radio(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
-                mutable_device.set_device_serial(cmd.device_serial.to_owned());
+                mutable_device.set_name(cmd.name.to_owned());
                 let mutable_chips = mutable_device.mut_chips();
                 mutable_chips.push_default();
                 let mut bt_chip = Chip_Bluetooth::new();
@@ -70,9 +70,9 @@ impl Command {
                 result.write_to_bytes().unwrap()
             }
             Command::Move(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
-                mutable_device.set_device_serial(cmd.device_serial.to_owned());
+                mutable_device.set_name(cmd.name.to_owned());
                 mutable_device.set_position(model::Position {
                     x: cmd.x,
                     y: cmd.y,
@@ -81,11 +81,11 @@ impl Command {
                 });
                 result.write_to_bytes().unwrap()
             }
-            Command::Devices => Vec::new(),
+            Command::Devices(_) => Vec::new(),
             Command::Capture(cmd) => {
-                let mut result = frontend::UpdateDeviceRequest::new();
+                let mut result = frontend::PatchDeviceRequest::new();
                 let mutable_device = result.mut_device();
-                mutable_device.set_device_serial(cmd.device_serial.to_owned());
+                mutable_device.set_name(cmd.name.to_owned());
                 let mutable_chips = mutable_device.mut_chips();
                 mutable_chips.push_default();
                 let capture_state = match cmd.state {
@@ -112,8 +112,8 @@ pub struct Radio {
     /// Radio status
     #[clap(value_enum)]
     pub status: UpDownStatus,
-    /// Device serial
-    pub device_serial: String,
+    /// Device name
+    pub name: String,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
@@ -130,8 +130,8 @@ pub enum UpDownStatus {
 
 #[derive(Debug, Args)]
 pub struct Move {
-    /// Device serial
-    pub device_serial: String,
+    /// Device name
+    pub name: String,
     /// x position of device
     pub x: f32,
     /// y position of device
@@ -141,12 +141,19 @@ pub struct Move {
 }
 
 #[derive(Debug, Args)]
+pub struct Devices {
+    /// Continuously print device(s) information every second
+    #[clap(short, long)]
+    pub continuous: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct Capture {
     /// Capture state
     #[clap(value_enum)]
     pub state: OnOffState,
-    /// Device serial
-    pub device_serial: String,
+    /// Device name
+    pub name: String,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
