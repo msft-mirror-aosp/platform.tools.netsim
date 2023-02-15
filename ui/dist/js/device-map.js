@@ -8,7 +8,7 @@ import{__decorate as e}from"../node_modules/tslib/tslib.es6.js";import{css as t,
                       style=${n({position:"absolute",left:100*t.position.x+"px",top:100*t.position.y+"px"})}
                     >
                       <ns-cube-sprite
-                        id=${t.deviceSerial}
+                        id=${t.name}
                         .color=${e[i%e.length]}
                         .size=${"30px"}
                         .controls=${!0}

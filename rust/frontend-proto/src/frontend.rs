@@ -185,7 +185,7 @@ impl ::protobuf::reflect::ProtobufValue for VersionResponse {
 #[derive(PartialEq,Clone,Default)]
 pub struct SetLinkLossRequest {
     // message fields
-    pub device_serial: ::std::string::String,
+    pub device_name: ::std::string::String,
     pub other_device: ::std::string::String,
     pub radio: super::model::PhyKind,
     pub link_loss: f32,
@@ -205,30 +205,30 @@ impl SetLinkLossRequest {
         ::std::default::Default::default()
     }
 
-    // string device_serial = 1;
+    // string device_name = 1;
 
 
-    pub fn get_device_serial(&self) -> &str {
-        &self.device_serial
+    pub fn get_device_name(&self) -> &str {
+        &self.device_name
     }
-    pub fn clear_device_serial(&mut self) {
-        self.device_serial.clear();
+    pub fn clear_device_name(&mut self) {
+        self.device_name.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_device_serial(&mut self, v: ::std::string::String) {
-        self.device_serial = v;
+    pub fn set_device_name(&mut self, v: ::std::string::String) {
+        self.device_name = v;
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_device_serial(&mut self) -> &mut ::std::string::String {
-        &mut self.device_serial
+    pub fn mut_device_name(&mut self) -> &mut ::std::string::String {
+        &mut self.device_name
     }
 
     // Take field
-    pub fn take_device_serial(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.device_serial, ::std::string::String::new())
+    pub fn take_device_name(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.device_name, ::std::string::String::new())
     }
 
     // string other_device = 2;
@@ -298,7 +298,7 @@ impl ::protobuf::Message for SetLinkLossRequest {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.device_serial)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.device_name)?;
                 },
                 2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.other_device)?;
@@ -325,8 +325,8 @@ impl ::protobuf::Message for SetLinkLossRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.device_serial.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.device_serial);
+        if !self.device_name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.device_name);
         }
         if !self.other_device.is_empty() {
             my_size += ::protobuf::rt::string_size(2, &self.other_device);
@@ -343,8 +343,8 @@ impl ::protobuf::Message for SetLinkLossRequest {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.device_serial.is_empty() {
-            os.write_string(1, &self.device_serial)?;
+        if !self.device_name.is_empty() {
+            os.write_string(1, &self.device_name)?;
         }
         if !self.other_device.is_empty() {
             os.write_string(2, &self.other_device)?;
@@ -394,9 +394,9 @@ impl ::protobuf::Message for SetLinkLossRequest {
         descriptor.get(|| {
             let mut fields = ::std::vec::Vec::new();
             fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                "device_serial",
-                |m: &SetLinkLossRequest| { &m.device_serial },
-                |m: &mut SetLinkLossRequest| { &mut m.device_serial },
+                "device_name",
+                |m: &SetLinkLossRequest| { &m.device_name },
+                |m: &mut SetLinkLossRequest| { &mut m.device_name },
             ));
             fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                 "other_device",
@@ -429,7 +429,7 @@ impl ::protobuf::Message for SetLinkLossRequest {
 
 impl ::protobuf::Clear for SetLinkLossRequest {
     fn clear(&mut self) {
-        self.device_serial.clear();
+        self.device_name.clear();
         self.other_device.clear();
         self.radio = super::model::PhyKind::NONE;
         self.link_loss = 0.;
@@ -1310,9 +1310,9 @@ impl ::protobuf::reflect::ProtobufValue for SetPacketCaptureRequest {
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x0efrontend.proto\x12\x0fnetsim.frontend\x1a\x1bgoogle/protobuf/empty\
     .proto\x1a\x0bmodel.proto\"+\n\x0fVersionResponse\x12\x18\n\x07version\
-    \x18\x01\x20\x01(\tR\x07version\"\xa6\x01\n\x12SetLinkLossRequest\x12#\n\
-    \rdevice_serial\x18\x01\x20\x01(\tR\x0cdeviceSerial\x12!\n\x0cother_devi\
-    ce\x18\x02\x20\x01(\tR\x0botherDevice\x12+\n\x05radio\x18\x03\x20\x01(\
+    \x18\x01\x20\x01(\tR\x07version\"\xa2\x01\n\x12SetLinkLossRequest\x12\
+    \x1f\n\x0bdevice_name\x18\x01\x20\x01(\tR\ndeviceName\x12!\n\x0cother_de\
+    vice\x18\x02\x20\x01(\tR\x0botherDevice\x12+\n\x05radio\x18\x03\x20\x01(\
     \x0e2\x15.netsim.model.PhyKindR\x05radio\x12\x1b\n\tlink_loss\x18\x04\
     \x20\x01(\x02R\x08linkLoss\"B\n\x12PatchDeviceRequest\x12,\n\x06device\
     \x18\x02\x20\x01(\x0b2\x14.netsim.model.DeviceR\x06device\"7\n\x05Event\
