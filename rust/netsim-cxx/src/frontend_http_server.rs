@@ -118,7 +118,7 @@ fn handle_pcap_file(request: &HttpRequest, id: &str) -> HttpResponse {
         let mut filepath = std::env::current_exe().unwrap();
         filepath.pop();
         filepath.push("/tmp");
-        filepath.push(format!("{id}-hci.pcap"));
+        filepath.push(format!("{}-hci.pcap", id.replace("%20", " ")));
         if let Ok(body) = fs::read(&filepath) {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
