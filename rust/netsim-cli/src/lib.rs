@@ -21,12 +21,12 @@ mod response;
 
 use args::NetsimArgs;
 use clap::Parser;
-use frontend_client_cxx::{ffi, send_grpc, GrpcMethod};
+use frontend_client_cxx::ffi::{new_frontend_client, FrontendClient, GrpcMethod};
 
 /// helper function to send the Grpc request and handle the response
 fn perform_request(
     command: args::Command,
-    client: cxx::UniquePtr<ffi::FrontendClient>,
+    client: cxx::UniquePtr<FrontendClient>,
     grpc_method: GrpcMethod,
     request: Vec<u8>,
 ) -> Result<(), String> {
@@ -35,7 +35,7 @@ fn perform_request(
         _ => false,
     };
     loop {
-        let client_result = send_grpc(&client, &grpc_method, &request);
+        let client_result = client.send_grpc(&grpc_method, &request);
         if client_result.is_ok() {
             command.print_response(client_result.byte_vec().as_slice());
             if !continuous {
@@ -58,7 +58,7 @@ pub extern "C" fn rust_main() {
     }
     let grpc_method = args.command.grpc_method();
     let request = args.command.get_request_bytes();
-    let client = ffi::new_frontend_client();
+    let client = new_frontend_client();
     if client.is_null() {
         eprintln!("Unable to create frontend client. Please ensure netsimd is running.");
         return;
