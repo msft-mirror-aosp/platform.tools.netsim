@@ -118,7 +118,7 @@ fn handle_pcap_file(request: &HttpRequest, id: &str) -> HttpResponse {
         let mut filepath = std::env::current_exe().unwrap();
         filepath.pop();
         filepath.push("/tmp");
-        filepath.push(format!("{id}-hci.pcap"));
+        filepath.push(format!("{}-hci.pcap", id.replace("%20", " ")));
         if let Ok(body) = fs::read(&filepath) {
             return HttpResponse::new_200(to_content_type(&filepath), body);
         }
@@ -140,7 +140,7 @@ fn handle_static(request: &HttpRequest, path: &str) -> HttpResponse {
 fn handle_version(_request: &HttpRequest, _param: &str) -> HttpResponse {
     HttpResponse::new_200(
         "text/plain",
-        format!("{{version: \"{}\"}}", VERSION).into_bytes().to_vec(),
+        format!("{{\"version\": \"{}\"}}", VERSION).into_bytes().to_vec(),
     )
 }
 
@@ -179,7 +179,7 @@ fn handle_devices(request: &HttpRequest, _param: &str) -> HttpResponse {
 fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     let mut router = Router::new();
     router.add_route("/", Box::new(handle_index));
-    router.add_route("/get-version", Box::new(handle_version));
+    router.add_route("/version", Box::new(handle_version));
     router.add_route("/v1/devices", Box::new(handle_devices));
     router.add_route(r"/pcap/{id}", Box::new(handle_pcap_file));
 
