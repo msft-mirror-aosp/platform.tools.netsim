@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "controller/device.h"
+syntax = "proto3";
 
-#include "gtest/gtest.h"
-#include "model.pb.h"
+package netsim.common;
 
-namespace netsim {
-namespace testing {
-namespace {}  // namespace
-}  // namespace testing
-}  // namespace netsim
+enum ChipKind {
+  UNSPECIFIED = 0;
+  BLUETOOTH = 1;
+  WIFI = 2;
+  UWB = 3;
+}

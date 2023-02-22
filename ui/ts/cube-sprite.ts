@@ -76,9 +76,9 @@ export class CubeSprite extends LitElement implements Notifiable {
   }
 
   onNotify(data: SimulationInfo) {
-    this.highlighted = data.selectedSerial === this.id;
+    this.highlighted = data.selectedId === this.id;
     for (const device of data.devices) {
-      if (device.deviceSerial === this.id) {
+      if (device.name === this.id) {
         this.posZ = device.position.z * 100;
         return;
       }
@@ -167,7 +167,7 @@ export class CubeSprite extends LitElement implements Notifiable {
 
   private handleOrientationEvent = (e: Event) => {
     const { detail } = e as CustomEvent;
-    if (detail.deviceSerial === this.id && this.controls) {
+    if (detail.name === this.id && this.controls) {
       if (detail.type === 'yaw') {
         this.yaw = detail.value;
       } else if (detail.type === 'pitch') {
