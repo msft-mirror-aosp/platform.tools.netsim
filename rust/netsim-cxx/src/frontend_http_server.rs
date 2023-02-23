@@ -39,6 +39,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+const PATH_PREFIXES: [&str; 3] = ["js", "assets", "node_modules/tslib"];
+
 pub fn run_frontend_http_server() {
     let listener = TcpListener::bind("127.0.0.1:7681").unwrap();
     let pool = ThreadPool::new(4);
@@ -65,7 +67,6 @@ fn ui_path(suffix: &str) -> PathBuf {
 
 fn create_filename_hash_set() -> HashSet<String> {
     let mut valid_files: HashSet<String> = HashSet::new();
-    const PATH_PREFIXES: [&str; 3] = ["js", "assets", "node_modules/tslib"];
     for path_prefix in PATH_PREFIXES {
         let dir_path = ui_path(path_prefix);
         if let Ok(mut file) = fs::read_dir(dir_path) {
@@ -185,14 +186,23 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
 
     // A closure for checking if path is a static file we wish to serve, and call handle_static
     let handle_static_wrapper = move |request: &HttpRequest, path: &str| {
-        if check_valid_file_path(path, &valid_files) {
-            handle_static(request, path)
-        } else {
-            let body = format!("404 not found (netsim): Invalid path {path}");
-            HttpResponse::new_404(body.into_bytes())
+        for prefix in PATH_PREFIXES {
+            let new_path = format!("{prefix}/{path}");
+            if check_valid_file_path(new_path.as_str(), &valid_files) {
+                return handle_static(request, new_path.as_str());
+            }
         }
+        let body = format!("404 not found (netsim): Invalid path {path}");
+        HttpResponse::new_404(body.into_bytes())
     };
-    router.add_route(r"/{path}", Box::new(handle_static_wrapper));
+
+    // Connecting all path prefixes to handle_static_wrapper
+    for prefix in PATH_PREFIXES {
+        router.add_route(
+            format!(r"/{prefix}/{{path}}").as_str(),
+            Box::new(handle_static_wrapper.clone()),
+        )
+    }
 
     let response =
         if let Ok(request) = HttpRequest::parse::<&TcpStream>(&mut BufReader::new(&stream)) {
