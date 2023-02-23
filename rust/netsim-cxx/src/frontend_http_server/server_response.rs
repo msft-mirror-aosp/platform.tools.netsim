@@ -33,6 +33,7 @@ pub trait ServerResponseWritable {
     fn put_chunk(&mut self, chunk: &[u8]);
     fn put_ok(&mut self, mime_type: &str, body: &str);
     fn put_error(&mut self, error_code: u16, error_message: &str);
+    fn put_ok_with_vec(&mut self, mime_type: &str, body: Vec<u8>);
 }
 
 // A response writer that can contain a TCP stream or other writable.
@@ -56,11 +57,6 @@ impl<'a> ServerResponseWriter<'a> {
             println!("netsim: handle_connection error {e}");
         };
     }
-
-    pub fn put_ok_with_vec(&mut self, mime_type: &str, body: Vec<u8>) {
-        let response = HttpResponse::new_ok(mime_type, body);
-        self.put_response(response);
-    }
 }
 
 // Implement the ServerResponseWritable trait for the
@@ -83,6 +79,10 @@ impl ServerResponseWritable for ServerResponseWriter<'_> {
     }
     fn put_ok(&mut self, mime_type: &str, body: &str) {
         let response = HttpResponse::new_ok(mime_type, body.into());
+        self.put_response(response);
+    }
+    fn put_ok_with_vec(&mut self, mime_type: &str, body: Vec<u8>) {
+        let response = HttpResponse::new_ok(mime_type, body);
         self.put_response(response);
     }
 }

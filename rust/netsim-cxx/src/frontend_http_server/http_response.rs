@@ -67,7 +67,9 @@ impl HttpResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::frontend_http_server::server_response::ServerResponseWriter;
+    use crate::frontend_http_server::server_response::{
+        ServerResponseWritable, ServerResponseWriter,
+    };
     use std::io::Cursor;
 
     #[test]
