@@ -19,6 +19,8 @@ mod pcap;
 mod ranging;
 mod version;
 
+use std::pin::Pin;
+
 use cxx::let_cxx_string;
 use ffi::CxxServerResponseWriter;
 use frontend_http_server::server_response::ServerResponseWritable;
@@ -50,7 +52,7 @@ mod ffi {
 
         #[cxx_name = "HandlePcapCxx"]
         fn handle_pcap_cxx(
-            responder: &CxxServerResponseWriter,
+            responder: Pin<&mut CxxServerResponseWriter>,
             method: String,
             param: String,
             body: String,
@@ -98,19 +100,9 @@ mod ffi {
 }
 
 /// CxxServerResponseWriter is implemented in server_response_writable.cc
-///
-/// We've attempted several options:
-/// 1. Directly putting in CxxServerResponseWriter
-/// 2. Using Pin<&mut CxxServerResponseWriter>
-///
-/// The 1. doesn't work because writer has to be a mutable reference to
-/// invoke write_all(). The 2. doesn't work, because unpinning is unstable
-/// and not allowed for CxxServerResponseWriter.
-///
-/// Thus, wrapping it with a struct and implementing for it solved the issue.
-///
+/// Wrapper struct allows the impl to discover the respective C++ methods
 struct CxxServerResponseWriterWrapper<'a> {
-    writer: &'a CxxServerResponseWriter,
+    writer: Pin<&'a mut CxxServerResponseWriter>,
 }
 
 impl ServerResponseWritable for CxxServerResponseWriterWrapper<'_> {
