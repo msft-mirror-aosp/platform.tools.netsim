@@ -20,11 +20,13 @@
 #include <memory>
 #include <string_view>
 
-#include "../rust/frontend-client-cxx/cxx/cxx.h"
+#include "../../rust/frontend-client-cxx/cxx/cxx.h"
 #include "frontend.grpc.pb.h"
 
 namespace netsim {
 namespace frontend {
+
+enum class GrpcMethod : ::std::uint8_t;
 
 class ClientResult {
  public:
@@ -45,6 +47,9 @@ class ClientResult {
 class FrontendClient {
  public:
   virtual ~FrontendClient(){};
+  virtual std::unique_ptr<ClientResult> SendGrpc(
+      frontend::GrpcMethod const &grpc_method,
+      rust::Vec<rust::u8> const &request_byte_vec) const = 0;
   virtual std::unique_ptr<ClientResult> GetVersion() const = 0;
   virtual std::unique_ptr<ClientResult> GetDevices() const = 0;
   virtual std::unique_ptr<ClientResult> PatchDevice(

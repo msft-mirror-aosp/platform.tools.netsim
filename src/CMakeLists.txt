@@ -19,6 +19,7 @@ add_subdirectory(controller)
 add_subdirectory(frontend)
 add_subdirectory(backend)
 add_subdirectory(hci)
+add_subdirectory(packet_hub)
 
 add_library(netsim-lib INTERFACE)
 target_link_libraries(
@@ -27,6 +28,7 @@ target_link_libraries(
             frontend-grpc-lib
             frontend-lib
             backend-lib
+            packet-hub-lib
             hci-lib
             util-lib
             protobuf::libprotobuf)

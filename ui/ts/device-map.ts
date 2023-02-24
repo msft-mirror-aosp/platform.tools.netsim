@@ -141,7 +141,7 @@ export class DeviceMap extends LitElement implements Notifiable {
                       })}
                     >
                       <ns-cube-sprite
-                        id=${device.deviceSerial}
+                        id=${device.name}
                         .color=${rainbow[idx % rainbow.length]}
                         .size=${'30px'}
                         .controls=${true}
