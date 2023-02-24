@@ -15,6 +15,7 @@
 //! Netsim cxx libraries.
 
 mod frontend_http_server;
+mod pcap;
 mod ranging;
 mod version;
 
