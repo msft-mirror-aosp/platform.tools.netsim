@@ -48,6 +48,9 @@ model::Device Device::Get() {
 }
 
 void Device::Patch(const model::Device &request) {
+  if (this->visible != request.visible()) {
+    this->visible = request.visible();
+  }
   if (request.has_position()) {
     this->position.CopyFrom(request.position());
   }
