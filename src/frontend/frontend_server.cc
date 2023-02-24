@@ -17,50 +17,44 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "controller/scene_controller.h"
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"
-#include "grpcpp/security/server_credentials.h"
-#include "grpcpp/server.h"
-#include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
-#include "util/ini_file.h"
-#include "util/log.h"
-#include "util/os_utils.h"
+#include "netsim_cxx_generated.h"
 
 namespace netsim {
-
+namespace {
 class FrontendServer final : public frontend::FrontendService::Service {
  public:
   grpc::Status GetVersion(grpc::ServerContext *context,
                           const google::protobuf::Empty *empty,
                           frontend::VersionResponse *reply) {
-    reply->set_version("123b");
+    reply->set_version(std::string(netsim::GetVersion()));
     return grpc::Status::OK;
   }
 
   grpc::Status GetDevices(grpc::ServerContext *context,
                           const google::protobuf::Empty *empty,
                           frontend::GetDevicesResponse *reply) {
-    const auto devices =
-        netsim::controller::SceneController::Singleton().Copy();
-    for (const auto &device : devices)
-      reply->add_devices()->CopyFrom(device->model);
+    const auto scene = netsim::controller::SceneController::Singleton().Get();
+    for (const auto &device : scene.devices())
+      reply->add_devices()->CopyFrom(device);
     return grpc::Status::OK;
   }
 
-  grpc::Status UpdateDevice(grpc::ServerContext *context,
-                            const frontend::UpdateDeviceRequest *request,
-                            google::protobuf::Empty *response) {
-    auto status = netsim::controller::SceneController::Singleton().UpdateDevice(
+  grpc::Status PatchDevice(grpc::ServerContext *context,
+                           const frontend::PatchDeviceRequest *request,
+                           google::protobuf::Empty *response) {
+    auto status = netsim::controller::SceneController::Singleton().PatchDevice(
         request->device());
     if (!status)
-      return grpc::Status(
-          grpc::StatusCode::NOT_FOUND,
-          "device " + request->device().device_serial() + " not found.");
+      return grpc::Status(grpc::StatusCode::NOT_FOUND,
+                          "device " + request->device().name() + " not found.");
     return grpc::Status::OK;
   }
 
@@ -69,13 +63,12 @@ class FrontendServer final : public frontend::FrontendService::Service {
       const frontend::SetPacketCaptureRequest *request,
       google::protobuf::Empty *empty) {
     model::Device device;
-    device.set_device_serial(request->device_serial());
     model::Chip chip;
     // Turn on bt packet capture
     chip.set_capture(request->capture() ? model::State::ON : model::State::OFF);
     chip.mutable_bt();
     device.mutable_chips()->Add()->CopyFrom(chip);
-    controller::SceneController::Singleton().UpdateDevice(device);
+    controller::SceneController::Singleton().PatchDevice(device);
     return grpc::Status::OK;
   }
 
@@ -86,27 +79,10 @@ class FrontendServer final : public frontend::FrontendService::Service {
     return grpc::Status::OK;
   }
 };
+}  // namespace
 
-void RunFrontendServer() {
-  FrontendServer service;
-
-  grpc::ServerBuilder builder;
-  int selected_port;
-  builder.AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(),
-                           &selected_port);
-  builder.RegisterService(&service);
-  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-
-  BtsLog("Server listening on localhost: %s",
-         std::to_string(selected_port).c_str());
-
-  // Writes port to ini file.
-  auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");
-  IniFile iniFile(filepath);
-  iniFile.Set("grpc.port", std::to_string(selected_port));
-  iniFile.Write();
-
-  server->Wait();
+std::unique_ptr<frontend::FrontendService::Service> GetFrontendService() {
+  return std::make_unique<FrontendServer>();
 }
 
 }  // namespace netsim

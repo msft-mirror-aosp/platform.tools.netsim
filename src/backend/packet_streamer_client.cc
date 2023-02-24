@@ -41,6 +41,7 @@ void RunNetsimd(std::string rootcanal_default_commands_file,
                 std::string rootcanal_controller_properties_file) {
   auto exe = android::base::System::get()->findBundledExecutable("netsimd");
   auto cmd = android::base::Command::create({exe, "-g"});
+  std::cerr << "*** netsim " << exe << std::endl;
   if (!rootcanal_default_commands_file.empty())
     cmd.arg("--rootcanal_default_commands_file=" +
             rootcanal_default_commands_file);
@@ -61,7 +62,7 @@ std::shared_ptr<grpc::Channel> CreateChannel(
     std::string rootcanal_controller_properties_file) {
   bool start_netsimd = false;
   for (int second : {1, 2, 4, 8}) {
-    auto port = netsim::osutils::GetServerAddress();
+    auto port = netsim::osutils::GetServerAddress(/*frontend_server=*/false);
     if (port.has_value()) {
       auto server = "localhost:" + port.value();
       auto channel =
