@@ -81,8 +81,7 @@ if(TARGET Rust::Rustc)
          netsim-rust-lib
          packet-streamer-client-lib
          protobuf::libprotobuf
-         util-lib
-    TEST_PARAMS --gtest_filter=-OsUtilsTest.GetDiscoveryDir)
+         util-lib)
 
   add_dependencies(netsim-test netsimd)
   target_compile_definitions(netsim-test PUBLIC NETSIM_ANDROID_EMULATOR)
