@@ -33,6 +33,7 @@ else()
 endif()
 
 add_subdirectory(src)
+add_subdirectory(ui)
 
 if(TARGET Rust::Rustc)
   android_add_executable(
@@ -90,8 +91,6 @@ if(TARGET Rust::Rustc)
   endif()
 
   target_include_directories(netsim-test PRIVATE src rust/netsim-cxx/cxx)
-
-  add_subdirectory(ui)
 endif()
 
 android_add_executable(
