@@ -1,4 +1,4 @@
-# Copyright 2022 The Android Open Source Project
+# Copyright 2023 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.5)
-
 android_add_library(
-  TARGET controller-lib
+  TARGET wifi-lib
   LICENSE Apache-2.0
-  SRC chip.cc
-      chip.h
-      controller.cc
-      controller.h
-      device.cc
-      device.h
-      device_notify_manager.cc
-      device_notify_manager.h
-      scene_controller.cc
-      scene_controller.h
-  DEPS frontend-grpc-lib grpc++ hci-lib libbt-rootcanal util-lib wifi-lib)
-target_include_directories(controller-lib PRIVATE ..)
+  SRC wifi_facade.cc wifi_facade.h wifi_packet_hub.cc wifi_packet_hub.h
+  DEPS controller-lib frontend-grpc-lib packet-streamer-server-lib
+       protobuf::libprotobuf)
+target_include_directories(wifi-lib PRIVATE ${PROTOBUF_INCLUDE_DIR} ..)
+target_compile_definitions(wifi-lib PUBLIC NETSIM_ANDROID_EMULATOR)
