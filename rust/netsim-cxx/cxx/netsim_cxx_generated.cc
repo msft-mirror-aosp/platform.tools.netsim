@@ -496,7 +496,7 @@ void netsim$cxxbridge1$run_frontend_http_server() noexcept;
 
 void netsim$cxxbridge1$get_version(::rust::String *return$) noexcept;
 
-void netsim$cxxbridge1$handle_pcap_cxx(::netsim::frontend::CxxServerResponseWriter const &responder, ::rust::String *method, ::rust::String *param, ::rust::String *body) noexcept;
+void netsim$cxxbridge1$handle_pcap_cxx(::netsim::frontend::CxxServerResponseWriter &responder, ::rust::String *method, ::rust::String *param, ::rust::String *body) noexcept;
 } // extern "C"
 
 namespace scene_controller {
@@ -551,7 +551,7 @@ void RunFrontendHttpServer() noexcept {
   return ::std::move(return$.value);
 }
 
-void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter const &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept {
+void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept {
   netsim$cxxbridge1$handle_pcap_cxx(responder, &method, &param, &body);
 }
 } // namespace netsim

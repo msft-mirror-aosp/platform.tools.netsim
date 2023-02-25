@@ -474,5 +474,5 @@ void RunFrontendHttpServer() noexcept;
 
 ::rust::String GetVersion() noexcept;
 
-void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter const &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept;
+void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept;
 } // namespace netsim
