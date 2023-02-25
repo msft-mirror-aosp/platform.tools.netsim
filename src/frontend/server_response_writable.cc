@@ -54,7 +54,7 @@ class CxxServerResponseWritable : public CxxServerResponseWriter {
 
 void StartMockGrpcServer() {
   std::ofstream outfile("/tmp/test.txt");
-  const CxxServerResponseWritable responder(&outfile);
+  CxxServerResponseWritable responder(&outfile);
   HandlePcapCxx(responder, "GET", "0", "HandlePcapCxx");
 }
 }  // namespace frontend
