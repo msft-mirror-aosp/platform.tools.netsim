@@ -44,11 +44,13 @@ TEST_F(SceneControllerTest, GetTest) {
 TEST_F(SceneControllerTest, AddChipTest) {
   auto guid = "guid-SceneControllerTest-AddChipTest";
   auto device_name = "device_name-SceneControllerTest-AddChipTest";
-  auto [device_id, chip_id, _] =
+  auto [device_id, chip_id1, _1] =
       scene_controller::AddChip(guid, device_name, common::ChipKind::BLUETOOTH);
-  const auto size = SceneController::Singleton().Get().devices_size();
-  EXPECT_EQ(size, 1);
+  auto [device_id2, chip_id2, _2] =
+      scene_controller::AddChip(guid, device_name, common::ChipKind::WIFI);
 
+  EXPECT_EQ(device_id, device_id2);
+  EXPECT_EQ(SceneController::Singleton().Get().devices_size(), 1);
   auto device = match(device_name);
   EXPECT_TRUE(device != nullptr);
   auto device_proto = device->Get();
@@ -58,9 +60,21 @@ TEST_F(SceneControllerTest, AddChipTest) {
   EXPECT_TRUE(device_proto.has_position());
   EXPECT_TRUE(device_proto.has_orientation());
 
-  EXPECT_EQ(device_proto.chips_size(), 1);
-  EXPECT_TRUE(device_proto.chips()[0].has_bt());
-  EXPECT_EQ(device_proto.chips()[0].id(), chip_id);
+  EXPECT_EQ(device_proto.chips_size(), 2);
+  for (const auto &chip : device_proto.chips()) {
+    EXPECT_TRUE(chip.id() == chip_id1 || chip.id() == chip_id2);
+    if (chip.id() == chip_id1) {
+      EXPECT_TRUE(chip.has_bt());
+      EXPECT_EQ(chip.id(), chip_id1);
+
+    } else if (chip.id() == chip_id2) {
+      EXPECT_TRUE(chip.has_wifi());
+      EXPECT_EQ(chip.id(), chip_id2);
+    } else {
+      FAIL() << "Unknown chip id: " << chip.id() << ". Should be in ["
+             << chip_id1 << "," << chip_id2 << "].";
+    }
+  }
 }
 
 TEST_F(SceneControllerTest, MatchDeviceTest) {

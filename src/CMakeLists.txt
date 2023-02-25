@@ -19,6 +19,7 @@ add_subdirectory(controller)
 add_subdirectory(frontend)
 add_subdirectory(backend)
 add_subdirectory(hci)
+add_subdirectory(wifi)
 add_subdirectory(packet_hub)
 
 add_library(netsim-lib INTERFACE)
