@@ -26,9 +26,9 @@
 
 use crate::frontend_http_server::http_request::HttpRequest;
 
-use crate::frontend_http_server::server_response::ServerResponseWritable;
+use crate::frontend_http_server::server_response::ResponseWritable;
 
-type RequestHandler = Box<dyn Fn(&HttpRequest, &str, &mut dyn ServerResponseWritable)>;
+type RequestHandler = Box<dyn Fn(&HttpRequest, &str, ResponseWritable)>;
 
 pub struct Router {
     routes: Vec<(String, RequestHandler)>,
@@ -43,7 +43,7 @@ impl Router {
         self.routes.push((route.to_owned(), handler));
     }
 
-    pub fn handle_request(&self, request: &HttpRequest, writer: &mut dyn ServerResponseWritable) {
+    pub fn handle_request(&self, request: &HttpRequest, writer: ResponseWritable) {
         for (route, handler) in &self.routes {
             if let Some(param) = match_route(route, &request.uri) {
                 handler(request, param, writer);
@@ -97,11 +97,11 @@ mod tests {
     use crate::frontend_http_server::server_response::ServerResponseWriter;
     use std::io::Cursor;
 
-    fn handle_index(_request: &HttpRequest, _param: &str, writer: &mut dyn ServerResponseWritable) {
+    fn handle_index(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
         writer.put_ok_with_vec("text/html", b"Hello, world!".to_vec());
     }
 
-    fn handle_user(_request: &HttpRequest, user_id: &str, writer: &mut dyn ServerResponseWritable) {
+    fn handle_user(_request: &HttpRequest, user_id: &str, writer: ResponseWritable) {
         let body = format!("Hello, {user_id}!");
         writer.put_ok("application/json", body.as_str());
     }
