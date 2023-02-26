@@ -26,6 +26,8 @@ use std::io::Write;
 
 use crate::frontend_http_server::http_response::HttpResponse;
 
+pub type ResponseWritable<'a> = &'a mut dyn ServerResponseWritable;
+
 // ServerResponseWritable trait is used by both the Http and gRPC
 // servers.
 pub trait ServerResponseWritable {
