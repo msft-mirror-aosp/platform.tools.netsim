@@ -20,11 +20,15 @@
 //! /v1/pcap/{id} --> handle_pcap
 //! handle_pcap_cxx calls handle_pcaps or handle_pcap based on the method
 
-use crate::frontend_http_server::http_request::HttpRequest;
-use crate::frontend_http_server::server_response::ServerResponseWritable;
+use std::pin::Pin;
+
+use crate::ffi::CxxServerResponseWriter;
+use crate::frontend_http_server::http_request::{HttpHeaders, HttpRequest};
+use crate::frontend_http_server::server_response::ResponseWritable;
+use crate::CxxServerResponseWriterWrapper;
 
 /// The Rust pcap handler used directly by Http frontend for GET, PATCH
-pub fn handle_pcap(request: &HttpRequest, _param: &str, writer: &mut dyn ServerResponseWritable) {
+pub fn handle_pcap(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
     match request.method.as_str() {
         "GET" => writer.put_ok("text/plain", "GetPcap"),
         "PATCH" => writer.put_ok("text/plain", "PatchPcap"),
@@ -35,11 +39,31 @@ pub fn handle_pcap(request: &HttpRequest, _param: &str, writer: &mut dyn ServerR
 }
 
 /// The Rust pcap handler used directly by Http frontend for LIST
-pub fn handle_pcaps(request: &HttpRequest, _param: &str, writer: &mut dyn ServerResponseWritable) {
+pub fn handle_pcaps(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
     match request.method.as_str() {
         "GET" => writer.put_ok("text/plain", "ListPcap"),
         _ => {
             writer.put_error(404, "Not found.");
         }
     }
+}
+
+pub fn handle_pcap_cxx(
+    responder: Pin<&mut CxxServerResponseWriter>,
+    method: String,
+    param: String,
+    body: String,
+) {
+    let request = HttpRequest {
+        method,
+        uri: "/v1/pcap".to_string(),
+        headers: HttpHeaders::new(),
+        version: "1.1".to_string(),
+        body: body.as_bytes().to_vec(),
+    };
+    handle_pcap(
+        &request,
+        param.as_str(),
+        &mut CxxServerResponseWriterWrapper { writer: responder },
+    );
 }
