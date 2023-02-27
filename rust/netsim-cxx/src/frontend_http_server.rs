@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod http_request;
+pub(crate) mod http_request;
 mod http_response;
 mod http_router;
-mod server_response;
+pub(crate) mod server_response;
 mod thread_pool;
-
-extern crate frontend_proto;
 
 use crate::frontend_http_server::http_request::HttpRequest;
 use crate::frontend_http_server::http_router::Router;
-use crate::frontend_http_server::server_response::{ServerResponseWritable, ServerResponseWriter};
+use crate::frontend_http_server::server_response::{
+    ResponseWritable, ServerResponseWritable, ServerResponseWriter,
+};
+use crate::pcap::*;
 use crate::version::VERSION;
 
 use crate::frontend_http_server::thread_pool::ThreadPool;
@@ -101,7 +102,7 @@ fn to_content_type(file_path: &Path) -> &str {
     }
 }
 
-fn handle_file(method: &str, path: &str, writer: &mut ServerResponseWriter<'_>) {
+fn handle_file(method: &str, path: &str, writer: ResponseWritable) {
     if method == "GET" {
         let filepath = match path.strip_prefix('/') {
             Some(stripped_path) => ui_path(stripped_path),
@@ -116,7 +117,7 @@ fn handle_file(method: &str, path: &str, writer: &mut ServerResponseWriter<'_>) 
     writer.put_error(404, body.as_str());
 }
 
-fn handle_pcap_file(request: &HttpRequest, id: &str, writer: &mut ServerResponseWriter<'_>) {
+fn handle_pcap_file(request: &HttpRequest, id: &str, writer: ResponseWritable) {
     if &request.method == "GET" {
         let mut filepath = std::env::current_exe().unwrap();
         filepath.pop();
@@ -132,21 +133,21 @@ fn handle_pcap_file(request: &HttpRequest, id: &str, writer: &mut ServerResponse
 }
 
 // TODO handlers accept additional "context" including filepath
-fn handle_index(request: &HttpRequest, _param: &str, writer: &mut ServerResponseWriter<'_>) {
+fn handle_index(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
     handle_file(&request.method, "index.html", writer)
 }
 
-fn handle_static(request: &HttpRequest, path: &str, writer: &mut ServerResponseWriter<'_>) {
+fn handle_static(request: &HttpRequest, path: &str, writer: ResponseWritable) {
     // The path verification happens in the closure wrapper around handle_static.
     handle_file(&request.method, path, writer)
 }
 
-fn handle_version(_request: &HttpRequest, _param: &str, writer: &mut ServerResponseWriter<'_>) {
+fn handle_version(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
     let body = format!("{{\"version\": \"{}\"}}", VERSION);
     writer.put_ok("text/plain", body.as_str());
 }
 
-fn handle_devices(request: &HttpRequest, _param: &str, writer: &mut ServerResponseWriter<'_>) {
+fn handle_devices(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
     if &request.method == "GET" {
         let_cxx_string!(request = "");
         let_cxx_string!(response = "");
@@ -184,10 +185,12 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     router.add_route("/version", Box::new(handle_version));
     router.add_route("/v1/devices", Box::new(handle_devices));
     router.add_route(r"/pcap/{id}", Box::new(handle_pcap_file));
+    router.add_route(r"/v1/pcap", Box::new(handle_pcaps));
+    router.add_route(r"/v1/pcap/{id}", Box::new(handle_pcap));
 
     // A closure for checking if path is a static file we wish to serve, and call handle_static
     let handle_static_wrapper =
-        move |request: &HttpRequest, path: &str, writer: &mut ServerResponseWriter<'_>| {
+        move |request: &HttpRequest, path: &str, writer: ResponseWritable| {
             for prefix in PATH_PREFIXES {
                 let new_path = format!("{prefix}/{path}");
                 if check_valid_file_path(new_path.as_str(), &valid_files) {
