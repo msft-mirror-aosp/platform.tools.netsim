@@ -15,7 +15,7 @@
 android_add_library(
   TARGET wifi-lib
   LICENSE Apache-2.0
-  SRC wifi_facade.cc wifi_facade.h wifi_packet_hub.cc wifi_packet_hub.h
+  SRC wifi_facade.cc wifi_facade.h wifi_packet_hub.h
   DEPS controller-lib frontend-grpc-lib packet-streamer-server-lib
        protobuf::libprotobuf)
 target_include_directories(wifi-lib PRIVATE ${PROTOBUF_INCLUDE_DIR} ..)
