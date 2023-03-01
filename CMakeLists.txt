@@ -41,9 +41,9 @@ if(TARGET Rust::Rustc)
     LICENSE Apache-2.0 INSTALL .
     SRC rust/netsim.cc
     DEPS frontend-client
-         frontend-grpc-lib
          frontend_client_cxx_generated
          grpc++
+         netsim-cli-proto-lib
          netsim-cli-rust-lib
          protobuf::libprotobuf
          util-lib)
@@ -99,5 +99,5 @@ android_add_executable(
   TARGET netsim-packet-streamer-client
   LICENSE Apache-2.0
   SRC src/netsim-packet-streamer-client.cc
-  DEPS grpc++ packet-streamer-client-grpc-lib packet-streamer-client-lib
+  DEPS grpc++ packet-streamer-client-lib packet-streamer-proto-lib
        protobuf::libprotobuf)
