@@ -1,8 +1,6 @@
+import {State, Chip, Device as ProtoDevice} from './model.js';
 // URL for netsim
-const GET_DEVICES_URL = 'http://localhost:7681/get-devices';
-const UPDATE_DEVICE_URL = 'http://localhost:7681/update-device';
-const SET_PACKET_CAPTURE_URL =
-  'http://localhost:7681/netsim/set-packet-capture';
+const DEVICES_URL = 'http://localhost:7681/v1/devices';
 
 /**
  * Interface for a method in notifying the subscribed observers.
@@ -10,51 +8,6 @@ const SET_PACKET_CAPTURE_URL =
  */
 export interface Notifiable {
   onNotify(data: {}): void;
-}
-
-// TODO(b/255353541): import message interfaces in model.proto
-interface Radio {
-  state?: string;
-  range?: number;
-  txCount?: number;
-  rxCount?: number;
-}
-
-interface Bluetooth {
-  lowEnergy?: Radio;
-  classic?: Radio;
-}
-
-interface Chip {
-  chipId?: string;
-  manufacturer?: string;
-  model?: string;
-  capture?: string;
-  bt?: Bluetooth;
-  uwb?: Radio;
-  wifi?: Radio;
-}
-
-/**
- * Data structure of Device from protobuf.
- * Used as a reference for subscribed observers to get proper attributes.
- * TODO: use ts-proto to auto translate protobuf messaegs to TS interfaces
- */
-export interface ProtoDevice {
-  deviceSerial: string;
-  name?: string;
-  position?: {
-    x?: number;
-    y?: number;
-    z?: number;
-  };
-  orientation?: {
-    yaw?: number;
-    pitch?: number;
-    roll?: number;
-  };
-  chips?: Chip[];
-  visible?: boolean;
 }
 
 /**
@@ -68,12 +21,8 @@ export class Device {
     this.device = device;
   }
 
-  get deviceSerial() {
-    return this.device.deviceSerial;
-  }
-
   get name() : string {
-    return this.device.name ?? "";
+    return this.device.name;
   }
 
   set name(value: string) {
@@ -96,7 +45,7 @@ export class Device {
     return result;
   }
 
-  set position(pos: {x?: number; y?: number; z?: number}) {
+  set position(pos: {x: number; y: number; z: number}) {
     this.device.position = pos;
   }
 
@@ -116,7 +65,7 @@ export class Device {
     return result;
   }
 
-  set orientation(ori: {yaw?: number; pitch?: number; roll?: number}) {
+  set orientation(ori: {yaw: number; pitch: number; roll: number}) {
     this.device.orientation = ori;
   }
 
@@ -147,23 +96,23 @@ export class Device {
       }
       if (btType === "lowEnergy" && "lowEnergy" in chip.bt && chip.bt.lowEnergy) {
         if ("state" in chip.bt.lowEnergy) {
-          chip.bt.lowEnergy.state = chip.bt.lowEnergy.state === 'ON' ? 'OFF' : 'ON';
+          chip.bt.lowEnergy.state = chip.bt.lowEnergy.state === State.ON ? State.OFF : State.ON;
         }
       }
       if (btType === "classic" && "classic" in chip.bt && chip.bt.classic) {
         if ("state" in chip.bt.classic) {
-          chip.bt.classic.state = chip.bt.classic.state === 'ON' ? 'OFF' : 'ON';
+          chip.bt.classic.state = chip.bt.classic.state === State.ON ? State.OFF : State.ON;
         }
       }
     }
     if ("wifi" in chip && chip.wifi) {
       if ("state" in chip.wifi) {
-        chip.wifi.state = chip.wifi.state === 'ON' ? 'OFF' : 'ON';
+        chip.wifi.state = chip.wifi.state === State.ON ? State.OFF : State.ON;
       }
     }
     if ("uwb" in chip && chip.uwb) {
       if ("state" in chip.uwb) {
-        chip.uwb.state = chip.uwb.state === 'ON' ? 'OFF' : 'ON';
+        chip.uwb.state = chip.uwb.state ===  State.ON ? State.OFF : State.ON;
       }
     }
 
@@ -171,9 +120,9 @@ export class Device {
 
   toggleCapture(device: Device, chip: Chip) {
     if ("capture" in chip && chip.capture) {
-      chip.capture = chip.capture === 'ON' ? 'OFF' : 'ON';
-      simulationState.updateDevice({device: {
-        deviceSerial: device.deviceSerial,
+      chip.capture = chip.capture ===  State.ON ? State.OFF : State.ON;
+      simulationState.patchDevice({device: {
+        name: device.name,
         chips: device.chips,
       }});
     }
@@ -181,12 +130,12 @@ export class Device {
 }
 
 /**
- * The most updated state of the simulation.
- * Subscribed observers must refer to this info and update accordingly.
+ * The most recent state of the simulation.
+ * Subscribed observers must refer to this info and patch accordingly.
  */
 export interface SimulationInfo {
   devices: Device[];
-  selectedSerial: string;
+  selectedId: string;
   dimension: {
     x: number;
     y: number;
@@ -204,7 +153,7 @@ class SimulationState implements Observable {
 
   private simulationInfo: SimulationInfo = {
     devices: [],
-    selectedSerial: '',
+    selectedId: '',
     dimension: { x: 10, y: 10, z: 0 },
   };
 
@@ -214,7 +163,9 @@ class SimulationState implements Observable {
   }
 
   invokeGetDevice() {
-    fetch(GET_DEVICES_URL)
+    fetch(DEVICES_URL, {
+      method: 'GET',
+    })
       .then(response => response.json())
       .then(data => {
         this.fetchDevice(data.devices);
@@ -233,18 +184,18 @@ class SimulationState implements Observable {
     this.notifyObservers();
   }
 
-  updateSelected(serial: string) {
-    this.simulationInfo.selectedSerial = serial;
+  patchSelected(id: string) {
+    this.simulationInfo.selectedId = id;
     this.notifyObservers();
   }
 
-  handleDrop(serial: string, x: number, y: number) {
+  handleDrop(id: string, x: number, y: number) {
     for (const device of this.simulationInfo.devices) {
-      if (serial === device.deviceSerial) {
+      if (id === device.name) {
         device.position = {x, y, z: device.position.z};
-        this.updateDevice({
+        this.patchDevice({
           device: {
-            deviceSerial: serial,
+            name: device.name,
             position: device.position,
           },
         });
@@ -253,28 +204,15 @@ class SimulationState implements Observable {
     }
   }
 
-  updateDevice(obj: object) {
+  patchDevice(obj: object) {
     const jsonBody = JSON.stringify(obj);
-    fetch(UPDATE_DEVICE_URL, {
-      method: 'POST',
+    fetch(DEVICES_URL, {
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': jsonBody.length.toString(),
       },
       body: jsonBody,
-    })
-      .then(response => response.json())
-      .catch(error => {
-        // eslint-disable-next-line
-        console.error('Error:', error);
-      });
-    this.notifyObservers();
-  }
-
-  updateCapture(obj: object) {
-    fetch(SET_PACKET_CAPTURE_URL, {
-      method: 'POST',
-      body: JSON.stringify(obj),
     })
       .then(response => response.json())
       .catch(error => {

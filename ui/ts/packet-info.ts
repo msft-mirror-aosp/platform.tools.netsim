@@ -6,6 +6,7 @@ import {
   SimulationInfo,
   simulationState,
 } from './device-observer.js';
+import {State} from './model.js';
 
 @customElement('ns-packet-info')
 export class PacketInformation extends LitElement implements Notifiable {
@@ -195,7 +196,6 @@ export class PacketInformation extends LitElement implements Notifiable {
           ${resultCapture}
           <tr>
             <td>${device.name}</td>
-            <td>${device.deviceSerial}</td>
             <td>
               ${chip.bt ? "Bluetooth" : chip.uwb ? "UWB" : chip.wifi ? "WIFI" : "Unknown"}
             </td>
@@ -203,13 +203,13 @@ export class PacketInformation extends LitElement implements Notifiable {
               <input
                 type="checkbox"
                 class="switch_1"
-                .checked=${chip.capture === 'ON'}
+                .checked=${chip.capture === State.ON}
                 @click=${() => {device.toggleCapture(device, chip);}}
               />
             </td>
             <td>
               <a
-                href="http://localhost:7681/pcap/${device.deviceSerial}"
+                href="http://localhost:7681/pcap/${device.name}"
                 target="_blank"
                 type="application/vnd.tcpdump.pcap"
                 >Download PCAP</a
@@ -229,7 +229,7 @@ export class PacketInformation extends LitElement implements Notifiable {
         ${this.deviceData.map(
           device =>
             html`
-              <div class="label">${device.name} | ${device.deviceSerial}</div>
+              <div class="label">${device.name}</div>
               <table class="styled-table">
                 <tr>
                   <th>Radio</th>
@@ -244,7 +244,6 @@ export class PacketInformation extends LitElement implements Notifiable {
         <table class="styled-table">
           <tr>
             <th>Name</th>
-            <th>Serial</th>
             <th>Chip Type</th>
             <th>Capture ON/OFF</th>
             <th>Packet Trace</th>

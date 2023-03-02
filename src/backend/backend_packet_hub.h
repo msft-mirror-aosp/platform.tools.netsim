@@ -16,14 +16,23 @@
 
 #pragma once
 
-#include <memory>
-
-#include "frontend.grpc.pb.h"
+// Use gRPC HCI PacketType definitions so we don't expose Rootcanal's version
+// outside of the Bluetooth Facade.
+#include "packet_streamer.pb.h"
 
 namespace netsim {
+namespace backend {
+namespace grpc {
 
-// Startup netsim and connect over grpc then daemonize. If netsim already
-// running then process cli.
-void StartWithGrpc(bool);
+/* Handle packet requests for the backend. */
 
+void handle_bt_response(uint32_t facade_id,
+                        packet::HCIPacket_PacketType packet_type,
+                        const std::shared_ptr<std::vector<uint8_t>> packet);
+
+void handle_wifi_response(uint32_t facade_id,
+                          const std::shared_ptr<std::vector<uint8_t>> packet);
+
+}  // namespace grpc
+}  // namespace backend
 }  // namespace netsim
