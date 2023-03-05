@@ -47,6 +47,14 @@ DiscoveryDir discovery {
 
 }  // namespace
 
+std::string GetEnv(const std::string &name, const std::string &default_value) {
+  auto val = std::getenv(name.c_str());
+  if (!val) {
+    return default_value;
+  }
+  return val;
+}
+
 std::string GetDiscoveryDirectory() {
   // $TMPDIR is the temp directory on buildbots.
   const char *test_env_p = std::getenv("TMPDIR");
@@ -61,10 +69,16 @@ std::string GetDiscoveryDirectory() {
   return std::string(env_p) + netsim::filesystem::slash + discovery.subdir;
 }
 
+std::string GetNetsimIniFilepath() {
+  return GetDiscoveryDirectory()
+      .append(netsim::filesystem::slash)
+      .append("netsim.ini");
+}
+
 std::optional<std::string> GetServerAddress(bool frontend_server) {
-  auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");
+  auto filepath = GetNetsimIniFilepath();
   if (!netsim::filesystem::exists(filepath)) {
-    BtsLog("Unable to find discovery directory: %s", filepath.c_str());
+    BtsLog("Unable to find netsim ini file: %s", filepath.c_str());
     return std::nullopt;
   }
   if (!netsim::filesystem::is_regular_file(filepath)) {
@@ -73,7 +87,7 @@ std::optional<std::string> GetServerAddress(bool frontend_server) {
   }
   IniFile iniFile(filepath);
   iniFile.Read();
-  return iniFile.Get(frontend_server ? "grpc.port" : "grpc.backend.port");
+  return iniFile.Get("grpc.port");
 }
 }  // namespace osutils
 }  // namespace netsim

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "frontend/frontend_client.h"
 #if defined(_WIN32)
 #include <msvc-getopt.h>
 #else
@@ -26,12 +27,10 @@
 #include <cstdio>
 #endif
 
-#ifdef NETSIM_ANDROID_EMULATOR
-#include "core/server_rpc.h"
-#else
-#include "core/server.h"
+#ifndef NETSIM_ANDROID_EMULATOR
+#include "backend/fd_startup.h"
 #endif
-#include "frontend/cli.h"
+#include "core/server.h"
 #include "hci/bluetooth_facade.h"
 
 // Wireless network simulator for android (and other) emulated devices.
@@ -106,20 +105,23 @@ int main(int argc, char *argv[]) {
 
   // Daemon mode -- start radio managers
   if (!fd_startup_str.empty() || grpc_startup) {
-    netsim::hci::BluetoothChipEmulator::Get().Start(
-        rootcanal_default_commands_file, rootcanal_controller_properties_file);
+    netsim::hci::facade::Start();
   }
 
 #ifdef NETSIM_ANDROID_EMULATOR
   // get netsim daemon, starting if it doesn't exist
-  auto frontend_stub = netsim::NewFrontendStub();
+  // Create a frontend grpc client to check if a netsimd is already running.
+  auto frontend_stub = netsim::frontend::NewFrontendClient();
   if (frontend_stub == nullptr) {
     // starts netsim in vhci connection mode
-    netsim::StartWithGrpc(debug);
+    netsim::server::Run();
   }
 #else
   if (!fd_startup_str.empty()) {
-    netsim::StartWithFds(fd_startup_str, debug);
+    std::unique_ptr<netsim::hci::FdStartup> fds =
+        netsim::hci::FdStartup::Create();
+    fds->Connect(fd_startup_str);
+    netsim::server::Run();
     return -1;
   }
 #endif

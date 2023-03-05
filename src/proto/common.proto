@@ -14,23 +14,11 @@
 
 syntax = "proto3";
 
-package netsim.internal;
+package netsim.common;
 
-import "google/protobuf/empty.proto";
-
-/**
- * The internal service for the network simulator.
- *
- * Handles startup and shutdown.
- */
-service InternalService {
-  /**
-   * Scan for new discovery files.
-   */
-  rpc Scan(google.protobuf.Empty) returns (google.protobuf.Empty);
-
-  /**
-   * Stop the network simulator service.
-   */
-  rpc StopService(google.protobuf.Empty) returns (google.protobuf.Empty);
+enum ChipKind {
+  UNSPECIFIED = 0;
+  BLUETOOTH = 1;
+  WIFI = 2;
+  UWB = 3;
 }
