@@ -20,9 +20,11 @@
 //! /v1/pcap/{id} --> handle_pcap
 //! handle_pcap_cxx calls handle_pcaps or handle_pcap based on the method
 
+use std::pin::Pin;
+
 use crate::ffi::CxxServerResponseWriter;
-use crate::frontend_http_server::http_request::{HttpHeaders, HttpRequest};
-use crate::frontend_http_server::server_response::ResponseWritable;
+use crate::http_server::http_request::{HttpHeaders, HttpRequest};
+use crate::http_server::server_response::ResponseWritable;
 use crate::CxxServerResponseWriterWrapper;
 
 /// The Rust pcap handler used directly by Http frontend for GET, PATCH
@@ -47,7 +49,7 @@ pub fn handle_pcaps(request: &HttpRequest, _param: &str, writer: ResponseWritabl
 }
 
 pub fn handle_pcap_cxx(
-    responder: &CxxServerResponseWriter,
+    responder: Pin<&mut CxxServerResponseWriter>,
     method: String,
     param: String,
     body: String,

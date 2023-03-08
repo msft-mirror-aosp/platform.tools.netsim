@@ -13,27 +13,14 @@
 # limitations under the License.
 
 android_add_library(
-  TARGET backend-lib
-  LICENSE Apache-2.0
-  SRC rpc_transport.cc rpc_transport.h
-  DEPS android-emu-base
-       android-emu-base-headers
-       controller-lib
-       frontend-grpc-lib
-       grpc++
-       libbt-rootcanal
-       libbt-rootcanal-qemu)
-target_include_directories(backend-lib PRIVATE ${PROTOBUF_INCLUDE_DIR} ..)
-
-android_add_library(
   TARGET packet-streamer-server-lib
   LICENSE Apache-2.0
-  SRC backend_packet_hub.h backend_server.cc backend_server.h
-  DEPS frontend-grpc-lib
-       grpc++
+  SRC backend_packet_hub.h grpc_server.cc grpc_server.h
+  DEPS grpc++
        libbt-rootcanal
        netsim-cxx
        netsim-cxx-generated
+       netsimd-proto-lib
        protobuf::libprotobuf
        util-lib)
 
@@ -49,7 +36,7 @@ android_add_library(
        android-emu-base-headers
        android-emu-base-process
        grpc++
-       packet-streamer-client-grpc-lib
+       packet-streamer-proto-lib
        protobuf::libprotobuf
        util-lib)
 

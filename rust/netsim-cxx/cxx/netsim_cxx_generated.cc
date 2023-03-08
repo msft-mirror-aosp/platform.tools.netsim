@@ -490,13 +490,13 @@ namespace netsim {
 
 namespace netsim {
 extern "C" {
-void netsim$cxxbridge1$run_frontend_http_server() noexcept;
+void netsim$cxxbridge1$run_http_server() noexcept;
 
 ::std::int8_t netsim$cxxbridge1$distance_to_rssi(::std::int8_t tx_power, float distance) noexcept;
 
 void netsim$cxxbridge1$get_version(::rust::String *return$) noexcept;
 
-void netsim$cxxbridge1$handle_pcap_cxx(::netsim::frontend::CxxServerResponseWriter const &responder, ::rust::String *method, ::rust::String *param, ::rust::String *body) noexcept;
+void netsim$cxxbridge1$handle_pcap_cxx(::netsim::frontend::CxxServerResponseWriter &responder, ::rust::String *method, ::rust::String *param, ::rust::String *body) noexcept;
 } // extern "C"
 
 namespace scene_controller {
@@ -537,8 +537,8 @@ void netsim$frontend$cxxbridge1$CxxServerResponseWriter$put_error(::netsim::fron
 } // extern "C"
 } // namespace frontend
 
-void RunFrontendHttpServer() noexcept {
-  netsim$cxxbridge1$run_frontend_http_server();
+void RunHttpServer() noexcept {
+  netsim$cxxbridge1$run_http_server();
 }
 
 ::std::int8_t DistanceToRssi(::std::int8_t tx_power, float distance) noexcept {
@@ -551,7 +551,7 @@ void RunFrontendHttpServer() noexcept {
   return ::std::move(return$.value);
 }
 
-void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter const &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept {
+void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept {
   netsim$cxxbridge1$handle_pcap_cxx(responder, &method, &param, &body);
 }
 } // namespace netsim

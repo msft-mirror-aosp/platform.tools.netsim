@@ -468,11 +468,11 @@ namespace netsim {
 }
 
 namespace netsim {
-void RunFrontendHttpServer() noexcept;
+void RunHttpServer() noexcept;
 
 ::std::int8_t DistanceToRssi(::std::int8_t tx_power, float distance) noexcept;
 
 ::rust::String GetVersion() noexcept;
 
-void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter const &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept;
+void HandlePcapCxx(::netsim::frontend::CxxServerResponseWriter &responder, ::rust::String method, ::rust::String param, ::rust::String body) noexcept;
 } // namespace netsim

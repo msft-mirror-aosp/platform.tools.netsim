@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,15 @@
 
 #pragma once
 
-// Use gRPC HCI PacketType definitions so we don't expose Rootcanal's version
-// outside of the Bluetooth Facade.
-#include "hci_packet.pb.h"
+#include <cstdint>
+#include <memory>
+#include <vector>
+namespace netsim::wifi {
 
-namespace netsim {
-namespace hci {
-
-/* Handle packet requests for the Bluetooth Facade which may come over
+/* Handle packet requests for the WiFi Facade which may come over
    different transports including gRPC. */
 
-void handle_bt_request(uint32_t facade_id,
-                       packet::HCIPacket_PacketType packet_type,
-                       const std::shared_ptr<std::vector<uint8_t>> &packet);
+void handle_wifi_request(uint32_t facade_id,
+                         const std::shared_ptr<std::vector<uint8_t>> &packet);
 
-}  // namespace hci
-}  // namespace netsim
+}  // namespace netsim::wifi
