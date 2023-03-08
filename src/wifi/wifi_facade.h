@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,26 @@
  */
 
 #pragma once
+#include <memory>
+#include <string>
 
-// Use gRPC HCI PacketType definitions so we don't expose Rootcanal's version
-// outside of the Bluetooth Facade.
-#include "hci_packet.pb.h"
+#include "model.pb.h"
 
-namespace netsim {
-namespace hci {
+/** Manages the WiFi chip emulation provided by the WiFi service library.
+ *
+ * Owns the WiFi service, setup, and manages the packet flow into and out of
+ * WiFi service.
+ */
 
-/* Handle packet requests for the Bluetooth Facade which may come over
-   different transports including gRPC. */
+namespace netsim::wifi::facade {
 
-void handle_bt_request(uint32_t facade_id,
-                       packet::HCIPacket_PacketType packet_type,
-                       const std::shared_ptr<std::vector<uint8_t>> &packet);
+void Reset(uint32_t);
+void Remove(uint32_t);
+void Patch(uint32_t, const model::Chip::Radio &);
+model::Chip::Radio Get(uint32_t);
+uint32_t Add(uint32_t simulation_device);
 
-}  // namespace hci
-}  // namespace netsim
+void Start();
+void Stop();
+
+}  // namespace netsim::wifi::facade

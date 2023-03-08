@@ -14,16 +14,18 @@
 
 //! Netsim cxx libraries.
 
-mod frontend_http_server;
+mod http_server;
 mod pcap;
 mod ranging;
 mod version;
 
+use std::pin::Pin;
+
 use cxx::let_cxx_string;
 use ffi::CxxServerResponseWriter;
-use frontend_http_server::server_response::ServerResponseWritable;
+use http_server::server_response::ServerResponseWritable;
 
-use crate::frontend_http_server::run_frontend_http_server;
+use crate::http_server::run_http_server;
 use crate::pcap::handle_pcap_cxx;
 use crate::ranging::*;
 use crate::version::*;
@@ -33,8 +35,8 @@ mod ffi {
 
     extern "Rust" {
 
-        #[cxx_name = "RunFrontendHttpServer"]
-        fn run_frontend_http_server();
+        #[cxx_name = "RunHttpServer"]
+        fn run_http_server();
 
         // Ranging
 
@@ -50,11 +52,12 @@ mod ffi {
 
         #[cxx_name = "HandlePcapCxx"]
         fn handle_pcap_cxx(
-            responder: &CxxServerResponseWriter,
+            responder: Pin<&mut CxxServerResponseWriter>,
             method: String,
             param: String,
             body: String,
         );
+
     }
 
     unsafe extern "C++" {
@@ -97,20 +100,10 @@ mod ffi {
     }
 }
 
-/// CxxServerResponseWriter is implemented in server_response_writable.cc
-///
-/// We've attempted several options:
-/// 1. Directly putting in CxxServerResponseWriter
-/// 2. Using Pin<&mut CxxServerResponseWriter>
-///
-/// The 1. doesn't work because writer has to be a mutable reference to
-/// invoke write_all(). The 2. doesn't work, because unpinning is unstable
-/// and not allowed for CxxServerResponseWriter.
-///
-/// Thus, wrapping it with a struct and implementing for it solved the issue.
-///
+/// CxxServerResponseWriter is defined in server_response_writable.h
+/// Wrapper struct allows the impl to discover the respective C++ methods
 struct CxxServerResponseWriterWrapper<'a> {
-    writer: &'a CxxServerResponseWriter,
+    writer: Pin<&'a mut CxxServerResponseWriter>,
 }
 
 impl ServerResponseWritable for CxxServerResponseWriterWrapper<'_> {
