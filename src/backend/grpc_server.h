@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
+// Grpc C++ Server implementation of PacketStreamer.
+//
+// Moves packets between Chip and Host with the help of a manager.
+
 #pragma once
 
 #include <memory>
+#include <utility>
 
-#include "frontend.grpc.pb.h"
+#include "packet_streamer.grpc.pb.h"
 
 namespace netsim {
-
-// Startup netsim and connect over grpc then daemonize. If netsim already
-// running then process cli.
-void StartWithGrpc(bool);
+std::unique_ptr<packet::PacketStreamer::Service> GetBackendService();
 
 }  // namespace netsim

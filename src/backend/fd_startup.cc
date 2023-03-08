@@ -23,14 +23,13 @@
 #include <memory>
 #include <thread>
 
-#include "controller/device.h"
+#include "common.pb.h"
 #include "controller/scene_controller.h"
 #include "hci/bluetooth_facade.h"
 #include "model/hci/h4_parser.h"
 #include "model/hci/hci_transport.h"
 #include "startup.pb.h"
 #include "util/log.h"
-#include "util/string_utils.h"
 
 namespace netsim {
 namespace hci {
@@ -51,8 +50,8 @@ class FdHciForwarder : public rootcanal::HciTransport {
  public:
   ~FdHciForwarder() {}
 
-  FdHciForwarder(std::string serial, int fd_in, int fd_out)
-      : fd_in_(fd_in), fd_out_(fd_out), serial_(std::move(serial)) {}
+  FdHciForwarder(std::string name, int fd_in, int fd_out)
+      : fd_in_(fd_in), fd_out_(fd_out), name_(std::move(name)) {}
 
   // Called by HCITransport (rootcanal)
   void SendEvent(const std::vector<uint8_t> &data) override {
@@ -112,13 +111,13 @@ class FdHciForwarder : public rootcanal::HciTransport {
 
   // Called by HCITransport (rootcanal)
   void Close() override {
-    BtsLog("netsim - Close called for %s", serial_.c_str());
+    BtsLog("netsim - Close called for %s", name_.c_str());
     close(fd_in_);
     close(fd_out_);
   }
 
   // Called by HCITransport (rootcanal)
-  void TimerTick() override {}
+  void Tick() override {}
 
  private:
   const int fd_in_, fd_out_;
@@ -126,7 +125,7 @@ class FdHciForwarder : public rootcanal::HciTransport {
   bool disconnected_ = false;
   rootcanal::CloseCallback close_cb_;
   std::unique_ptr<rootcanal::H4Parser> h4_parser_;
-  const std::string serial_;
+  const std::string name_;
 
   // Write packets from rootcanal back to guest os
   int Write(uint8_t type, const uint8_t *data, size_t length) {
@@ -153,7 +152,7 @@ class FdHciForwarder : public rootcanal::HciTransport {
       ssize_t bytes_read;
       bytes_read = read(fd_out_, buffer.data(), bytes_to_read);
       if (bytes_read == 0) {
-        BtsLog("remote disconnected -- %s", serial_.c_str());
+        BtsLog("remote disconnected -- %s", name_.c_str());
         disconnected_ = true;
         close_cb_();
         break;
@@ -201,24 +200,23 @@ class FdStartupImpl : public FdStartup {
     }
 
     for (const auto &device : info.devices()) {
-      auto serial = device.serial();
+      auto name = device.name();
       for (const auto &chip : device.chips()) {
-        if (chip.kind() == startup::Chip::BLUETOOTH) {
+        if (chip.kind() == common::ChipKind::BLUETOOTH) {
           auto fd_in = chip.fd_in();
           auto fd_out = chip.fd_out();
 
-          BtsLog("Connecting %s on fd_in:%d, fd_out:%d", serial.c_str(), fd_in,
+          BtsLog("Connecting %s on fd_in:%d, fd_out:%d", name.c_str(), fd_in,
                  fd_out);
 
           std::shared_ptr<rootcanal::HciTransport> transport =
-              std::make_shared<FdHciForwarder>(serial, fd_in, fd_out);
+              std::make_shared<FdHciForwarder>(name, fd_in, fd_out);
+          auto guid =
+              name + ":" + std::to_string(fd_in) + ":" + std::to_string(fd_out);
+          netsim::controller::SceneController::Singleton().AddChip(
+              guid, name, common::ChipKind::BLUETOOTH);
 
-          auto device = netsim::controller::CreateDevice(serial);
-          netsim::controller::SceneController::Singleton().Add(device);
-
-          // Add a new HCI device. Rootcanal will eventually RegisterCallbacks
-          // which starts reading and writing to the fd.
-          hci::BluetoothChipEmulator::Get().AddHciConnection(serial, transport);
+          BtsLog("FdHciForwarder is not supported");
         }
       }
     }

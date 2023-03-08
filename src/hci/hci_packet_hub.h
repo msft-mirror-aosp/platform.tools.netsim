@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-// Grpc C++ Server implementation of PacketStreamer.
-//
-// Moves packets between Chip and Host with the help of a manager.
-
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include "grpcpp/server.h"
+// Use gRPC HCI PacketType definitions so we don't expose Rootcanal's version
+// outside of the Bluetooth Facade.
+#include "hci_packet.pb.h"
 
 namespace netsim {
+namespace hci {
 
-std::pair<std::unique_ptr<grpc::Server>, std::string> RunBackendServer();
+/* Handle packet requests for the Bluetooth Facade which may come over
+   different transports including gRPC. */
 
+void handle_bt_request(uint32_t facade_id,
+                       packet::HCIPacket_PacketType packet_type,
+                       const std::shared_ptr<std::vector<uint8_t>> &packet);
+
+}  // namespace hci
 }  // namespace netsim

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-// Frontend command line interface.
 #pragma once
 
+#include <cstdint>
 #include <memory>
-#include <string_view>
+#include <vector>
+namespace netsim::wifi {
 
-#include "frontend.grpc.pb.h"
+/* Handle packet requests for the WiFi Facade which may come over
+   different transports including gRPC. */
 
-namespace netsim {
+void handle_wifi_request(uint32_t facade_id,
+                         const std::shared_ptr<std::vector<uint8_t>> &packet);
 
-std::unique_ptr<frontend::FrontendService::Stub> NewFrontendStub();
-
-// Sends a command from the netsim client to netsim server.
-int SendCommand(std::unique_ptr<frontend::FrontendService::Stub> stub,
-                const std::vector<std::string_view> &args);
-
-}  // namespace netsim
+}  // namespace netsim::wifi
