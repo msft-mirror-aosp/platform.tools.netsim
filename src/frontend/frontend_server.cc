@@ -27,7 +27,7 @@
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
-#include "netsim-cxx/src/lib.rs.h"
+#include "netsim_cxx_generated.h"
 
 namespace netsim {
 namespace {
