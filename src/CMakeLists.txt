@@ -66,7 +66,8 @@ android_add_library(
       controller/scene_controller.h
       core/server.cc
       core/server.h
-      frontend/
+      frontend/frontend_client_stub.cc
+      frontend/frontend_client_stub.h
       frontend/frontend_server.cc
       frontend/frontend_server.h
       frontend/server_response_writable.h
