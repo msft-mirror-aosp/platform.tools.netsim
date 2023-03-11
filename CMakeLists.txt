@@ -89,8 +89,7 @@ if(TARGET Rust::Rustc)
   if(ANDROID_EMULATOR_BUILD)
     add_dependencies(netsim-test emulator) # For PacketStreamerClientTest.
   endif()
-
-  target_include_directories(netsim-test PRIVATE src rust/netsim-cxx/cxx)
+  target_include_directories(netsim-test PRIVATE src)
 endif()
 
 android_add_executable(
