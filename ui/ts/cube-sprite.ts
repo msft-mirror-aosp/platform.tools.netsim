@@ -85,6 +85,7 @@ export class CubeSprite extends LitElement implements Notifiable {
       transform-origin: center;
       transform-style: preserve-3d;
       transform: translateZ(calc(var(--posZ) * 1px));
+      cursor: move;
     }
 
     .cube {
@@ -183,7 +184,7 @@ export class CubeSprite extends LitElement implements Notifiable {
           outline: ${this.highlighted && this.controls ? css`dashed` : css``};
         }
       </style>
-      <div class="cube">
+      <div class="cube" role="button" tabindex="0" aria-label="Device">
         <div></div>
         <div></div>
         <div></div>

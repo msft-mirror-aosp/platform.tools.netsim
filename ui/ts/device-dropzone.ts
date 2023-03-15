@@ -1,4 +1,4 @@
-import {css, html, LitElement} from 'lit';
+import {html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
 
 import {DeviceDragZone} from './device-dragzone.js';
@@ -9,12 +9,6 @@ export class DeviceDropZone extends LitElement {
   @property({type: String, attribute: 'serial'}) serial: string = '';
 
   @property({type: String, attribute: 'type'}) type: string = '';
-
-  static styles = css`
-    :host {
-      cursor: move;
-    }
-  `;
 
   constructor() {
     super();
