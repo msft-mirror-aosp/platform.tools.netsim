@@ -1,4 +1,4 @@
-import {css, html, LitElement} from 'lit';
+import {html, LitElement} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
 
 import {simulationState} from './device-observer.js';
@@ -8,12 +8,6 @@ export class DeviceDragZone extends LitElement {
   static dragged: EventTarget|null;
 
   @property({type: String, attribute: 'action'}) action = 'move';
-
-  static styles = css`
-    :host {
-      cursor: move;
-    }
-  `;
 
   constructor() {
     super();
