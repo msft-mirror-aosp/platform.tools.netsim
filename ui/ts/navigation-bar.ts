@@ -93,7 +93,7 @@ export class NavigationBar extends LitElement {
         <div id="nav-logo-section" class="nav-section">
           <a>
             <div id="nav-logo-pic" class="logo" @click=${
-        this.handleClick}></div>
+        this.handleClick} role="link" tabindex="0" aria-label="Netsim Logo, Scene View"></div>
           </a>
           <p>#betosim</p>
         </div>
