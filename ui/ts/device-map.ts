@@ -117,20 +117,28 @@ export class DeviceMap extends LitElement implements Notifiable {
         'none; top: 0px;';
 
     return html`
-      <ns-device-dropzone>
+      <ns-device-dropzone role="region" tabindex="0" aria-label="Device map">
         <div id="dropzone" class="box pattern${this.imageIdx}">
           ${
         this.deviceData.map(
             (device, idx) => html`
               ${
-                device.visible === true ? html`
+                device.visible === true ?
+                    html`
                     <ns-device-dragzone
                       .action=${'move'}
                       style=${styleMap({
-                  position: 'absolute',
-                  left: `${device.position.x * 100}px`,
-                  top: `${device.position.y * 100}px`,
-                })}
+                      position: 'absolute',
+                      left: `${device.position.x * 100}px`,
+                      top: `${device.position.y * 100}px`,
+                    })}
+                      role="region"
+                      tabindex="1"
+                      aria-label="Position: ${
+                        Math.round(device.position.x * 100)}, ${
+                        Math.round(device.position.y * 100)}, ${
+                        Math.round(device.position.z * 100)}"
+                      aria-live="assertive"
                     >
                       <ns-cube-sprite
                         id=${device.name}
@@ -144,7 +152,7 @@ export class DeviceMap extends LitElement implements Notifiable {
                       ></ns-cube-sprite>
                     </ns-device-dragzone>
                   ` :
-                                          html``}
+                    html``}
             `)}
         </div>
         <style>
