@@ -125,7 +125,7 @@ impl Command {
                 unimplemented!("get_request_bytes is not implemented for Gui Command.");
             }
             Command::Pcap(pcap_cmd) => match pcap_cmd {
-                Pcap::List => Vec::new(),
+                Pcap::List(_) => Vec::new(),
                 Pcap::Get(cmd) => {
                     let mut result = frontend::GetPcapRequest::new();
                     result.set_id(cmd.id);
@@ -224,12 +224,18 @@ pub enum OnOffState {
 
 #[derive(Debug, Subcommand)]
 pub enum Pcap {
-    /// List all currently available Pcaps (packet captures)
-    List,
+    /// List currently available Pcaps (packet captures)
+    List(ListPcap),
     /// Patch a Pcap source to turn packet capture on/off
     Patch(PatchPcap),
     /// Download the packet capture content
     Get(GetPcap),
+}
+
+#[derive(Debug, Args)]
+pub struct ListPcap {
+    /// Optional strings of pattern for pcaps to list. Possible filter fields include Pcap ID, Device Name, and Chip Kind
+    pub patterns: Vec<String>,
 }
 
 #[derive(Debug, Args)]

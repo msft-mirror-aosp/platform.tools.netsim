@@ -26,7 +26,7 @@ impl args::Command {
             Command::Capture(_) => GrpcMethod::PatchDevice,
             Command::Reset => GrpcMethod::Reset,
             Command::Pcap(cmd) => match cmd {
-                args::Pcap::List => GrpcMethod::ListPcap,
+                args::Pcap::List(_) => GrpcMethod::ListPcap,
                 args::Pcap::Get(_) => GrpcMethod::GetPcap,
                 args::Pcap::Patch(_) => GrpcMethod::PatchPcap,
             },
