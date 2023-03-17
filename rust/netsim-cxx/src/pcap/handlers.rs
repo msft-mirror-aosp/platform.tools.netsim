@@ -68,17 +68,19 @@ impl Pcaps {
         self.pcaps.get_mut(key)
     }
 
+    pub fn get_by_id(&mut self, id: i32) -> Option<&mut ProtoPcap> {
+        self.pcaps.iter_mut().map(|(_, pcap)| pcap).find(|pcap| pcap.id == id)
+    }
+
     // TODO: replace with "optional bool" in proto
     pub fn set_state(&mut self, id: i32, state: bool) -> bool {
-        for (_, pcap) in self.pcaps.iter_mut() {
-            if pcap.id == id {
-                let capture_state = match state {
-                    true => State::ON,
-                    false => State::OFF,
-                };
-                pcap.set_state(capture_state);
-                return true;
-            }
+        let capture_state = match state {
+            true => State::ON,
+            false => State::OFF,
+        };
+        if let Some(pcap) = self.get_by_id(id) {
+            pcap.set_state(capture_state);
+            return true;
         }
         false
     }
