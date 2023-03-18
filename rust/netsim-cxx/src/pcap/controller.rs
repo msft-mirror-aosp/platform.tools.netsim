@@ -180,7 +180,11 @@ pub fn handle_pcap_patch(writer: ResponseWritable, pcaps: &mut Pcaps, id: i32, s
 
     // Patch the state of the pcap and write appropriate responses
     if pcaps.set_state(id, state) {
-        writer.put_ok("text/plain", "PatchPcap Success")
+        let pcap = pcaps.get_by_id(id).unwrap();
+        let mut out = String::new();
+        pcap_to_string(pcap, &mut out);
+        out.pop();
+        writer.put_ok("text/json", out.as_str())
     } else {
         let body = format!("ID: {} doesn't exist in pcaps", id);
         writer.put_error(404, body.as_str())
