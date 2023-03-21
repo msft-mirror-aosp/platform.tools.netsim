@@ -50,14 +50,15 @@ OPTIONS:
             * USAGE:
                 * `netsim pcap list [PATTERNS]...`
             * ARGS:
-                * \<PATTERNS\>...:    Optional strings of pattern for pcaps to list. Possible filter fields
-                     include Pcap ID, Device Name, and Chip Kind
+                * \<PATTERNS\>...:  Optional strings of pattern for pcaps to list. Possible filter fields
+                                    include Pcap ID, Device Name, and Chip Kind
         * `patch`:  Patch a Pcap source to turn packet capture on/off
             * USAGE:
-                * `netsim pcap patch <ID> <STATE>`
+                * `netsim pcap patch <STATE> [PATTERNS]...`
             * ARGS:
-                * \<ID\>:        Pcap id
-                * \<STATE\>:     Packet capture state [possible values: on, off]
+                * \<STATE\>:        Packet capture state [possible values: on, off]
+                * \<PATTERNS\>...:  Optional strings of pattern for pcaps to patch. Possible filter fields
+                                    include Pcap ID, Device Name, and Chip Kind
         * `get`:    Download the packet capture content
             * USAGE:
                 * `netsim pcap get <ID>`
