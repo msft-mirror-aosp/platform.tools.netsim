@@ -77,11 +77,7 @@ impl args::Command {
             ),
             Command::Pcap(Pcap::Patch(cmd)) => {
                 if verbose {
-                    println!(
-                        "Patched Pcap id: {} to {}",
-                        cmd.id,
-                        Self::on_off_state_to_string(cmd.state)
-                    )
+                    println!("Patched Pcap state to {}", Self::on_off_state_to_string(cmd.state),);
                 }
             }
             Command::Pcap(Pcap::Get(_)) => {
@@ -265,7 +261,7 @@ impl args::Command {
         } else {
             println!("List of Pcaps matching pattern(s) `{:?}`:", patterns);
             // Filter out list of pcaps with matching patterns
-            Self::filter_pcaps(&mut response.pcaps, patterns)
+            Self::filter_pcaps(&mut response.pcaps, &patterns)
         }
         // Create the header row and determine column widths
         let id_hdr = "ID";
@@ -322,7 +318,7 @@ impl args::Command {
         }
     }
 
-    fn filter_pcaps(pcaps: &mut RepeatedField<model::Pcap>, keys: Vec<String>) {
+    pub fn filter_pcaps(pcaps: &mut RepeatedField<model::Pcap>, keys: &[String]) {
         // Filter out list of pcaps with matching pattern
         pcaps.retain(|pcap| {
             keys.iter().map(|key| key.to_uppercase()).all(|key| {
@@ -339,7 +335,7 @@ mod tests {
     use super::*;
     fn test_filter_pcaps_helper(patterns: Vec<String>, expected_pcaps: RepeatedField<model::Pcap>) {
         let mut pcaps = all_test_pcaps();
-        Command::filter_pcaps(&mut pcaps, patterns);
+        Command::filter_pcaps(&mut pcaps, &patterns);
         assert_eq!(pcaps, expected_pcaps);
     }
 
