@@ -26,7 +26,7 @@ use ffi::CxxServerResponseWriter;
 use http_server::server_response::ServerResponseWritable;
 
 use crate::http_server::run_http_server;
-use crate::pcap::handle_pcap_cxx;
+use crate::pcap::handlers::handle_pcap_cxx;
 use crate::ranging::*;
 use crate::version::*;
 
@@ -57,12 +57,12 @@ mod ffi {
             param: String,
             body: String,
         );
+
     }
 
     unsafe extern "C++" {
         include!("controller/controller.h");
 
-        #[allow(dead_code)]
         #[rust_name = "get_devices"]
         #[namespace = "netsim::scene_controller"]
         fn GetDevices(
@@ -70,6 +70,10 @@ mod ffi {
             response: Pin<&mut CxxString>,
             error_message: Pin<&mut CxxString>,
         ) -> u32;
+
+        #[rust_name = "get_devices_bytes"]
+        #[namespace = "netsim::scene_controller"]
+        fn GetDevicesBytes(vec: &mut Vec<u8>) -> bool;
 
         #[rust_name = "patch_device"]
         #[namespace = "netsim::scene_controller"]
@@ -99,7 +103,7 @@ mod ffi {
     }
 }
 
-/// CxxServerResponseWriter is implemented in server_response_writable.cc
+/// CxxServerResponseWriter is defined in server_response_writable.h
 /// Wrapper struct allows the impl to discover the respective C++ methods
 struct CxxServerResponseWriterWrapper<'a> {
     writer: Pin<&'a mut CxxServerResponseWriter>,
