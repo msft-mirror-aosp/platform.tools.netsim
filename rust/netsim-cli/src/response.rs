@@ -81,9 +81,8 @@ impl args::Command {
                 }
             }
             Command::Pcap(Pcap::Get(_)) => {
-                if verbose {
-                    println!("Successfully downloaded Pcap.");
-                }
+                // TODO: Add output with downloaded file information
+                todo!("GetPcap response output not yet implemented.")
             }
             Command::Gui => {
                 unimplemented!("No Grpc Response for Gui Command.");
@@ -337,7 +336,7 @@ impl args::Command {
         }
     }
 
-    pub fn chip_kind_to_string(chip_kind: ChipKind) -> String {
+    fn chip_kind_to_string(chip_kind: ChipKind) -> String {
         match chip_kind {
             ChipKind::UNSPECIFIED => "UNSPECIFIED".to_string(),
             ChipKind::BLUETOOTH => "BLUETOOTH".to_string(),

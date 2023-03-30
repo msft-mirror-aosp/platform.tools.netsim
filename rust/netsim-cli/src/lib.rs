@@ -19,104 +19,70 @@ mod browser;
 mod requests;
 mod response;
 
-use std::env;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
-
-use args::{BinaryProtobuf, GetPcap, NetsimArgs};
+use args::{BinaryProtobuf, NetsimArgs};
 use clap::Parser;
 use cxx::UniquePtr;
 use frontend_client_cxx::ffi::{new_frontend_client, ClientResult, FrontendClient, GrpcMethod};
 use frontend_client_cxx::{ClientResponseReadable, ClientResponseReader};
 
 struct PcapHandler {
-    file: File,
-    path: PathBuf,
+    file: String,
+}
+
+impl Drop for PcapHandler {
+    // handle cleanup for file
+    fn drop(&mut self) {
+        // TODO: close the open file and remove print statement
+        println!("Dropping reader file: {}", self.file);
+    }
 }
 
 impl ClientResponseReadable for PcapHandler {
     // function to handle writing each chunk to file
     fn handle_chunk(&self, chunk: &[u8]) {
-        println!("handling chunk of length {} on file {}", chunk.len(), self.path.display());
-        (&self.file)
-            .write_all(chunk)
-            .unwrap_or_else(|_| panic!("Unable to write to file: {}", self.path.display()));
+        //TODO: write chunk to file
+        println!("handling chunk of length {} on file {}", chunk.len(), self.file);
     }
     // function to handle error response
     fn handle_error(&self, error_code: u32, error_message: &str) {
         println!(
             "Handling error code: {}, msg: {}, on file: {}",
-            error_code,
-            error_message,
-            self.path.display()
+            error_code, error_message, self.file
         );
     }
 }
 
 // helper function to process streaming Grpc request
-fn perform_streaming_request(
-    client: &cxx::UniquePtr<FrontendClient>,
-    cmd: &GetPcap,
-    req: &BinaryProtobuf,
-    filename: &str,
-) -> UniquePtr<ClientResult> {
-    let dir = if cmd.location.is_some() {
-        PathBuf::from(cmd.location.to_owned().unwrap())
-    } else {
-        env::current_dir().unwrap()
-    };
-    // Find next available file name
-    let mut output_file = dir.join(filename.to_string() + ".pcap");
-    let mut idx = 0;
-    while output_file.exists() {
-        idx += 1;
-        output_file = dir.join(format!("{}_{}.pcap", filename, idx));
-    }
+fn perform_streaming_request(client: &cxx::UniquePtr<FrontendClient>) -> UniquePtr<ClientResult> {
     client.get_pcap(
-        req,
+        &Vec::new(),
         &ClientResponseReader {
-            handler: Box::new(PcapHandler {
-                file: File::create(&output_file).unwrap_or_else(|_| {
-                    panic!("Failed to create file: {}", &output_file.display())
-                }),
-                path: output_file,
-            }),
+            handler: Box::new(PcapHandler { file: "placeholder file name".to_string() }),
         },
     )
 }
 
-/// helper function to send the Grpc request(s) and handle the response(s) per the given command
-fn perform_command(
-    command: &mut args::Command,
+/// helper function to send the Grpc request and handle the response
+fn perform_request(
+    command: args::Command,
     client: cxx::UniquePtr<FrontendClient>,
     grpc_method: GrpcMethod,
+    requests: Vec<BinaryProtobuf>,
     verbose: bool,
 ) -> Result<(), String> {
-    // Get command's gRPC request(s)
-    let requests = match command {
-        args::Command::Pcap(args::Pcap::Patch(_) | args::Pcap::Get(_)) => {
-            command.get_requests(&client)
-        }
-        _ => vec![command.get_request_bytes()],
-    };
-
-    // Process each request
-    for (i, req) in requests.iter().enumerate() {
+    for req in requests {
         let result = match command {
             // Continuous option sends the gRPC call every second
             args::Command::Devices(ref cmd) if cmd.continuous => loop {
-                process_result(command, client.send_grpc(&grpc_method, req), verbose)?;
+                process_result(&command, client.send_grpc(&grpc_method, &req), verbose)?;
                 std::thread::sleep(std::time::Duration::from_secs(1));
             },
             // Get Pcap use streaming gRPC reader request
-            args::Command::Pcap(args::Pcap::Get(ref cmd)) => {
-                perform_streaming_request(&client, cmd, req, &cmd.filenames[i])
-            }
+            args::Command::Pcap(args::Pcap::Get(_)) => perform_streaming_request(&client),
             // All other commands use a single gRPC call
-            _ => client.send_grpc(&grpc_method, req),
+            _ => client.send_grpc(&grpc_method, &req),
         };
-        process_result(command, result, verbose)?;
+        process_result(&command, result, verbose)?;
     }
     Ok(())
 }
@@ -137,10 +103,14 @@ fn process_result(
 #[no_mangle]
 /// main Rust netsim CLI function to be called by C wrapper netsim.cc
 pub extern "C" fn rust_main() {
-    let mut args = NetsimArgs::parse();
+    let args = NetsimArgs::parse();
     if matches!(args.command, args::Command::Gui) {
         browser::open("http://localhost:7681/");
         return;
+    }
+    // TODO: remove warning once pcap commands are implemented
+    if matches!(args.command, args::Command::Pcap(args::Pcap::Get(_))) {
+        eprintln!("Warning: GetPcap is not fully implemented yet!");
     }
     let grpc_method = args.command.grpc_method();
     let client = new_frontend_client();
@@ -148,7 +118,13 @@ pub extern "C" fn rust_main() {
         eprintln!("Unable to create frontend client. Please ensure netsimd is running.");
         return;
     }
-    if let Err(e) = perform_command(&mut args.command, client, grpc_method, args.verbose) {
+    // Handle where there are potentially multiple requests
+    let reqs = if matches!(args.command, args::Command::Pcap(args::Pcap::Patch(_))) {
+        args.command.get_requests(&client)
+    } else {
+        vec![args.command.get_request_bytes()]
+    };
+    if let Err(e) = perform_request(args.command, client, grpc_method, reqs, args.verbose) {
         eprintln!("{e}");
     }
 }

@@ -61,9 +61,6 @@ OPTIONS:
                                     include Pcap ID, Device Name, and Chip Kind
         * `get`:    Download the packet capture content
             * USAGE:
-                * `netsim pcap get [OPTIONS] [PATTERNS]...`
+                * `netsim pcap get <ID>`
             * ARGS:
-                * \<PATTERNS\>...:  Optional strings of pattern for pcaps to get. Possible filter fields
-                                    include Pcap ID, Device Name, and Chip Kind
-            * OPTIONS:
-                * `-o, --location`: Directory to store downloaded pcap(s)
+                * \<ID\>:        Pcap id
