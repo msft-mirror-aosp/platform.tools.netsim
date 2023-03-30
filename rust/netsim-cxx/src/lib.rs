@@ -98,6 +98,10 @@ mod ffi {
         #[namespace = "netsim::scene_controller"]
         fn GetDevicesBytes(vec: &mut Vec<u8>) -> bool;
 
+        #[rust_name = "get_facade_id"]
+        #[namespace = "netsim::scene_controller"]
+        fn GetFacadeId(chip_id: i32) -> i32;
+
         #[rust_name = "patch_device"]
         #[namespace = "netsim::scene_controller"]
         fn PatchDevice(
