@@ -15,30 +15,21 @@
 //! The pcap::controller is a controller that manages all pcaps.
 //!
 //! Provides the API for the frontend to interact with pcaps.
+//! TODO: Will take components of this file and put in capture_info.rs,
+//! captures.rs, and handlers.rs. And remove managers.rs
 
-use cxx::let_cxx_string;
+use std::collections::HashSet;
+
 use frontend_proto::common::ChipKind;
 use frontend_proto::frontend::GetDevicesResponse;
 use frontend_proto::model::{Pcap as ProtoPcap, State};
 use protobuf::Message;
-use std::collections::HashMap;
 
-use crate::ffi::{get_devices_bytes, patch_device};
+use crate::ffi::get_devices_bytes;
 use crate::http_server::server_response::ResponseWritable;
 
-use super::handlers::{ChipId, PcapId, Pcaps};
-
-// Creating a new ProtoPcap with known entries
-fn new_with_entry(chip_kind: ChipKind, chip_id: i32, device_name: String) -> ProtoPcap {
-    ProtoPcap {
-        chip_kind,
-        chip_id,
-        device_name,
-        state: State::OFF,
-        valid: true,
-        ..Default::default()
-    }
-}
+use super::capture::Pcap;
+use super::handlers::{ChipId, PcapMaps};
 
 // Will be deprecated once protobuf v3 is imported
 fn state_to_string(state: State) -> &'static str {
@@ -84,46 +75,33 @@ fn pcap_to_string(proto: &ProtoPcap, out: &mut String) {
     out.push_str(r"},");
 }
 
-// Perform get_devices and add chips into a pcap hashmap
-fn get_pcaps_from_devices() -> HashMap<ChipId, ProtoPcap> {
-    // Instantiate pcap hashmap
-    let mut new_pcaps = HashMap::<ChipId, ProtoPcap>::new();
-
-    // Perform get_devices_bytes ffi to receive bytes of GetDevicesResponse
-    // Print error and return empty hashmap if GetDevicesBytes fails.
-    let mut vec = Vec::<u8>::new();
-    if !get_devices_bytes(&mut vec) {
-        println!("netsim error: GetDevicesBytes failed - returning an empty set of pcaps");
-        return new_pcaps;
-    }
-
-    // Parse get_devices_response
-    let device_response = GetDevicesResponse::parse_from_bytes(&vec).unwrap();
-
-    // Adding to pcap hashmap
-    for device in device_response.get_devices() {
-        for chip in device.get_chips() {
-            let new_pcap = new_with_entry(chip.get_kind(), chip.get_id(), device.get_name().into());
-            new_pcaps.insert(new_pcap.chip_id, new_pcap);
-        }
-    }
-    new_pcaps
-}
-
 // Update the Pcaps collection to reflect the currently connected devices.
 // This function removes entries from Pcaps when devices/chips
 // go away and adds entries when new devices/chips connect.
 //
 // Note: if a device disconnects and there is captured data, the entry
 // remains with a flag valid = false so it can be retrieved.
-fn update_pcaps(pcaps: &mut Pcaps) {
-    // Parse the get_devices_response and add info to ProtoPcap
-    let new_pcaps = get_pcaps_from_devices();
+fn update_pcaps(pcaps: &mut PcapMaps) {
+    // Perform get_devices_bytes ffi to receive bytes of GetDevicesResponse
+    // Print error and return empty hashmap if GetDevicesBytes fails.
+    let mut vec = Vec::<u8>::new();
+    if !get_devices_bytes(&mut vec) {
+        println!("netsim error: GetDevicesBytes failed - returning an empty set of pcaps");
+        return;
+    }
 
-    // Merging the active chips (new_pcaps) into the active pcaps
-    for pcap in new_pcaps.values() {
-        if !pcaps.contains_pcap(pcap) {
-            pcaps.insert(pcap.clone());
+    // Parse get_devices_response
+    let device_response = GetDevicesResponse::parse_from_bytes(&vec).unwrap();
+
+    // Adding to pcap hashmap
+    let mut chip_ids = HashSet::<ChipId>::new();
+    for device in device_response.get_devices() {
+        for chip in device.get_chips() {
+            chip_ids.insert(chip.get_id());
+            if !pcaps.contains(chip.get_id()) {
+                let pcap = Pcap::new(chip.get_kind(), chip.get_id(), device.get_name().into());
+                pcaps.insert(pcap);
+            }
         }
     }
 
@@ -137,12 +115,14 @@ fn update_pcaps(pcaps: &mut Pcaps) {
 
     // Check if the active_pcap entry still exists in the chips.
     let mut removal = Vec::<RemovalIndicator>::new();
-    for (key, pcap) in pcaps.iter_chip_id_map() {
-        if !new_pcaps.contains_key(key) {
-            if pcap.get_size() == 0 {
-                removal.push(RemovalIndicator::Unused(key.to_owned()));
+    for (chip_id, pcap) in pcaps.iter() {
+        let lock = pcap.lock().unwrap();
+        let proto_pcap = lock.get_pcap_proto();
+        if !chip_ids.contains(chip_id) {
+            if proto_pcap.get_size() == 0 {
+                removal.push(RemovalIndicator::Unused(chip_id.to_owned()));
             } else {
-                removal.push(RemovalIndicator::Gone(key.to_owned()))
+                removal.push(RemovalIndicator::Gone(chip_id.to_owned()))
             }
         }
     }
@@ -151,53 +131,16 @@ fn update_pcaps(pcaps: &mut Pcaps) {
     for indicator in removal {
         match indicator {
             RemovalIndicator::Unused(key) => pcaps.remove(&key),
-            RemovalIndicator::Gone(key) => pcaps.get_by_chip_id(key).unwrap().set_valid(false),
-        }
-    }
-}
-
-fn patch_chip_capture(chip_id: ChipId, state: bool) -> bool {
-    // Get Devices
-    let mut vec = Vec::<u8>::new();
-    if !get_devices_bytes(&mut vec) {
-        println!("netsim error: GetDevicesBytes in patch_chip_capture failed");
-        return false;
-    }
-
-    // Parse get_devices_response
-    let device_response = GetDevicesResponse::parse_from_bytes(&vec).unwrap();
-
-    // Update capture field in chip with given chip_id
-    for device in device_response.get_devices() {
-        for chip in device.get_chips() {
-            if chip.get_id() == chip_id {
-                let capture_state = match state {
-                    true => State::ON,
-                    false => State::OFF,
-                };
-                let body = format!(
-                    r#"{{"device":{{"name":{:?},"chips":[{{"id":{:?},"kind":"{:?}","capture":"{:?}"}}]}}}}"#,
-                    device.get_name(),
-                    chip.get_id(),
-                    chip.get_kind(),
-                    capture_state
-                );
-                let_cxx_string!(request = body);
-                let_cxx_string!(response = "");
-                let_cxx_string!(error_message = "");
-                let status = patch_device(&request, response, error_message.as_mut());
-                if status != 200 {
-                    println!("netsim: error from patch_chip_capture: {:?}", error_message.to_str());
-                    return false;
+            RemovalIndicator::Gone(key) => {
+                for pcap in pcaps.get(key).iter() {
+                    pcap.lock().unwrap().valid = false;
                 }
-                return true;
             }
         }
     }
-    false
 }
 
-pub fn handle_pcap_list(writer: ResponseWritable, pcaps: &mut Pcaps) {
+pub fn handle_pcap_list(writer: ResponseWritable, pcaps: &mut PcapMaps) {
     // Get the most updated active pcaps
     update_pcaps(pcaps);
 
@@ -208,7 +151,7 @@ pub fn handle_pcap_list(writer: ResponseWritable, pcaps: &mut Pcaps) {
     } else {
         out.push_str(r#"{"pcaps": ["#);
         for pcap in pcaps.values() {
-            pcap_to_string(pcap, &mut out)
+            pcap_to_string(&pcap.lock().unwrap().get_pcap_proto(), &mut out)
         }
         out.pop();
         out.push_str(r"]}");
@@ -216,26 +159,27 @@ pub fn handle_pcap_list(writer: ResponseWritable, pcaps: &mut Pcaps) {
     writer.put_ok("text/json", out.as_str());
 }
 
-pub fn handle_pcap_patch(writer: ResponseWritable, pcaps: &mut Pcaps, id: PcapId, state: bool) {
+pub fn handle_pcap_patch(writer: ResponseWritable, pcaps: &mut PcapMaps, id: ChipId, state: bool) {
     // Get the most updated active pcaps
     update_pcaps(pcaps);
 
-    // Patch the state of the pcap and write appropriate responses
-    if pcaps.set_state(id, state) {
-        let pcap = pcaps.get_by_pcap_id(id).unwrap();
-        let status = patch_chip_capture(pcap.get_chip_id(), state);
-        if !status {
-            pcaps.set_state(id, !state);
-            writer.put_error(404, "Patch Chip failure");
-            return;
+    if let Some(mut pcap) = pcaps.get(id).map(|arc_pcap| arc_pcap.lock().unwrap()) {
+        match state {
+            true => {
+                if let Err(err) = pcap.start_capture() {
+                    writer.put_error(404, err.to_string().as_str());
+                    return;
+                }
+            }
+            false => pcap.stop_capture(),
         }
+
+        // Write result to writer
+        let proto_pcap = pcap.get_pcap_proto();
         let mut out = String::new();
-        pcap_to_string(pcap, &mut out);
+        pcap_to_string(&proto_pcap, &mut out);
         out.pop();
-        writer.put_ok("text/json", out.as_str())
-    } else {
-        let body = format!("ID: {} doesn't exist in pcaps", id);
-        writer.put_error(404, body.as_str())
+        writer.put_ok("text/json", out.as_str());
     }
 }
 
