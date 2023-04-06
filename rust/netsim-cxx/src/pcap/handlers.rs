@@ -20,25 +20,29 @@
 //! /v1/pcap/{id} --> handle_pcap
 //! handle_pcap_cxx calls handle_pcaps or handle_pcap based on the method
 
+use cxx::CxxVector;
+use frontend_proto::common::ChipKind;
 use frontend_proto::frontend::GetPcapResponse;
-use frontend_proto::model::{Pcap as ProtoPcap, State};
 use lazy_static::lazy_static;
 use protobuf::Message;
 use std::collections::hash_map::{Iter, Values};
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::RwLock;
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::ffi::CxxServerResponseWriter;
 use crate::http_server::http_request::{HttpHeaders, HttpRequest};
 use crate::http_server::server_response::ResponseWritable;
 use crate::CxxServerResponseWriterWrapper;
 
+use super::capture::Pcap;
 use super::managers::{handle_pcap_list, handle_pcap_patch};
+use super::pcap_util::{append_record, PacketDirection};
 
 // The Pcap resource is a singleton that manages all pcaps
 lazy_static! {
-    static ref RESOURCE: RwLock<Pcaps> = RwLock::new(Pcaps::new());
+    static ref RESOURCE: RwLock<PcapMaps> = RwLock::new(PcapMaps::new());
 }
 
 // Pcaps contains a recent copy of all chips and their ChipKind, chip_id,
@@ -46,77 +50,62 @@ lazy_static! {
 // also stored in the ProtoPcap.
 pub type ChipId = i32;
 pub type FacadeId = i32;
-pub type PcapId = i32;
-pub struct Pcaps {
-    chip_id_map: HashMap<ChipId, ProtoPcap>,
-    facade_id_map: HashMap<FacadeId, ProtoPcap>,
-    current_idx: i32,
+
+// facade_id_to_pcap allows for fast lookups when handle_request, handle_response
+// is invoked from packet_hub.
+pub struct PcapMaps {
+    facade_key_to_pcap: HashMap<(ChipKind, FacadeId), Arc<Mutex<Pcap>>>,
+    chip_id_to_pcap: HashMap<ChipId, Arc<Mutex<Pcap>>>,
 }
 
-impl Pcaps {
-    // The idx starts with 4000 to avoid conflict with other indices that may
-    // exist in different resources
+impl PcapMaps {
     fn new() -> Self {
-        Pcaps {
-            chip_id_map: HashMap::<ChipId, ProtoPcap>::new(),
-            facade_id_map: HashMap::<FacadeId, ProtoPcap>::new(),
-            current_idx: 4000,
+        PcapMaps {
+            facade_key_to_pcap: HashMap::<(ChipKind, FacadeId), Arc<Mutex<Pcap>>>::new(),
+            chip_id_to_pcap: HashMap::<ChipId, Arc<Mutex<Pcap>>>::new(),
         }
     }
 
-    pub fn contains_pcap(&self, pcap: &ProtoPcap) -> bool {
-        self.chip_id_map.contains_key(&pcap.get_chip_id())
+    pub fn contains(&self, key: ChipId) -> bool {
+        self.chip_id_to_pcap.contains_key(&key)
     }
 
-    pub fn get_by_chip_id(&mut self, key: ChipId) -> Option<&mut ProtoPcap> {
-        self.chip_id_map.get_mut(&key)
+    pub fn get(&mut self, key: ChipId) -> Option<&mut Arc<Mutex<Pcap>>> {
+        self.chip_id_to_pcap.get_mut(&key)
     }
 
-    pub fn get_by_facade_id(&mut self, key: FacadeId) -> Option<&mut ProtoPcap> {
-        self.facade_id_map.get_mut(&key)
-    }
-
-    pub fn get_by_pcap_id(&mut self, id: PcapId) -> Option<&mut ProtoPcap> {
-        self.chip_id_map.iter_mut().map(|(_, pcap)| pcap).find(|pcap| pcap.id == id)
-    }
-
-    // TODO: replace with "optional bool" in proto
-    pub fn set_state(&mut self, id: PcapId, state: bool) -> bool {
-        let capture_state = match state {
-            true => State::ON,
-            false => State::OFF,
-        };
-        if let Some(pcap) = self.get_by_pcap_id(id) {
-            pcap.set_state(capture_state);
-            return true;
-        }
-        false
-    }
-
-    // TODO: invoke GetFacadeId cxx method to obtain facade_id from chip_id
-    pub fn insert(&mut self, mut pcap: ProtoPcap) {
-        pcap.set_id(self.current_idx);
-        self.chip_id_map.insert(pcap.get_chip_id(), pcap);
-        self.current_idx += 1;
+    pub fn insert(&mut self, pcap: Pcap) {
+        let chip_id = pcap.id;
+        let facade_key = pcap.get_facade_key();
+        let arc_pcap = Arc::new(Mutex::new(pcap));
+        self.chip_id_to_pcap.insert(chip_id, arc_pcap.clone());
+        self.facade_key_to_pcap.insert(facade_key, arc_pcap);
     }
 
     pub fn is_empty(&self) -> bool {
-        self.chip_id_map.is_empty()
+        self.chip_id_to_pcap.is_empty()
     }
 
-    pub fn iter_chip_id_map(&self) -> Iter<ChipId, ProtoPcap> {
-        self.chip_id_map.iter()
+    pub fn iter(&self) -> Iter<ChipId, Arc<Mutex<Pcap>>> {
+        self.chip_id_to_pcap.iter()
     }
 
-    // TODO: remove pcap from facade_id_map
+    // When pcap is removed, remove from each map and also invoke closing of files.
     pub fn remove(&mut self, key: &ChipId) {
-        if self.chip_id_map.remove(key).is_none() {
+        if let Some(arc_pcap) = self.chip_id_to_pcap.get(key) {
+            if let Ok(mut pcap) = arc_pcap.lock() {
+                self.facade_key_to_pcap.remove(&pcap.get_facade_key());
+                pcap.stop_capture();
+            }
+        } else {
             println!("key does not exist in Pcaps");
+            return;
         }
+        self.chip_id_to_pcap.remove(key);
     }
 
-    pub fn values(&self) -> Values<ChipId, ProtoPcap> {
-        self.chip_id_map.values()
+    pub fn values(&self) -> Values<ChipId, Arc<Mutex<Pcap>>> {
+        self.chip_id_to_pcap.values()
     }
 }
 
@@ -185,4 +174,55 @@ pub fn handle_pcap_cxx(
         param.as_str(),
         &mut CxxServerResponseWriterWrapper { writer: responder },
     );
+}
+
+// Helper function for translating u32 representation of ChipKind
+fn int_to_chip_kind(kind: u32) -> ChipKind {
+    match kind {
+        1 => ChipKind::BLUETOOTH,
+        2 => ChipKind::WIFI,
+        3 => ChipKind::UWB,
+        _ => ChipKind::UNSPECIFIED,
+    }
+}
+
+// A common code for handle_request and handle_response cxx mehtods
+fn handle_packet(
+    kind: u32,
+    facade_id: u32,
+    packet: &CxxVector<u8>,
+    packet_type: u32,
+    direction: PacketDirection,
+) {
+    let pcaps = RESOURCE.read().unwrap();
+    let facade_key = Pcap::new_facade_key(int_to_chip_kind(kind), facade_id as i32);
+    if let Some(mut pcap) =
+        pcaps.facade_key_to_pcap.get(&facade_key).map(|arc_pcap| arc_pcap.lock().unwrap())
+    {
+        if let Some(ref mut file) = pcap.file {
+            if int_to_chip_kind(kind) == ChipKind::BLUETOOTH {
+                let timestamp =
+                    SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
+                match append_record(timestamp, file, direction, packet_type, packet.as_slice()) {
+                    Ok(size) => {
+                        pcap.size += size;
+                        pcap.records += 1;
+                    }
+                    Err(err) => {
+                        println!("netsimd: {err:?}");
+                    }
+                }
+            }
+        }
+    };
+}
+
+// Cxx Method for packet_hub to invoke (Host to Controller Packet Flow)
+pub fn handle_pcap_request(kind: u32, facade_id: u32, packet: &CxxVector<u8>, packet_type: u32) {
+    handle_packet(kind, facade_id, packet, packet_type, PacketDirection::HostToController)
+}
+
+// Cxx Method for packet_hub to invoke (Controller to Host Packet Flow)
+pub fn handle_pcap_response(kind: u32, facade_id: u32, packet: &CxxVector<u8>, packet_type: u32) {
+    handle_packet(kind, facade_id, packet, packet_type, PacketDirection::ControllerToHost)
 }
