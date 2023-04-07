@@ -12,8 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! The internal structure of CaptureInfo and CaptureMaps
+//!
+//! CaptureInfo is the internal structure of any Capture that includes
+//! the protobuf structure. CaptureMaps contains mappings of ChipId
+//! and FacadeId to CaptureInfo.
+
+use std::collections::hash_map::{Iter, Values};
+use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::Result;
+use std::sync::{Arc, Mutex};
 
 use frontend_proto::{
     common::ChipKind,
@@ -24,11 +33,14 @@ use crate::ffi::get_facade_id;
 
 use super::pcap_util::write_pcap_header;
 
-pub struct Pcap {
-    facade_id: i32,
+pub type ChipId = i32;
+pub type FacadeId = i32;
+
+pub struct CaptureInfo {
+    facade_id: FacadeId,
     pub file: Option<File>,
     // Following items will be returned as ProtoPcap. (state: file.is_some())
-    pub id: i32,
+    id: ChipId,
     chip_kind: ChipKind,
     device_name: String,
     pub size: usize,
@@ -37,9 +49,19 @@ pub struct Pcap {
     pub valid: bool,
 }
 
-impl Pcap {
-    pub fn new(chip_kind: ChipKind, chip_id: i32, device_name: String) -> Self {
-        Pcap {
+// Captures contains a recent copy of all chips and their ChipKind, chip_id,
+// and owning device name. Information for any recent or ongoing captures is
+// also stored in the ProtoPcap.
+// facade_key_to_capture allows for fast lookups when handle_request, handle_response
+// is invoked from packet_hub.
+pub struct Captures {
+    pub facade_key_to_capture: HashMap<(ChipKind, FacadeId), Arc<Mutex<CaptureInfo>>>,
+    pub chip_id_to_capture: HashMap<ChipId, Arc<Mutex<CaptureInfo>>>,
+}
+
+impl CaptureInfo {
+    pub fn new(chip_kind: ChipKind, chip_id: ChipId, device_name: String) -> Self {
+        CaptureInfo {
             facade_id: get_facade_id(chip_id),
             id: chip_id,
             chip_kind,
@@ -75,15 +97,15 @@ impl Pcap {
         self.file = None;
     }
 
-    pub fn new_facade_key(kind: ChipKind, facade_id: i32) -> (ChipKind, i32) {
+    pub fn new_facade_key(kind: ChipKind, facade_id: FacadeId) -> (ChipKind, FacadeId) {
         (kind, facade_id)
     }
 
-    pub fn get_facade_key(&self) -> (ChipKind, i32) {
-        Pcap::new_facade_key(self.chip_kind, self.facade_id)
+    pub fn get_facade_key(&self) -> (ChipKind, FacadeId) {
+        CaptureInfo::new_facade_key(self.chip_kind, self.facade_id)
     }
 
-    pub fn get_pcap_proto(&self) -> ProtoPcap {
+    pub fn get_capture_proto(&self) -> ProtoPcap {
         ProtoPcap {
             id: self.id,
             chip_kind: self.chip_kind,
@@ -99,5 +121,56 @@ impl Pcap {
             valid: self.valid,
             ..Default::default()
         }
+    }
+}
+
+impl Captures {
+    pub fn new() -> Self {
+        Captures {
+            facade_key_to_capture: HashMap::<(ChipKind, FacadeId), Arc<Mutex<CaptureInfo>>>::new(),
+            chip_id_to_capture: HashMap::<ChipId, Arc<Mutex<CaptureInfo>>>::new(),
+        }
+    }
+
+    pub fn contains(&self, key: ChipId) -> bool {
+        self.chip_id_to_capture.contains_key(&key)
+    }
+
+    pub fn get(&mut self, key: ChipId) -> Option<&mut Arc<Mutex<CaptureInfo>>> {
+        self.chip_id_to_capture.get_mut(&key)
+    }
+
+    pub fn insert(&mut self, capture: CaptureInfo) {
+        let chip_id = capture.id;
+        let facade_key = capture.get_facade_key();
+        let arc_capture = Arc::new(Mutex::new(capture));
+        self.chip_id_to_capture.insert(chip_id, arc_capture.clone());
+        self.facade_key_to_capture.insert(facade_key, arc_capture);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.chip_id_to_capture.is_empty()
+    }
+
+    pub fn iter(&self) -> Iter<ChipId, Arc<Mutex<CaptureInfo>>> {
+        self.chip_id_to_capture.iter()
+    }
+
+    // When Capture is removed, remove from each map and also invoke closing of files.
+    pub fn remove(&mut self, key: &ChipId) {
+        if let Some(arc_capture) = self.chip_id_to_capture.get(key) {
+            if let Ok(mut capture) = arc_capture.lock() {
+                self.facade_key_to_capture.remove(&capture.get_facade_key());
+                capture.stop_capture();
+            }
+        } else {
+            println!("key does not exist in Pcaps");
+            return;
+        }
+        self.chip_id_to_capture.remove(key);
+    }
+
+    pub fn values(&self) -> Values<ChipId, Arc<Mutex<CaptureInfo>>> {
+        self.chip_id_to_capture.values()
     }
 }
