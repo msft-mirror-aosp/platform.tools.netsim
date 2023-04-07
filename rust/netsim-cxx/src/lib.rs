@@ -20,6 +20,7 @@ mod http_server;
 mod pcap;
 mod ranging;
 mod transport;
+mod uwb;
 mod version;
 
 use std::pin::Pin;
