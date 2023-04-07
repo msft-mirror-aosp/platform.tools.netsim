@@ -14,7 +14,7 @@
 
 use std::{
     fs::File,
-    io::{Error, ErrorKind, IoSlice, Result, Write},
+    io::{Result, Write},
     time::Duration,
 };
 macro_rules! be_vec {
@@ -66,14 +66,11 @@ pub fn append_record(
         length as u32,              // Captured Packet Length
         length as u32               // Original Packet Length
     ];
-    let written = output.write_vectored(&[
-        IoSlice::new(&header),
-        IoSlice::new(&record),
-        IoSlice::new(packet),
-    ])?;
-    if written < header.len() + length {
-        return Err(Error::new(ErrorKind::WriteZero, "Not all data was written"));
-    }
+    let mut bytes = Vec::<u8>::with_capacity(header.len() + length);
+    bytes.extend(&header);
+    bytes.extend(&record);
+    bytes.extend(packet);
+    output.write_all(&bytes)?;
     output.flush()?;
     Ok(header.len() + length)
 }
