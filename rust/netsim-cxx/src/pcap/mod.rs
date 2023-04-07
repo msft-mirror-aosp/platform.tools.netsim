@@ -14,5 +14,5 @@
 
 pub mod capture;
 pub mod handlers;
-pub mod managers;
 pub mod pcap_util;
+pub mod proto_json;
