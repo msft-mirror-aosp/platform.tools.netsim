@@ -150,7 +150,7 @@ mod ffi {
         type CxxServerResponseWriter;
 
         #[namespace = "netsim::frontend"]
-        fn put_ok_with_length(self: &CxxServerResponseWriter, mime_type: &CxxString, length: u32);
+        fn put_ok_with_length(self: &CxxServerResponseWriter, mime_type: &CxxString, length: usize);
 
         #[namespace = "netsim::frontend"]
         fn put_chunk(self: &CxxServerResponseWriter, chunk: &[u8]);
@@ -177,7 +177,7 @@ struct CxxServerResponseWriterWrapper<'a> {
 }
 
 impl ServerResponseWritable for CxxServerResponseWriterWrapper<'_> {
-    fn put_ok_with_length(&mut self, mime_type: &str, length: u32) {
+    fn put_ok_with_length(&mut self, mime_type: &str, length: usize) {
         let_cxx_string!(mime_type = mime_type);
         self.writer.put_ok_with_length(&mime_type, length);
     }
