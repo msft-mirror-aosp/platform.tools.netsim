@@ -33,7 +33,7 @@ use crate::transport::fd::handle_response;
 use crate::transport::fd::run_fd_transport;
 
 use crate::http_server::run_http_server;
-use crate::pcap::handlers::{handle_pcap_cxx, handle_pcap_request, handle_pcap_response};
+use crate::pcap::handlers::{handle_packet_request, handle_packet_response, handle_pcap_cxx};
 use crate::ranging::*;
 use crate::version::*;
 
@@ -78,11 +78,16 @@ mod ffi {
 
         #[cxx_name = HandleRequest]
         #[namespace = "netsim::pcap"]
-        fn handle_pcap_request(kind: u32, facade_id: u32, packet: &CxxVector<u8>, packet_type: u32);
+        fn handle_packet_request(
+            kind: u32,
+            facade_id: u32,
+            packet: &CxxVector<u8>,
+            packet_type: u32,
+        );
 
         #[cxx_name = HandleResponse]
         #[namespace = "netsim::pcap"]
-        fn handle_pcap_response(
+        fn handle_packet_response(
             kind: u32,
             facade_id: u32,
             packet: &CxxVector<u8>,
