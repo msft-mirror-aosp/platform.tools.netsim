@@ -14,6 +14,8 @@
 
 #include "frontend/frontend_server.h"
 
+#include <google/protobuf/util/json_util.h>
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -23,43 +25,81 @@
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"
-#include "grpcpp/security/server_credentials.h"
-#include "grpcpp/server.h"
-#include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
-#include "util/log.h"
+#include "netsim-cxx/src/lib.rs.h"
 
 namespace netsim {
 namespace {
+
+/// The C++ implementation of the CxxServerResponseWriter interface. This is
+/// used by the gRPC server to invoke the Rust pcap handler and process a
+/// responses.
+class CxxServerResponseWritable : public frontend::CxxServerResponseWriter {
+ public:
+  CxxServerResponseWritable()
+      : grpc_writer_(nullptr), err(""), is_ok(false), body(""), length(0){};
+  CxxServerResponseWritable(
+      grpc::ServerWriter<netsim::frontend::GetPcapResponse> *grpc_writer)
+      : grpc_writer_(grpc_writer), err(""), is_ok(false), body(""), length(0){};
+
+  void put_error(unsigned int error_code,
+                 const std::string &response) const override {
+    err = std::to_string(error_code) + ": " + response;
+    is_ok = false;
+  }
+
+  void put_ok_with_length(const std::string &mime_type,
+                          unsigned int length) const override {
+    this->length = length;
+    is_ok = true;
+  }
+
+  void put_chunk(rust::Slice<const uint8_t> chunk) const override {
+    netsim::frontend::GetPcapResponse response;
+    response.ParseFromArray(chunk.data(), chunk.length());
+    is_ok = grpc_writer_->Write(response);
+  }
+
+  void put_ok(const std::string &mime_type,
+              const std::string &body) const override {
+    this->body = body;
+    is_ok = true;
+  }
+
+  mutable grpc::ServerWriter<netsim::frontend::GetPcapResponse> *grpc_writer_;
+  mutable std::string err;
+  mutable bool is_ok;
+  mutable std::string body;
+  mutable unsigned int length;
+};
+
 class FrontendServer final : public frontend::FrontendService::Service {
  public:
   grpc::Status GetVersion(grpc::ServerContext *context,
                           const google::protobuf::Empty *empty,
                           frontend::VersionResponse *reply) {
-    reply->set_version("123b");
+    reply->set_version(std::string(netsim::GetVersion()));
     return grpc::Status::OK;
   }
 
   grpc::Status GetDevices(grpc::ServerContext *context,
                           const google::protobuf::Empty *empty,
                           frontend::GetDevicesResponse *reply) {
-    const auto devices =
-        netsim::controller::SceneController::Singleton().Copy();
-    for (const auto &device : devices)
-      reply->add_devices()->CopyFrom(device->model);
+    const auto scene = netsim::controller::SceneController::Singleton().Get();
+    for (const auto &device : scene.devices())
+      reply->add_devices()->CopyFrom(device);
     return grpc::Status::OK;
   }
 
-  grpc::Status UpdateDevice(grpc::ServerContext *context,
-                            const frontend::UpdateDeviceRequest *request,
-                            google::protobuf::Empty *response) {
-    auto status = netsim::controller::SceneController::Singleton().UpdateDevice(
+  grpc::Status PatchDevice(grpc::ServerContext *context,
+                           const frontend::PatchDeviceRequest *request,
+                           google::protobuf::Empty *response) {
+    auto status = netsim::controller::SceneController::Singleton().PatchDevice(
         request->device());
     if (!status)
-      return grpc::Status(
-          grpc::StatusCode::NOT_FOUND,
-          "device " + request->device().device_serial() + " not found.");
+      return grpc::Status(grpc::StatusCode::NOT_FOUND,
+                          "device " + request->device().name() + " not found.");
     return grpc::Status::OK;
   }
 
@@ -68,13 +108,12 @@ class FrontendServer final : public frontend::FrontendService::Service {
       const frontend::SetPacketCaptureRequest *request,
       google::protobuf::Empty *empty) {
     model::Device device;
-    device.set_device_serial(request->device_serial());
     model::Chip chip;
     // Turn on bt packet capture
     chip.set_capture(request->capture() ? model::State::ON : model::State::OFF);
     chip.mutable_bt();
     device.mutable_chips()->Add()->CopyFrom(chip);
-    controller::SceneController::Singleton().UpdateDevice(device);
+    controller::SceneController::Singleton().PatchDevice(device);
     return grpc::Status::OK;
   }
 
@@ -84,22 +123,46 @@ class FrontendServer final : public frontend::FrontendService::Service {
     netsim::controller::SceneController::Singleton().Reset();
     return grpc::Status::OK;
   }
-};
 
-FrontendServer service;
+  grpc::Status ListPcap(grpc::ServerContext *context,
+                        const google::protobuf::Empty *empty,
+                        frontend::ListPcapResponse *reply) {
+    CxxServerResponseWritable writer;
+    HandlePcapCxx(writer, "GET", "", "");
+    if (writer.is_ok) {
+      google::protobuf::util::JsonStringToMessage(writer.body, reply);
+      return grpc::Status::OK;
+    }
+    return grpc::Status(grpc::StatusCode::UNKNOWN, writer.err);
+  }
+
+  grpc::Status PatchPcap(grpc::ServerContext *context,
+                         const frontend::PatchPcapRequest *request,
+                         google::protobuf::Empty *response) {
+    CxxServerResponseWritable writer;
+    HandlePcapCxx(writer, "PATCH", std::to_string(request->id()),
+                  std::to_string(request->patch().state()));
+    if (writer.is_ok) {
+      return grpc::Status::OK;
+    }
+    return grpc::Status(grpc::StatusCode::UNKNOWN, writer.err);
+  }
+  grpc::Status GetPcap(
+      grpc::ServerContext *context,
+      const netsim::frontend::GetPcapRequest *request,
+      grpc::ServerWriter<netsim::frontend::GetPcapResponse> *grpc_writer) {
+    CxxServerResponseWritable writer(grpc_writer);
+    HandlePcapCxx(writer, "GET", std::to_string(request->id()), "");
+    if (writer.is_ok) {
+      return grpc::Status::OK;
+    }
+    return grpc::Status(grpc::StatusCode::UNKNOWN, writer.err);
+  }
+};
 }  // namespace
 
-std::pair<std::unique_ptr<grpc::Server>, std::string> RunFrontendServer() {
-  grpc::ServerBuilder builder;
-  int selected_port;
-  builder.AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(),
-                           &selected_port);
-  builder.RegisterService(&service);
-  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-
-  BtsLog("Frontend server listening on localhost: %s",
-         std::to_string(selected_port).c_str());
-  return std::make_pair(std::move(server), std::to_string(selected_port));
+std::unique_ptr<frontend::FrontendService::Service> GetFrontendService() {
+  return std::make_unique<FrontendServer>();
 }
 
 }  // namespace netsim

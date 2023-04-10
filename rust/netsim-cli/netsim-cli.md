@@ -1,50 +1,69 @@
-# Command Line Interface for Netsim (netsim-cli)
+# Command Line Interface for Netsim (netsim)
 
 USAGE:
-* `netsim-cli <SUBCOMMAND>`
+* `netsim [OPTIONS] <SUBCOMMAND>`
 
 OPTIONS:
-* -`h, --help`:    Print help information
+* `-h, --help`:    Print help information
+* `-v, --verbose`: Set verbose mode
+
 
 ## SUBCOMMANDS:
-* ### `capture`:           Control the packet capture for one or all devices
+* ### `capture`:    Control the bluetooth packet capture for one or all devices
     * USAGE:
-        * `netsim-cli capture <STATE> <SERIAL>`
+        * `netsim capture <STATE> <NAME>`
 
     * ARGS:
-        * \<STATE\>:     Capture state (true/false)
-        * \<SERIAL\>:    Device serial
-* ### `devices`:           Display device(s) information
+        * \<STATE\>:     Capture state [possible values: on, off]
+        * \<NAME\>:      Device name
+* ### `devices`:    Display device(s) information
     * USAGE:
-        * `netsim-cli devices`
-* ### `help`:              Print this message or the help of the given subcommand(s)
-* ### `move`:              Set the device location
+        * `netsim devices [OPTIONS]`
+    * OPTIONS:
+        * `-c, --continuous`:    Continuously print device(s) information every second
+* ### `help`:       Print this message or the help of the given subcommand(s)
+* ### `move`:       Set the device location
     * USAGE:
-        * `netsim-cli move <SERIAL> <X> <Y> [Z]`
-
+        * `netsim move <NAME> <X> <Y> [Z]`
     * ARGS:
-        * \<SERIAL\>:    Device serial
+        * \<NAME\>:      Device name
         * \<X\>:         x position of device
         * \<Y\>:         y position of device
         * \<Z\>:         Optional z position of device
-* ### `radio`:             Control the radio state of a device
+* ### `radio`:      Control the radio state of a device
     * USAGE:
-        * `netsim-cli radio <BT_TYPE> <STATUS> <SERIAL>`
+        * `netsim radio <BT_TYPE> <STATUS> <NAME>`
 
     * ARGS:
-        * \<BT_TYPE\>    Radio type
-        * \<STATUS\>     Radio status (up/down)
-        * \<SERIAL\>     Device serial*`
-* ### `reset`:             Reset Netsim device scene
+        * \<RADIO_TYPE\>:    Radio type [possible values: ble, classic, wifi]
+        * \<STATUS\>:        Radio status [possible values: up, down]
+        * \<NAME\>:          Device name
+* ### `reset`:      Reset Netsim device scene
     * USAGE:
-        * `netsim-cli reset`
-* ### `set-visibility`:    Toggle visibility of a device
+        * `netsim reset`
+* ### `version`:    Print Netsim version information
     * USAGE:
-        * `netsim-cli set-visibility <SERIAL> <STATE>`
-
-    * ARGS:
-        * \<SERIAL\>    Device serial
-        * \<STATE\>     Visibility state (on/off)
-* ### `version`:          Print Netsim version information
-    * USAGE:
-        * `netsim-cli version`
+        * `netsim version`
+* ### `pcap`:       (Not fully implemented)  Control the packet capture functionalities
+    * #### SUBCOMMANDS
+        * `list`:   List currently available Pcaps (packet captures)
+            * USAGE:
+                * `netsim pcap list [PATTERNS]...`
+            * ARGS:
+                * \<PATTERNS\>...:  Optional strings of pattern for pcaps to list. Possible filter fields
+                                    include Pcap ID, Device Name, and Chip Kind
+        * `patch`:  Patch a Pcap source to turn packet capture on/off
+            * USAGE:
+                * `netsim pcap patch <STATE> [PATTERNS]...`
+            * ARGS:
+                * \<STATE\>:        Packet capture state [possible values: on, off]
+                * \<PATTERNS\>...:  Optional strings of pattern for pcaps to patch. Possible filter fields
+                                    include Pcap ID, Device Name, and Chip Kind
+        * `get`:    Download the packet capture content
+            * USAGE:
+                * `netsim pcap get [OPTIONS] [PATTERNS]...`
+            * ARGS:
+                * \<PATTERNS\>...:  Optional strings of pattern for pcaps to get. Possible filter fields
+                                    include Pcap ID, Device Name, and Chip Kind
+            * OPTIONS:
+                * `-o, --location`: Directory to store downloaded pcap(s)
