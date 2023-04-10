@@ -24,14 +24,14 @@
 
 use std::io::Write;
 
-use crate::http_server::http_response::HttpResponse;
+use crate::{http_server::http_response::HttpResponse, pcap::PCAP_MIME_TYPE};
 
 pub type ResponseWritable<'a> = &'a mut dyn ServerResponseWritable;
 
 // ServerResponseWritable trait is used by both the Http and gRPC
 // servers.
 pub trait ServerResponseWritable {
-    fn put_ok_with_length(&mut self, mime_type: &str, length: u32);
+    fn put_ok_with_length(&mut self, mime_type: &str, length: usize);
     fn put_chunk(&mut self, chunk: &[u8]);
     fn put_ok(&mut self, mime_type: &str, body: &str);
     fn put_error(&mut self, error_code: u16, error_message: &str);
@@ -47,7 +47,6 @@ impl<'a> ServerResponseWriter<'a> {
     pub fn new<W: Write>(writer: &mut W) -> ServerResponseWriter {
         ServerResponseWriter { writer }
     }
-
     pub fn put_response(&mut self, response: HttpResponse) {
         let mut buffer = format!("HTTP/1.1 {}\r\n", response.status_code).into_bytes();
         for (name, value) in response.headers.iter() {
@@ -70,13 +69,17 @@ impl ServerResponseWritable for ServerResponseWriter<'_> {
         self.put_response(response);
     }
     fn put_chunk(&mut self, chunk: &[u8]) {
-        println!("Rust put_body_chunk: {}", chunk.len());
         if let Err(e) = self.writer.write_all(chunk) {
             println!("netsim: handle_connection error {e}");
         };
+        self.writer.flush().unwrap();
     }
-    fn put_ok_with_length(&mut self, mime_type: &str, length: u32) {
-        let response = HttpResponse::new_ok_with_length(mime_type, length);
+    // TODO: include Headers as a parameter for caller to have more control.
+    fn put_ok_with_length(&mut self, mime_type: &str, length: usize) {
+        let mut response = HttpResponse::new_ok_with_length(mime_type, length);
+        if mime_type == PCAP_MIME_TYPE {
+            response.add_header("Content-Disposition", "attachment; filename=\"capture.pcap\"");
+        }
         self.put_response(response);
     }
     fn put_ok(&mut self, mime_type: &str, body: &str) {
