@@ -21,7 +21,7 @@
 //! This library is only used for serving the netsim client and is not
 //! meant to implement all aspects of RFC 5322.
 
-pub use crate::http_server::http_request::HttpHeaders;
+use super::http_request::{HttpHeaders, StrHeaders};
 
 pub struct HttpResponse {
     pub status_code: u16,
@@ -64,8 +64,10 @@ impl HttpResponse {
         }
     }
 
-    pub fn add_header(&mut self, header_key: &str, header_value: &str) {
-        self.headers.add_header(header_key, header_value);
+    pub fn add_headers(&mut self, headers: StrHeaders) {
+        for (header_key, header_value) in headers {
+            self.headers.add_header(header_key, header_value)
+        }
     }
 }
 
@@ -78,7 +80,7 @@ mod tests {
     fn test_write_to() {
         let mut stream = Cursor::new(Vec::new());
         let mut writer = ServerResponseWriter::new(&mut stream);
-        writer.put_ok_with_vec("text/plain", b"Hello World".to_vec());
+        writer.put_ok_with_vec("text/plain", b"Hello World".to_vec(), &[]);
         let written_bytes = stream.get_ref();
         let expected_bytes =
             b"HTTP/1.1 200\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nHello World";
