@@ -146,7 +146,7 @@ pub fn handle_capture_get(writer: ResponseWritable, captures: &mut Captures, id:
             loop {
                 match file.read(&mut buffer) {
                     Ok(0) => break,
-                    Ok(_) => writer.put_chunk(&buffer),
+                    Ok(length) => writer.put_chunk(&buffer[..length]),
                     Err(_) => writer.put_error(404, "Error reading pcap file"),
                 }
             }
