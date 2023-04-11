@@ -50,7 +50,7 @@ class CxxServerResponseWritable : public frontend::CxxServerResponseWriter {
   }
 
   void put_ok_with_length(const std::string &mime_type,
-                          unsigned int length) const override {
+                          std::size_t length) const override {
     this->length = length;
     is_ok = true;
   }
@@ -71,7 +71,7 @@ class CxxServerResponseWritable : public frontend::CxxServerResponseWriter {
   mutable std::string err;
   mutable bool is_ok;
   mutable std::string body;
-  mutable unsigned int length;
+  mutable std::size_t length;
 };
 
 class FrontendServer final : public frontend::FrontendService::Service {
