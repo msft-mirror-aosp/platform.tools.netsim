@@ -30,7 +30,7 @@ pub struct HttpResponse {
 }
 
 impl HttpResponse {
-    pub fn new_ok_with_length(content_type: &str, length: u32) -> HttpResponse {
+    pub fn new_ok_with_length(content_type: &str, length: usize) -> HttpResponse {
         let body = Vec::new();
         HttpResponse {
             status_code: 200,
@@ -62,6 +62,10 @@ impl HttpResponse {
             ]),
             body,
         }
+    }
+
+    pub fn add_header(&mut self, header_key: &str, header_value: &str) {
+        self.headers.add_header(header_key, header_value);
     }
 }
 
