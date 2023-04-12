@@ -25,14 +25,15 @@ pub type BinaryProtobuf = Vec<u8>;
 
 #[derive(Debug, Parser)]
 pub struct NetsimArgs {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub command: Command,
     /// Set verbose mode
-    #[clap(short, long)]
+    #[arg(short, long)]
     pub verbose: bool,
 }
 
 #[derive(Debug, Subcommand)]
+#[command(infer_subcommands = true)]
 pub enum Command {
     /// Print Netsim version information
     Version,
@@ -50,7 +51,7 @@ pub enum Command {
     Gui,
     /// (Not fully implemented)
     /// Control the packet capture functionalities with subcommands: list, patch, get
-    #[clap(subcommand)]
+    #[command(subcommand)]
     Pcap(Pcap),
 }
 
@@ -209,10 +210,10 @@ impl Command {
 #[derive(Debug, Args)]
 pub struct Radio {
     /// Radio type
-    #[clap(value_enum)]
+    #[arg(value_enum, ignore_case = true)]
     pub radio_type: RadioType,
     /// Radio status
-    #[clap(value_enum)]
+    #[arg(value_enum, ignore_case = true)]
     pub status: UpDownStatus,
     /// Device name
     pub name: String,
@@ -258,14 +259,14 @@ pub struct Move {
 #[derive(Debug, Args)]
 pub struct Devices {
     /// Continuously print device(s) information every second
-    #[clap(short, long)]
+    #[arg(short, long)]
     pub continuous: bool,
 }
 
 #[derive(Debug, Args)]
 pub struct Capture {
     /// Capture state
-    #[clap(value_enum)]
+    #[arg(value_enum, ignore_case = true)]
     pub state: OnOffState,
     /// Device name
     pub name: String,
@@ -273,10 +274,7 @@ pub struct Capture {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
 pub enum OnOffState {
-    // NOTE: Temporarily disable this attribute because clap-3.2.22 is used.
-    // #[value(alias("On"), alias("ON"))]
     On,
-    // #[value(alias("Off"), alias("OFF"))]
     Off,
 }
 
@@ -299,7 +297,7 @@ pub struct ListPcap {
 #[derive(Debug, Args)]
 pub struct PatchPcap {
     /// Packet capture state
-    #[clap(value_enum)]
+    #[arg(value_enum, ignore_case = true)]
     pub state: OnOffState,
     /// Optional strings of pattern for pcaps to patch. Possible filter fields include Pcap ID, Device Name, and Chip Kind
     pub patterns: Vec<String>,
@@ -310,8 +308,8 @@ pub struct GetPcap {
     /// Optional strings of pattern for pcaps to get. Possible filter fields include Pcap ID, Device Name, and Chip Kind
     pub patterns: Vec<String>,
     /// Directory to store downloaded pcap(s)
-    #[clap(short = 'o', long)]
+    #[arg(short = 'o', long)]
     pub location: Option<String>,
-    #[clap(skip)]
+    #[arg(skip)]
     pub filenames: Vec<String>,
 }
