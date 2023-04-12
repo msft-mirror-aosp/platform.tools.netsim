@@ -73,6 +73,11 @@ impl Command {
                     wifi_chip.set_state(chip_state);
                     chip.set_wifi(wifi_chip);
                     chip.set_kind(ChipKind::WIFI);
+                } else if cmd.radio_type == RadioType::Uwb {
+                    let mut uwb_chip = Chip_Radio::new();
+                    uwb_chip.set_state(chip_state);
+                    chip.set_uwb(uwb_chip);
+                    chip.set_kind(ChipKind::UWB);
                 } else {
                     let mut bt_chip = Chip_Bluetooth::new();
                     if cmd.radio_type == RadioType::Ble {
@@ -224,6 +229,7 @@ pub enum RadioType {
     Ble,
     Classic,
     Wifi,
+    Uwb,
 }
 
 impl fmt::Display for RadioType {
