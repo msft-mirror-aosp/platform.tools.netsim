@@ -109,6 +109,30 @@ mod tests {
     }
 
     #[test]
+    fn test_radio_ble_aliases() {
+        test_command(
+            "netsim-cli radio ble Down 1000",
+            GrpcMethod::PatchDevice,
+            get_expected_radio("1000", "ble", "down"),
+        );
+        test_command(
+            "netsim-cli radio ble Up 1000",
+            GrpcMethod::PatchDevice,
+            get_expected_radio("1000", "ble", "up"),
+        );
+        test_command(
+            "netsim-cli radio ble DOWN 1000",
+            GrpcMethod::PatchDevice,
+            get_expected_radio("1000", "ble", "down"),
+        );
+        test_command(
+            "netsim-cli radio ble UP 1000",
+            GrpcMethod::PatchDevice,
+            get_expected_radio("1000", "ble", "up"),
+        );
+    }
+
+    #[test]
     fn test_radio_classic() {
         test_command(
             "netsim-cli radio classic down 100",
@@ -223,34 +247,33 @@ mod tests {
         )
     }
 
-    // NOTE: Temporarily disable alias tests because clap-3.2.22 is used which does not support aliasing.
-    // #[test]
-    // fn test_capture_mixed_case() {
-    //     test_command(
-    //         "netsim-cli capture On 10",
-    //         GrpcMethod::PatchDevice,
-    //         get_expected_capture("10", OnOffState::On),
-    //     );
-    //     test_command(
-    //         "netsim-cli capture Off 1000",
-    //         GrpcMethod::PatchDevice,
-    //         get_expected_capture("1000", OnOffState::Off),
-    //     )
-    // }
+    #[test]
+    fn test_capture_mixed_case() {
+        test_command(
+            "netsim-cli capture On 10",
+            GrpcMethod::PatchDevice,
+            get_expected_capture("10", OnOffState::On),
+        );
+        test_command(
+            "netsim-cli capture Off 1000",
+            GrpcMethod::PatchDevice,
+            get_expected_capture("1000", OnOffState::Off),
+        )
+    }
 
-    // #[test]
-    // fn test_capture_uppercase() {
-    //     test_command(
-    //         "netsim-cli capture ON 1000",
-    //         GrpcMethod::PatchDevice,
-    //         get_expected_capture("1000", OnOffState::On),
-    //     );
-    //     test_command(
-    //         "netsim-cli capture OFF 1000",
-    //         GrpcMethod::PatchDevice,
-    //         get_expected_capture("1000", OnOffState::Off),
-    //     )
-    // }
+    #[test]
+    fn test_capture_uppercase() {
+        test_command(
+            "netsim-cli capture ON 1000",
+            GrpcMethod::PatchDevice,
+            get_expected_capture("1000", OnOffState::On),
+        );
+        test_command(
+            "netsim-cli capture OFF 1000",
+            GrpcMethod::PatchDevice,
+            get_expected_capture("1000", OnOffState::Off),
+        )
+    }
 
     #[test]
     fn test_reset() {
