@@ -49,8 +49,7 @@ pub enum Command {
     Reset,
     /// Open netsim Web UI
     Gui,
-    /// (Not fully implemented)
-    /// Control the packet capture functionalities with subcommands: list, patch, get
+    /// Control the packet capture functionalities with commands: list, patch, get
     #[command(subcommand)]
     Pcap(Pcap),
 }
