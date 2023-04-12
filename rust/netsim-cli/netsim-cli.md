@@ -35,7 +35,7 @@ OPTIONS:
         * `netsim radio <BT_TYPE> <STATUS> <NAME>`
 
     * ARGS:
-        * \<RADIO_TYPE\>:    Radio type [possible values: ble, classic, wifi]
+        * \<RADIO_TYPE\>:    Radio type [possible values: ble, classic, wifi, uwb]
         * \<STATUS\>:        Radio status [possible values: up, down]
         * \<NAME\>:          Device name
 * ### `reset`:      Reset Netsim device scene
