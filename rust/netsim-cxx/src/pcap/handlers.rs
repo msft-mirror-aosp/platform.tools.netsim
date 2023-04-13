@@ -142,7 +142,17 @@ pub fn handle_capture_get(writer: ResponseWritable, captures: &mut Captures, id:
             writer.put_error(404, "Capture file not found");
         } else if let Ok(mut file) = get_file(id, capture.device_name.clone(), capture.chip_kind) {
             let mut buffer = [0u8; CHUNK_LEN];
-            writer.put_ok_with_length(PCAP_MIME_TYPE, capture.size);
+            let header_value = format!(
+                "attachment; filename=\"{:?}-{:}-{:?}.pcap\"",
+                id,
+                capture.device_name.clone(),
+                capture.chip_kind
+            );
+            writer.put_ok_with_length(
+                PCAP_MIME_TYPE,
+                capture.size,
+                &[("Content-Disposition", header_value.as_str())],
+            );
             loop {
                 match file.read(&mut buffer) {
                     Ok(0) => break,
@@ -174,7 +184,7 @@ pub fn handle_capture_list(writer: ResponseWritable, captures: &mut Captures) {
         out.pop();
         out.push_str(r"]}");
     }
-    writer.put_ok("text/json", out.as_str());
+    writer.put_ok("text/json", out.as_str(), &[]);
 }
 
 pub fn handle_capture_patch(
@@ -202,7 +212,7 @@ pub fn handle_capture_patch(
         let mut out = String::new();
         capture_to_string(&proto_capture, &mut out);
         out.pop();
-        writer.put_ok("text/json", out.as_str());
+        writer.put_ok("text/json", out.as_str(), &[]);
     }
 }
 
