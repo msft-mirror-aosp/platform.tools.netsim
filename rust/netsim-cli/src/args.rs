@@ -18,6 +18,7 @@ use frontend_proto::common::ChipKind;
 use frontend_proto::frontend;
 use frontend_proto::frontend::PatchPcapRequest_PcapPatch as PcapPatch;
 use frontend_proto::model::{self, Chip_Bluetooth, Chip_Radio, State};
+use netsim_common::util::time_display::TimeDisplay;
 use protobuf::{Message, RepeatedField};
 use std::fmt;
 
@@ -174,11 +175,16 @@ impl Command {
                     let mut result = frontend::GetPcapRequest::new();
                     result.set_id(pcap.id);
                     reqs.push(result.write_to_bytes().unwrap());
+                    let time_display = TimeDisplay::new(
+                        pcap.timestamp.get_ref().seconds,
+                        pcap.timestamp.get_ref().nanos as u32,
+                    );
                     cmd.filenames.push(format!(
-                        "{}-{}-{}",
+                        "{:?}-{}-{}-{}",
+                        pcap.id,
                         pcap.device_name.to_owned().replace(' ', "_"),
                         Self::chip_kind_to_string(pcap.chip_kind),
-                        pcap.timestamp
+                        time_display.utc_display()
                     ));
                 }
                 reqs
