@@ -260,6 +260,7 @@ rust_defaults {
     name: "libnetsim_common_defaults",
     srcs: ["rust/netsim-common/src/lib.rs"],
     rustlibs: [
+        "libchrono",
         "librand",
     ],
 }
