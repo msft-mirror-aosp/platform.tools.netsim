@@ -184,8 +184,8 @@ mod tests {
         let mutable_device = result.mut_device();
         mutable_device.set_name(name.to_owned());
         mutable_device.set_position(Position {
-            x: x,
-            y: y,
+            x,
+            y,
             z: z.unwrap_or_default(),
             ..Default::default()
         });
