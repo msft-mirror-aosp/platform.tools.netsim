@@ -56,6 +56,15 @@ impl args::Command {
                     verbose,
                 );
             }
+            Command::Capture(cmd) => {
+                if verbose {
+                    println!(
+                        "Turned {} packet capture for {}",
+                        Self::on_off_state_to_string(cmd.state),
+                        cmd.name.to_owned()
+                    );
+                }
+            }
             Command::Reset => {
                 if verbose {
                     println!("All devices have been reset.");
