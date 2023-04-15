@@ -44,6 +44,8 @@ pub enum Command {
     Move(Move),
     /// Display device(s) information
     Devices(Devices),
+    /// Control the bluetooth packet capture for one or all devices
+    Capture(Capture),
     /// Reset Netsim device scene
     Reset,
     /// Open netsim Web UI
@@ -107,6 +109,24 @@ impl Command {
                 result.write_to_bytes().unwrap()
             }
             Command::Devices(_) => Vec::new(),
+            Command::Capture(cmd) => {
+                let mut bt_chip = model::Chip {
+                    kind: ChipKind::BLUETOOTH,
+                    chip: Some(model::Chip_oneof_chip::bt(Chip_Bluetooth { ..Default::default() })),
+                    ..Default::default()
+                };
+                let capture_state = match cmd.state {
+                    OnOffState::On => State::ON,
+                    OnOffState::Off => State::OFF,
+                };
+                bt_chip.set_capture(capture_state);
+                let mut result = frontend::PatchDeviceRequest::new();
+                let mutable_device = result.mut_device();
+                mutable_device.set_name(cmd.name.to_owned());
+                let mutable_chips = mutable_device.mut_chips();
+                mutable_chips.push(bt_chip);
+                result.write_to_bytes().unwrap()
+            }
             Command::Reset => Vec::new(),
             Command::Gui => {
                 unimplemented!("get_request_bytes is not implemented for Gui Command.");
@@ -252,6 +272,15 @@ pub struct Devices {
     /// Continuously print device(s) information every second
     #[arg(short, long)]
     pub continuous: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct Capture {
+    /// Capture state
+    #[arg(value_enum, ignore_case = true)]
+    pub state: OnOffState,
+    /// Device name
+    pub name: String,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
