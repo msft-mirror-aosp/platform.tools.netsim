@@ -18,7 +18,7 @@
 
 use frontend_proto::common::ChipKind;
 use frontend_proto::model::{Pcap as ProtoPcap, State};
-use protobuf::well_known_types::Timestamp;
+use protobuf::well_known_types::timestamp::Timestamp;
 
 // Will be deprecated once protobuf v3 is imported
 fn state_to_string(state: State) -> &'static str {
@@ -58,15 +58,23 @@ fn write_timestamp_to_json_str(key: &str, value: &Timestamp, out: &mut String) {
 // Will be deprecated once protobuf v3 is imported
 pub fn capture_to_string(proto: &ProtoPcap, out: &mut String) {
     out.push('{');
-    write_to_json_str("id", proto.get_id().to_string(), out);
-    write_to_json_str("chipKind", chip_kind_to_string(proto.get_chip_kind()).to_string(), out);
-    write_to_json_str("chipId", proto.get_chip_id().to_string(), out);
-    write_to_json_str("deviceName", proto.get_device_name().to_string(), out);
-    write_to_json_str("state", state_to_string(proto.get_state()).to_string(), out);
-    write_to_json_str("size", proto.get_size().to_string(), out);
-    write_to_json_str("records", proto.get_records().to_string(), out);
-    write_timestamp_to_json_str("timestamp", proto.get_timestamp(), out);
-    write_to_json_str("valid", proto.get_valid().to_string(), out);
+    write_to_json_str("id", proto.id.to_string(), out);
+    write_to_json_str(
+        "chipKind",
+        chip_kind_to_string(proto.chip_kind.enum_value_or_default()).to_string(),
+        out,
+    );
+    write_to_json_str("chipId", proto.chip_id.to_string(), out);
+    write_to_json_str("deviceName", proto.device_name.to_string(), out);
+    write_to_json_str(
+        "state",
+        state_to_string(proto.state.enum_value_or_default()).to_string(),
+        out,
+    );
+    write_to_json_str("size", proto.size.to_string(), out);
+    write_to_json_str("records", proto.records.to_string(), out);
+    write_timestamp_to_json_str("timestamp", &proto.timestamp, out);
+    write_to_json_str("valid", proto.valid.to_string(), out);
     out.pop();
     out.push_str(r"},");
 }
@@ -89,7 +97,7 @@ mod tests {
         let mut pcap = ProtoPcap::new();
         let mut out = String::new();
         pcap.id = 1;
-        pcap.chip_kind = ChipKind::WIFI;
+        pcap.chip_kind = ChipKind::WIFI.into();
         pcap.device_name = "sample".to_string();
         capture_to_string(&pcap, &mut out);
         let expected = r#"{"id": 1,"chipKind": "WIFI","chipId": 0,"deviceName": "sample","state": "UNKNOWN","size": 0,"records": 0,"timestamp": {"seconds": 0,"nanos": 0},"valid": false},"#;

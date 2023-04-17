@@ -76,12 +76,15 @@ fn update_captures(captures: &mut Captures) {
 
     // Adding to Captures hashmap
     let mut chip_ids = HashSet::<ChipId>::new();
-    for device in device_response.get_devices() {
-        for chip in device.get_chips() {
-            chip_ids.insert(chip.get_id());
-            if !captures.contains(chip.get_id()) {
-                let capture =
-                    CaptureInfo::new(chip.get_kind(), chip.get_id(), device.get_name().into());
+    for device in device_response.devices {
+        for chip in device.chips {
+            chip_ids.insert(chip.id);
+            if !captures.contains(chip.id) {
+                let capture = CaptureInfo::new(
+                    chip.kind.enum_value_or_default(),
+                    chip.id,
+                    device.name.clone(),
+                );
                 captures.insert(capture);
             }
         }
@@ -101,7 +104,7 @@ fn update_captures(captures: &mut Captures) {
         let lock = capture.lock().unwrap();
         let proto_capture = lock.get_capture_proto();
         if !chip_ids.contains(chip_id) {
-            if proto_capture.get_size() == 0 {
+            if proto_capture.size == 0 {
                 removal.push(RemovalIndicator::Unused(chip_id.to_owned()));
             } else {
                 removal.push(RemovalIndicator::Gone(chip_id.to_owned()))

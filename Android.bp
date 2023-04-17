@@ -65,7 +65,7 @@ rust_ffi_host_static {
         "libcxx",
         "libfrontend_proto",
         "libnetsim_common",
-        "libprotobuf_deprecated",
+        "libprotobuf",
         "libregex",
         "libserde",
         "libserde_json",
@@ -252,7 +252,7 @@ rust_library_host {
     crate_name: "frontend_proto",
     srcs: ["rust/frontend-proto/src/lib.rs"],
     rustlibs: [
-        "libprotobuf_deprecated",
+        "libprotobuf",
     ],
 }
 
@@ -310,7 +310,7 @@ rust_defaults {
         "libfrontend_proto",
         "libfrontend_client_cxx",
         "libnetsim_common",
-        "libprotobuf_deprecated",
+        "libprotobuf",
         "libcxx",
     ],
 }
