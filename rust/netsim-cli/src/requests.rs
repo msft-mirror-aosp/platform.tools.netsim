@@ -45,7 +45,11 @@ mod tests {
     use frontend_proto::{
         common::ChipKind,
         frontend,
-        model::{self, Chip_Bluetooth, Chip_Radio, Position, State},
+        model::{
+            self,
+            chip::{Bluetooth as Chip_Bluetooth, Radio as Chip_Radio},
+            Device, Position, State,
+        },
     };
     use protobuf::Message;
 
@@ -73,29 +77,31 @@ mod tests {
         };
         if radio_type == "wifi" {
             let mut wifi_chip = Chip_Radio::new();
-            wifi_chip.set_state(chip_state);
+            wifi_chip.state = chip_state.into();
             chip.set_wifi(wifi_chip);
-            chip.set_kind(ChipKind::WIFI);
+            chip.kind = ChipKind::WIFI.into();
         } else if radio_type == "uwb" {
             let mut uwb_chip = Chip_Radio::new();
-            uwb_chip.set_state(chip_state);
+            uwb_chip.state = chip_state.into();
             chip.set_uwb(uwb_chip);
-            chip.set_kind(ChipKind::UWB);
+            chip.kind = ChipKind::UWB.into();
         } else {
             let mut bt_chip = Chip_Bluetooth::new();
+            let mut bt_chip_radio = Chip_Radio::new();
+            bt_chip_radio.state = chip_state.into();
             if radio_type == "ble" {
-                bt_chip.set_low_energy(Chip_Radio { state: chip_state, ..Default::default() });
+                bt_chip.low_energy = Some(bt_chip_radio).into();
             } else {
-                bt_chip.set_classic(Chip_Radio { state: chip_state, ..Default::default() });
+                bt_chip.classic = Some(bt_chip_radio).into();
             }
-            chip.set_kind(ChipKind::BLUETOOTH);
+            chip.kind = ChipKind::BLUETOOTH.into();
             chip.set_bt(bt_chip);
         }
         let mut result = frontend::PatchDeviceRequest::new();
-        let mutable_device = result.mut_device();
-        mutable_device.set_name(name.to_owned());
-        let mutable_chips = mutable_device.mut_chips();
-        mutable_chips.push(chip);
+        let mut device = Device::new();
+        device.name = name.to_owned();
+        device.chips.push(chip);
+        result.device = Some(device).into();
         result.write_to_bytes().unwrap()
     }
 
@@ -181,14 +187,11 @@ mod tests {
 
     fn get_expected_move(name: &str, x: f32, y: f32, z: Option<f32>) -> BinaryProtobuf {
         let mut result = frontend::PatchDeviceRequest::new();
-        let mutable_device = result.mut_device();
-        mutable_device.set_name(name.to_owned());
-        mutable_device.set_position(Position {
-            x,
-            y,
-            z: z.unwrap_or_default(),
-            ..Default::default()
-        });
+        let mut device = Device::new();
+        let position = Position { x, y, z: z.unwrap_or_default(), ..Default::default() };
+        device.name = name.to_owned();
+        device.position = Some(position).into();
+        result.device = Some(device).into();
         result.write_to_bytes().unwrap()
     }
 
@@ -235,20 +238,20 @@ mod tests {
 
     fn get_expected_capture(name: &str, state: OnOffState) -> BinaryProtobuf {
         let mut bt_chip = model::Chip {
-            kind: ChipKind::BLUETOOTH,
-            chip: Some(model::Chip_oneof_chip::bt(Chip_Bluetooth { ..Default::default() })),
+            kind: ChipKind::BLUETOOTH.into(),
+            chip: Some(model::chip::Chip::Bt(Chip_Bluetooth { ..Default::default() })),
             ..Default::default()
         };
         let capture_state = match state {
             OnOffState::On => State::ON,
             OnOffState::Off => State::OFF,
         };
-        bt_chip.set_capture(capture_state);
+        bt_chip.capture = capture_state.into();
         let mut result = frontend::PatchDeviceRequest::new();
-        let mutable_device = result.mut_device();
-        mutable_device.set_name(name.to_owned());
-        let mutable_chips = mutable_device.mut_chips();
-        mutable_chips.push(bt_chip);
+        let mut device = Device::new();
+        device.name = name.to_owned();
+        device.chips.push(bt_chip);
+        result.device = Some(device).into();
         result.write_to_bytes().unwrap()
     }
 
