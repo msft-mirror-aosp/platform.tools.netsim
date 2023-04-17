@@ -57,9 +57,8 @@ cc_defaults {
     ],
 }
 
-rust_ffi_host_static {
-    name: "libnetsim_cxx",
-    crate_name: "netsim_cxx",
+rust_defaults {
+    name: "libnetsim_cxx_defaults",
     features: ["cuttlefish"],
     rlibs: [
         "libcxx",
@@ -73,6 +72,18 @@ rust_ffi_host_static {
         "liblazy_static",
     ],
     srcs: ["rust/netsim-cxx/src/lib.rs"],
+}
+
+rust_ffi_host_static {
+    name: "libnetsim_cxx",
+    crate_name: "netsim_cxx",
+    defaults: ["libnetsim_cxx_defaults"],
+}
+
+rust_test_host {
+    name: "libnetsim_cxx_tests",
+    defaults: ["libnetsim_cxx_defaults"],
+    test_suites: ["general_tests"],
 }
 
 genrule {
