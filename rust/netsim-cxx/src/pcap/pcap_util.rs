@@ -97,7 +97,7 @@ mod tests {
             append_record(
                 Duration::from_secs(0),
                 &mut file,
-                PacketDirection::ControllerToHost,
+                PacketDirection::HostToController,
                 4u32,
                 &[14, 4, 1, 10, 32, 0],
             )
@@ -105,7 +105,7 @@ mod tests {
             append_record(
                 Duration::from_millis(250),
                 &mut file,
-                PacketDirection::HostToController,
+                PacketDirection::ControllerToHost,
                 1u32,
                 &[10, 32, 1, 0],
             )
