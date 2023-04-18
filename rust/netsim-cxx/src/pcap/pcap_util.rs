@@ -111,16 +111,17 @@ mod tests {
             )
             .unwrap();
         } else {
-            println!("Cannot create temp file");
-            assert!(false);
+            panic!("Cannot create temp file")
         }
         if let Ok(mut file) = File::open(temp_dir) {
             let mut buffer = [0u8; 76];
-            file.read(&mut buffer).unwrap();
+            #[allow(clippy::unused_io_amount)]
+            {
+                file.read(&mut buffer).unwrap();
+            }
             assert_eq!(&buffer, EXPECTED);
         } else {
-            println!("Cannot reopen temp file");
-            assert!(false);
+            panic!("Cannot create temp file")
         }
     }
 }
