@@ -66,6 +66,7 @@ rust_ffi_host_static {
         "libfrontend_proto",
         "libnetsim_common",
         "libprotobuf",
+        "libprotobuf_json_mapping",
         "libregex",
         "libserde",
         "libserde_json",
