@@ -23,7 +23,6 @@ impl args::Command {
             Command::Radio(_) => GrpcMethod::PatchDevice,
             Command::Move(_) => GrpcMethod::PatchDevice,
             Command::Devices(_) => GrpcMethod::GetDevices,
-            Command::Capture(_) => GrpcMethod::PatchDevice,
             Command::Reset => GrpcMethod::Reset,
             Command::Pcap(cmd) => match cmd {
                 args::Pcap::List(_) => GrpcMethod::ListPcap,
@@ -40,7 +39,7 @@ impl args::Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use args::{BinaryProtobuf, NetsimArgs, OnOffState};
+    use args::{BinaryProtobuf, NetsimArgs};
     use clap::Parser;
     use frontend_proto::{
         common::ChipKind,
@@ -234,67 +233,6 @@ mod tests {
     #[test]
     fn test_devices() {
         test_command("netsim-cli devices", GrpcMethod::GetDevices, Vec::new())
-    }
-
-    fn get_expected_capture(name: &str, state: OnOffState) -> BinaryProtobuf {
-        let mut bt_chip = model::Chip {
-            kind: ChipKind::BLUETOOTH.into(),
-            chip: Some(model::chip::Chip::Bt(Chip_Bluetooth { ..Default::default() })),
-            ..Default::default()
-        };
-        let capture_state = match state {
-            OnOffState::On => State::ON,
-            OnOffState::Off => State::OFF,
-        };
-        bt_chip.capture = capture_state.into();
-        let mut result = frontend::PatchDeviceRequest::new();
-        let mut device = Device::new();
-        device.name = name.to_owned();
-        device.chips.push(bt_chip);
-        result.device = Some(device).into();
-        result.write_to_bytes().unwrap()
-    }
-
-    #[test]
-    fn test_capture_lowercase() {
-        test_command(
-            "netsim-cli capture on test_device",
-            GrpcMethod::PatchDevice,
-            get_expected_capture("test_device", OnOffState::On),
-        );
-        test_command(
-            "netsim-cli capture off 1000",
-            GrpcMethod::PatchDevice,
-            get_expected_capture("1000", OnOffState::Off),
-        )
-    }
-
-    #[test]
-    fn test_capture_mixed_case() {
-        test_command(
-            "netsim-cli capture On 10",
-            GrpcMethod::PatchDevice,
-            get_expected_capture("10", OnOffState::On),
-        );
-        test_command(
-            "netsim-cli capture Off 1000",
-            GrpcMethod::PatchDevice,
-            get_expected_capture("1000", OnOffState::Off),
-        )
-    }
-
-    #[test]
-    fn test_capture_uppercase() {
-        test_command(
-            "netsim-cli capture ON 1000",
-            GrpcMethod::PatchDevice,
-            get_expected_capture("1000", OnOffState::On),
-        );
-        test_command(
-            "netsim-cli capture OFF 1000",
-            GrpcMethod::PatchDevice,
-            get_expected_capture("1000", OnOffState::Off),
-        )
     }
 
     #[test]
