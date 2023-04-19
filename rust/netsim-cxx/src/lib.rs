@@ -17,6 +17,7 @@
 #![allow(dead_code)]
 
 mod captures;
+mod devices;
 mod http_server;
 mod ranging;
 mod transport;
