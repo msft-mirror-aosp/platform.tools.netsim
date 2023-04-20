@@ -29,7 +29,7 @@
 #include "model/setup/async_manager.h"
 #include "model/setup/test_command_handler.h"
 #include "model/setup/test_model.h"
-#include "netsim_cxx_generated.h"
+#include "netsim-cxx/src/lib.rs.h"
 #include "util/filesystem.h"
 #include "util/log.h"
 
@@ -153,10 +153,10 @@ class ChipInfo {
   std::shared_ptr<rootcanal::HciSniffer> sniffer;
   std::shared_ptr<model::Chip::Bluetooth> model;
   std::shared_ptr<HciPacketTransport> transport;
-  int le_tx_count;
-  int classic_tx_count;
-  int le_rx_count;
-  int classic_rx_count;
+  int le_tx_count = 0;
+  int classic_tx_count = 0;
+  int le_rx_count = 0;
+  int classic_rx_count = 0;
 
   ChipInfo(uint32_t simulation_device,
            std::shared_ptr<rootcanal::HciSniffer> sniffer,

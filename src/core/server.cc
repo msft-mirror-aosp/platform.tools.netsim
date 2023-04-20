@@ -21,14 +21,14 @@
 #include <thread>
 
 #ifdef NETSIM_ANDROID_EMULATOR
-#include "backend/backend_server.h"
+#include "backend/grpc_server.h"
 #endif
 #include "controller/controller.h"
 #include "frontend/frontend_server.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
-#include "netsim_cxx_generated.h"
+#include "netsim-cxx/src/lib.rs.h"
 #include "util/filesystem.h"
 #include "util/ini_file.h"
 #include "util/log.h"
