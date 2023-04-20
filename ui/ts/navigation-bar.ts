@@ -93,20 +93,20 @@ export class NavigationBar extends LitElement {
         <div id="nav-logo-section" class="nav-section">
           <a>
             <div id="nav-logo-pic" class="logo" @click=${
-        this.handleClick} role="link" tabindex="0" aria-label="Netsim Logo, Scene View"></div>
+        this.handleClick} role="tab" tabindex="0" aria-label="Netsim Logo, change view mode to scene view"></div>
           </a>
-          <p>#betosim</p>
+          <p>netsim</p>
         </div>
         <div id="nav-link-section" class="nav-section">
           <a href="http://go/betosim" target="_blank" rel="noopener noreferrer"
             >ABOUT</a
           >
           <a href="javascript:void(0)" id="nav-trace-section" @click=${
-        this.handleClick}
+        this.handleClick} role="tab" aria-label="Packet Trace, change view mode to packet trace view"
             >PACKET TRACE</a
           >
           <a href="javascript:void(0)" id="nav-os-library-section" @click=${
-        this.handleClick}
+        this.handleClick} role = "tab" aria-label="Open Source Libraries, change view mode to open source libraries view"
             >OPEN SOURCE LIBRARIES</a
           >
         </div>
