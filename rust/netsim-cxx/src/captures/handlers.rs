@@ -152,7 +152,13 @@ pub fn handle_capture_get(writer: ResponseWritable, captures: &mut Captures, id:
 
     if let Some(capture) = captures.get(id).map(|arc_capture| arc_capture.lock().unwrap()) {
         if capture.size == 0 {
-            writer.put_error(404, "Capture file not found");
+            writer.put_error(
+                404,
+                &format!(
+                    "Capture file not found for {:?}-{}-{:?}",
+                    id, capture.device_name, capture.chip_kind
+                ),
+            );
         } else if let Ok(mut file) = get_file(id, capture.device_name.clone(), capture.chip_kind) {
             let mut buffer = [0u8; CHUNK_LEN];
             let time_display = TimeDisplay::new(capture.seconds, capture.nanos as u32);
