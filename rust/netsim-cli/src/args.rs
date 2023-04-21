@@ -165,12 +165,14 @@ impl Command {
                         capture.timestamp.get_or_default().seconds,
                         capture.timestamp.get_or_default().nanos as u32,
                     );
+                    let file_extension = "pcap";
                     cmd.filenames.push(format!(
-                        "{:?}-{}-{}-{}",
+                        "{:?}-{}-{}-{}.{}",
                         capture.id,
                         capture.device_name.to_owned().replace(' ', "_"),
                         Self::chip_kind_to_string(capture.chip_kind.enum_value_or_default()),
-                        time_display.utc_display()
+                        time_display.utc_display(),
+                        file_extension
                     ));
                 }
                 reqs
