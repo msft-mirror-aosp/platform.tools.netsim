@@ -43,13 +43,7 @@ fn perform_streaming_request(
     } else {
         env::current_dir().unwrap()
     };
-    // Find next available file name
-    let mut output_file = dir.join(filename.to_string() + ".pcap");
-    let mut idx = 0;
-    while output_file.exists() {
-        idx += 1;
-        output_file = dir.join(format!("{}_{}.pcap", filename, idx));
-    }
+    let output_file = dir.join(filename);
     client.get_capture(
         req,
         &ClientResponseReader {
