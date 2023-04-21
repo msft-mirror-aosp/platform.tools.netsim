@@ -74,9 +74,9 @@ impl args::Command {
                     );
                 }
             }
-            Command::Pcap(Pcap::Get(_)) => {
+            Command::Pcap(Pcap::Get(cmd)) => {
                 if verbose {
-                    println!("Successfully downloaded Pcap.");
+                    println!("Successfully downloaded file: {}", cmd.current_file);
                 }
             }
             Command::Gui => {
