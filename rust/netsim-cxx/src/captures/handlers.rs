@@ -86,11 +86,14 @@ fn update_captures(captures: &mut Captures) {
         for chip in device.chips {
             chip_ids.insert(chip.id);
             if !captures.contains(chip.id) {
-                let capture = CaptureInfo::new(
+                let mut capture = CaptureInfo::new(
                     chip.kind.enum_value_or_default(),
                     chip.id,
                     device.name.clone(),
                 );
+                // TODO(b/268271460): Add ability to set default capture state.
+                // Currently, the default capture state is ON
+                let _ = capture.start_capture();
                 captures.insert(capture);
             }
         }
@@ -318,8 +321,12 @@ fn handle_packet(
     packet_type: u32,
     direction: PacketDirection,
 ) {
-    let captures = RESOURCE.read().unwrap();
+    let mut captures = RESOURCE.write().unwrap();
     let facade_key = CaptureInfo::new_facade_key(int_to_chip_kind(kind), facade_id as i32);
+    // TODO: Create event channel to invoke update_captures when new device is added.
+    if !captures.facade_key_to_capture.contains_key(&facade_key) {
+        update_captures(&mut captures);
+    }
     if let Some(mut capture) = captures
         .facade_key_to_capture
         .get(&facade_key)
