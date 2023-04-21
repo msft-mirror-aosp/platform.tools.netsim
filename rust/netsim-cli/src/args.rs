@@ -192,7 +192,7 @@ impl Command {
         // Get list of captures
         let result = client.send_grpc(&GrpcMethod::ListCapture, &Vec::new());
         if !result.is_ok() {
-            eprintln!("Grpc call error: {}", result.err());
+            eprintln!("ListCapture Grpc call error: {}", result.err());
             return Vec::new();
         }
         let mut response =
@@ -302,4 +302,6 @@ pub struct GetCapture {
     pub location: Option<String>,
     #[arg(skip)]
     pub filenames: Vec<String>,
+    #[arg(skip)]
+    pub current_file: String,
 }
