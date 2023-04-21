@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "frontend/frontend_client.h"
 #if defined(_WIN32)
 #include <msvc-getopt.h>
 #else
@@ -31,7 +30,9 @@
 #include "backend/fd_startup.h"
 #endif
 #include "core/server.h"
+#include "frontend/frontend_client_stub.h"
 #include "hci/bluetooth_facade.h"
+#include "netsim-cxx/src/lib.rs.h"
 
 // Wireless network simulator for android (and other) emulated devices.
 
@@ -118,9 +119,7 @@ int main(int argc, char *argv[]) {
   }
 #else
   if (!fd_startup_str.empty()) {
-    std::unique_ptr<netsim::hci::FdStartup> fds =
-        netsim::hci::FdStartup::Create();
-    fds->Connect(fd_startup_str);
+    netsim::RunFdTransport(fd_startup_str);
     netsim::server::Run();
     return -1;
   }

@@ -16,18 +16,21 @@
 #include "frontend/frontend_client.h"
 
 #include <google/protobuf/util/json_util.h>
+#include <grpcpp/support/status.h>
 #include <stdlib.h>
 
 #include <chrono>
+#include <cstdint>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
 
-#include "../../rust/frontend-client-cxx/cxx/frontend_client_cxx_generated.h"
+#include "frontend-client-cxx/src/lib.rs.h"
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"
@@ -105,16 +108,83 @@ class FrontendClientImpl : public FrontendClient {
   // Patchs the information of the device
   std::unique_ptr<ClientResult> PatchDevice(
       rust::Vec<::rust::u8> const &request_byte_vec) const override {
-    ::google::protobuf::Empty response;
+    google::protobuf::Empty response;
     grpc::ClientContext context_;
     frontend::PatchDeviceRequest request;
-    request.ParsePartialFromArray(request_byte_vec.data(),
-                                  request_byte_vec.size());
+    if (!request.ParseFromArray(request_byte_vec.data(),
+                                request_byte_vec.size())) {
+      return make_result(
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing PatchDevice request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
+          response);
+    };
     auto status = stub_->PatchDevice(&context_, request, &response);
     return make_result(status, response);
   }
 
-  // Helper function to redirect Grpc
+  // Get the list of Capture information
+  std::unique_ptr<ClientResult> ListCapture() const override {
+    frontend::ListCaptureResponse response;
+    grpc::ClientContext context_;
+    auto status = stub_->ListCapture(&context_, {}, &response);
+    return make_result(status, response);
+  }
+
+  // Patch the Capture
+  std::unique_ptr<ClientResult> PatchCapture(
+      rust::Vec<::rust::u8> const &request_byte_vec) const override {
+    google::protobuf::Empty response;
+    grpc::ClientContext context_;
+    frontend::PatchCaptureRequest request;
+    if (!request.ParseFromArray(request_byte_vec.data(),
+                                request_byte_vec.size())) {
+      return make_result(
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing PatchCapture request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
+          response);
+    };
+    auto status = stub_->PatchCapture(&context_, request, &response);
+    return make_result(status, response);
+  }
+
+  // Download capture file by using ClientResponseReader to handle streaming
+  // grpc
+  std::unique_ptr<ClientResult> GetCapture(
+      rust::Vec<::rust::u8> const &request_byte_vec,
+      ClientResponseReader const &client_reader) const override {
+    grpc::ClientContext context_;
+    frontend::GetCaptureRequest request;
+    if (!request.ParseFromArray(request_byte_vec.data(),
+                                request_byte_vec.size())) {
+      return make_result(
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing GetCapture request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
+          google::protobuf::Empty());
+    };
+    auto reader = stub_->GetCapture(&context_, request);
+    frontend::GetCaptureResponse chunk;
+    // Read every available chunks from grpc reader
+    while (reader->Read(&chunk)) {
+      // Using a mutable protobuf here so the move iterator can move
+      // the capture stream without copying.
+      auto mut_stream = chunk.mutable_capture_stream();
+      auto bytes =
+          std::vector<uint8_t>(std::make_move_iterator(mut_stream->begin()),
+                               std::make_move_iterator(mut_stream->end()));
+      client_reader.handle_chunk(
+          rust::Slice<const uint8_t>{bytes.data(), bytes.size()});
+    }
+    auto status = reader->Finish();
+    return make_result(status, google::protobuf::Empty());
+  }
+
+  // Helper function to redirect to the correct Grpc call
   std::unique_ptr<ClientResult> SendGrpc(
       frontend::GrpcMethod const &grpc_method,
       rust::Vec<::rust::u8> const &request_byte_vec) const override {
@@ -127,10 +197,14 @@ class FrontendClientImpl : public FrontendClient {
         return GetDevices();
       case frontend::GrpcMethod::Reset:
         return Reset();
+      case frontend::GrpcMethod::ListCapture:
+        return ListCapture();
+      case frontend::GrpcMethod::PatchCapture:
+        return PatchCapture(request_byte_vec);
       default:
-        return make_result(::grpc::Status(::grpc::StatusCode::UNKNOWN,
-                                          "Unknown GrpcMethod found."),
-                           ::google::protobuf::Empty());
+        return make_result(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                                        "Unknown GrpcMethod found."),
+                           google::protobuf::Empty());
     }
   }
 
