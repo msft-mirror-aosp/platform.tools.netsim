@@ -16,7 +16,7 @@
 
 mod args;
 mod browser;
-mod pcap_handler;
+mod capture_handler;
 mod requests;
 mod response;
 
@@ -25,11 +25,11 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use args::{BinaryProtobuf, GetCapture, NetsimArgs};
+use capture_handler::CaptureHandler;
 use clap::Parser;
 use cxx::UniquePtr;
 use frontend_client_cxx::ffi::{new_frontend_client, ClientResult, FrontendClient, GrpcMethod};
 use frontend_client_cxx::ClientResponseReader;
-use pcap_handler::CaptureHandler;
 
 // helper function to process streaming Grpc request
 fn perform_streaming_request(
@@ -67,7 +67,7 @@ fn perform_command(
 ) -> Result<(), String> {
     // Get command's gRPC request(s)
     let requests = match command {
-        args::Command::Pcap(args::Pcap::Patch(_) | args::Pcap::Get(_)) => {
+        args::Command::Capture(args::Capture::Patch(_) | args::Capture::Get(_)) => {
             command.get_requests(&client)
         }
         _ => vec![command.get_request_bytes()],
@@ -81,8 +81,8 @@ fn perform_command(
                 process_result(command, client.send_grpc(&grpc_method, req), verbose)?;
                 std::thread::sleep(std::time::Duration::from_secs(1));
             },
-            // Get Pcap use streaming gRPC reader request
-            args::Command::Pcap(args::Pcap::Get(ref mut cmd)) => {
+            // Get Capture use streaming gRPC reader request
+            args::Command::Capture(args::Capture::Get(ref mut cmd)) => {
                 perform_streaming_request(&client, cmd, req, &cmd.filenames[i].to_owned())
             }
             // All other commands use a single gRPC call
