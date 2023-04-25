@@ -88,6 +88,13 @@ void Run() {
     std::thread(RunHttpServer).detach();
   }
 
+  // Environment variable "NETSIM_HCI_PORT" can be set.
+  unsigned short netsim_hci_port =
+      std::atoi(osutils::GetEnv("NETSIM_HCI_PORT", "7300").c_str());
+  // Run the socket server.
+  BtsLog("RunSocketTransport:%d", netsim_hci_port);
+  RunSocketTransport(netsim_hci_port);
+
   while (true) {
     std::this_thread::sleep_for(InactivityCheckInterval);
     if (auto seconds_to_shutdown = netsim::scene_controller::GetShutdownTime();
