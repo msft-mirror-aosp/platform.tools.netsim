@@ -125,21 +125,6 @@ fn handle_file(method: &str, path: &str, writer: ResponseWritable) {
     writer.put_error(404, body.as_str());
 }
 
-fn handle_pcap_file(request: &HttpRequest, id: &str, writer: ResponseWritable) {
-    if &request.method == "GET" {
-        let mut filepath = std::env::current_exe().unwrap();
-        filepath.pop();
-        filepath.push("/tmp");
-        filepath.push(format!("{}-hci.pcap", id.replace("%20", " ")));
-        if let Ok(body) = fs::read(&filepath) {
-            writer.put_ok_with_vec(to_content_type(&filepath), body, &[]);
-            return;
-        }
-    }
-    let body = "404 not found (netsim): pcap file not exists for the device".to_string();
-    writer.put_error(404, body.as_str());
-}
-
 // TODO handlers accept additional "context" including filepath
 fn handle_index(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
     handle_file(&request.method, "index.html", writer)
@@ -192,7 +177,6 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     router.add_route("/", Box::new(handle_index));
     router.add_route("/version", Box::new(handle_version));
     router.add_route("/v1/devices", Box::new(handle_devices));
-    router.add_route(r"/pcap/{id}", Box::new(handle_pcap_file));
     router.add_route(r"/v1/captures", Box::new(handle_capture));
     router.add_route(r"/v1/captures/{id}", Box::new(handle_capture));
 
