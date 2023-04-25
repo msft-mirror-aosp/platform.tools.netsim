@@ -51,11 +51,15 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port) {
                            grpc::InsecureServerCredentials(), &selected_port);
   static auto frontend_service = GetFrontendService();
   builder.RegisterService(frontend_service.get());
+  builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
 #ifdef NETSIM_ANDROID_EMULATOR
   static auto backend_service = GetBackendService();
   builder.RegisterService(backend_service.get());
 #endif
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+  if (server == nullptr) {
+    return nullptr;
+  }
 
   BtsLog("Grpc server listening on localhost: %s",
          std::to_string(selected_port).c_str());
@@ -83,6 +87,10 @@ void Run() {
   auto netsim_grpc_port = std::stoi(osutils::GetEnv("NETSIM_GRPC_PORT", "0"));
   // Run frontend and backend grpc servers.
   auto grpc_server = RunGrpcServer(netsim_grpc_port);
+  if (grpc_server == nullptr) {
+    BtsLog("Failed to start Grpc server");
+    return;
+  }
   if (netsim_grpc_port == 0) {
     // Run frontend http server.
     std::thread(RunHttpServer).detach();
