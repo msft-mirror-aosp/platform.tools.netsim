@@ -20,6 +20,7 @@ mod captures;
 mod devices;
 mod http_server;
 mod ranging;
+mod system;
 mod transport;
 mod uwb;
 mod version;
