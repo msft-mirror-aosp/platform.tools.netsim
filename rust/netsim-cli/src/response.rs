@@ -111,48 +111,44 @@ impl args::Command {
                             if bt.low_energy.is_some() {
                                 let ble_chip = &bt.low_energy;
                                 println!(
-                                    "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?} | capture: {}",
+                                    "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
                                     "",
                                     "ble:",
                                     Self::chip_state_to_string(ble_chip.state.enum_value_or_default()),
                                     ble_chip.rx_count,
                                     ble_chip.tx_count,
-                                    Self::capture_state_to_string(chip.capture.enum_value_or_default())
                                 );
                             }
                             if bt.classic.is_some() {
                                 let classic_chip = &bt.classic;
                                 println!(
-                                    "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?} | capture: {}",
+                                    "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
                                     "",
                                     "classic:",
                                     Self::chip_state_to_string(classic_chip.state.enum_value_or_default()),
                                     classic_chip.rx_count,
                                     classic_chip.tx_count,
-                                    Self::capture_state_to_string(chip.capture.enum_value_or_default())
                                 );
                             }
                         }
                         Some(Chip_oneof_chip::Wifi(wifi_chip)) => {
                             println!(
-                                "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?} | capture: {}",
+                                "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
                                 "",
                                 "wifi:",
                                 Self::chip_state_to_string(wifi_chip.state.enum_value_or_default()),
                                 wifi_chip.rx_count,
                                 wifi_chip.tx_count,
-                                Self::capture_state_to_string(chip.capture.enum_value_or_default())
                             );
                         }
                         Some(Chip_oneof_chip::Uwb(uwb_chip)) => {
                             println!(
-                                "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?} | capture: {}",
+                                "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
                                 "",
                                 "uwb:",
                                 Self::chip_state_to_string(uwb_chip.state.enum_value_or_default()),
                                 uwb_chip.rx_count,
                                 uwb_chip.tx_count,
-                                Self::capture_state_to_string(chip.capture.enum_value_or_default())
                             );
                         }
                         _ => println!("{:chip_indent$}Unknown chip: down  ", ""),
@@ -224,9 +220,6 @@ impl args::Command {
                             }
                         }
                         _ => {}
-                    }
-                    if chip.capture.enum_value_or_default() == State::ON {
-                        print!("{:chip_indent$}capture: on", "");
                     }
                 }
                 println!();
