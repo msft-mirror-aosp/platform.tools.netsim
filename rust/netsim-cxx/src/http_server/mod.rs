@@ -44,7 +44,7 @@ use std::sync::Arc;
 
 const PATH_PREFIXES: [&str; 3] = ["js", "assets", "node_modules/tslib"];
 
-pub fn run_http_server() {
+pub fn run_http_server(dev: bool) {
     let listener = match TcpListener::bind("127.0.0.1:7681") {
         Ok(listener) => listener,
         Err(e) => {
@@ -59,7 +59,7 @@ pub fn run_http_server() {
         let stream = stream.unwrap();
         let valid_files = valid_files.clone();
         pool.execute(move || {
-            handle_connection(stream, valid_files);
+            handle_connection(stream, valid_files, dev);
         });
     }
 
@@ -191,7 +191,11 @@ fn handle_devices(request: &HttpRequest, _param: &str, writer: ResponseWritable)
     }
 }
 
-fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
+fn handle_debug(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
+    writer.put_ok("text/plain", r"Welcome to netsim debug mode", &[]);
+}
+
+fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>, dev: bool) {
     let mut router = Router::new();
     router.add_route("/", Box::new(handle_index));
     router.add_route("/version", Box::new(handle_version));
@@ -199,6 +203,11 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     router.add_route(r"/pcap/{id}", Box::new(handle_pcap_file));
     router.add_route(r"/v1/captures", Box::new(handle_capture));
     router.add_route(r"/v1/captures/{id}", Box::new(handle_capture));
+
+    // Adding additional routes in debug mode.
+    if dev {
+        router.add_route("/debug", Box::new(handle_debug));
+    }
 
     // A closure for checking if path is a static file we wish to serve, and call handle_static
     let handle_static_wrapper =
