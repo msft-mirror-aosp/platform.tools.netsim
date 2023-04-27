@@ -33,7 +33,6 @@ use frontend_proto::model::Position as ProtoPosition;
 use frontend_proto::model::Scene as ProtoScene;
 use lazy_static::lazy_static;
 use protobuf_json_mapping::merge_from_str;
-use protobuf_json_mapping::print_to_string;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::RwLockWriteGuard;
@@ -184,16 +183,13 @@ pub fn get_distance(id: DeviceIdentifier, other_id: DeviceIdentifier) -> f32 {
 }
 
 #[allow(dead_code)]
-pub fn get_devices() -> String {
+pub fn get_devices() -> ProtoScene {
     let mut scene = ProtoScene::new();
     // iterate over the devices and add each to the scene
     DEVICES.read().unwrap().devices.values().for_each(|device| {
         scene.devices.push(device.get());
     });
-    print_to_string(&scene).unwrap_or_else(|e| -> String {
-        eprintln!("Error converting scene {:?}", e);
-        String::new()
-    })
+    scene
 }
 
 #[allow(dead_code)]
@@ -221,19 +217,200 @@ fn get_secs_until_idle_shutdown() -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
+    use frontend_proto::model::Orientation as ProtoOrientation;
+    use protobuf_json_mapping::print_to_string;
+
     use super::*;
 
-    fn new_with_xyz(x: f32, y: f32, z: f32) -> ProtoPosition {
+    // Since rust unit tests occur in parallel. We must lock each test case
+    // to avoid unwanted interleaving operations on DEVICES
+    lazy_static! {
+        static ref MUTEX: Mutex<()> = Mutex::new(());
+    }
+
+    /// TestChipParameters struct to invoke add_chip
+    /// This struct contains parameters required to invoke add_chip.
+    /// This will eventually be invoked by the facades.
+    struct TestChipParameters<'a> {
+        device_guid: &'a str,
+        device_name: &'a str,
+        chip_kind: ProtoChipKind,
+        chip_name: &'a str,
+        chip_manufacturer: &'a str,
+        chip_product_name: &'a str,
+    }
+
+    impl TestChipParameters<'_> {
+        fn add_chip(&self) -> AddChipResult {
+            super::add_chip(
+                self.device_guid,
+                self.device_name,
+                self.chip_kind,
+                self.chip_name,
+                self.chip_manufacturer,
+                self.chip_product_name,
+            )
+        }
+    }
+
+    /// helper function for test cases to instantiate ProtoPosition
+    fn new_position(x: f32, y: f32, z: f32) -> ProtoPosition {
         ProtoPosition { x, y, z, ..Default::default() }
+    }
+
+    fn new_orientation(yaw: f32, pitch: f32, roll: f32) -> ProtoOrientation {
+        ProtoOrientation { yaw, pitch, roll, ..Default::default() }
+    }
+
+    /// helper function for test cases to refresh DEVICES
+    fn refresh_resource() {
+        let mut resource = DEVICES.write().unwrap();
+        resource.devices = HashMap::new();
+        resource.id_factory = IdFactory::new(1000, 1);
+        resource.idle_since = None
+    }
+
+    fn test_chip_1_bt() -> TestChipParameters<'static> {
+        TestChipParameters {
+            device_guid: "guid-fs-1",
+            device_name: "test-device-name-1",
+            chip_kind: ProtoChipKind::BLUETOOTH,
+            chip_name: "bt_chip_name",
+            chip_manufacturer: "netsim",
+            chip_product_name: "netsim_bt",
+        }
+    }
+
+    fn test_chip_1_wifi() -> TestChipParameters<'static> {
+        TestChipParameters {
+            device_guid: "guid-fs-1",
+            device_name: "test-device-name-1",
+            chip_kind: ProtoChipKind::WIFI,
+            chip_name: "bt_chip_name",
+            chip_manufacturer: "netsim",
+            chip_product_name: "netsim_bt",
+        }
     }
 
     #[test]
     fn test_distance() {
         // Pythagorean quadruples
-        let a = new_with_xyz(0.0, 0.0, 0.0);
-        let mut b = new_with_xyz(1.0, 2.0, 2.0);
+        let a = new_position(0.0, 0.0, 0.0);
+        let mut b = new_position(1.0, 2.0, 2.0);
         assert_eq!(distance(&a, &b), 3.0);
-        b = new_with_xyz(2.0, 3.0, 6.0);
+        b = new_position(2.0, 3.0, 6.0);
         assert_eq!(distance(&a, &b), 7.0);
+    }
+
+    #[test]
+    fn test_patch_device() {
+        // Avoiding Interleaving Operations
+        let _lock = MUTEX.lock().unwrap();
+
+        // Patching device position
+        refresh_resource();
+        let chip_params = test_chip_1_bt();
+        let chip_result = chip_params.add_chip();
+        let mut patch_device_request = ProtoDevice::new();
+        let request_position = new_position(1.1, 2.2, 3.3);
+        let request_orientation = new_orientation(4.4, 5.5, 6.6);
+        patch_device_request.name = chip_params.device_name.into();
+        patch_device_request.visible = false;
+        patch_device_request.position = Some(request_position.clone()).into();
+        patch_device_request.orientation = Some(request_orientation.clone()).into();
+        patch_device(
+            chip_result.device_id,
+            print_to_string(&patch_device_request).unwrap().as_str(),
+        );
+        match get_devices().devices.get(0) {
+            Some(device) => {
+                assert_eq!(device.position.x, request_position.x);
+                assert_eq!(device.position.y, request_position.y);
+                assert_eq!(device.position.z, request_position.z);
+                assert_eq!(device.orientation.yaw, request_orientation.yaw);
+                assert_eq!(device.orientation.pitch, request_orientation.pitch);
+                assert_eq!(device.orientation.roll, request_orientation.roll);
+                assert!(!device.visible);
+            }
+            None => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_adding_two_chips() {
+        // Avoiding Interleaving Operations
+        let _lock = MUTEX.lock().unwrap();
+
+        // Adding two chips of the same device
+        refresh_resource();
+        let bt_chip_params = test_chip_1_bt();
+        let wifi_chip_params = test_chip_1_wifi();
+        let bt_chip_result = bt_chip_params.add_chip();
+        let wifi_chip_result = wifi_chip_params.add_chip();
+        assert_eq!(bt_chip_result.device_id, wifi_chip_result.device_id);
+        assert_eq!(get_devices().devices.len(), 1);
+        let scene = get_devices();
+        let device = scene.devices.get(0).unwrap();
+        assert_eq!(device.id, bt_chip_result.device_id);
+        assert_eq!(device.name, bt_chip_params.device_name);
+        assert!(device.visible);
+        assert!(device.position.is_some());
+        assert!(device.orientation.is_some());
+        assert_eq!(device.chips.len(), 2);
+        for chip in &device.chips {
+            assert!(chip.id == bt_chip_result.chip_id || chip.id == wifi_chip_result.chip_id);
+            if chip.id == bt_chip_result.chip_id {
+                assert!(chip.has_bt());
+            } else if chip.id == wifi_chip_result.chip_id {
+                assert!(chip.has_wifi());
+            } else {
+                unreachable!();
+            }
+        }
+    }
+
+    #[test]
+    fn test_reset() {
+        // Avoiding Interleaving Operations
+        let _lock = MUTEX.lock().unwrap();
+
+        // Patching Device and Resetting scene
+        refresh_resource();
+        let chip_params = test_chip_1_bt();
+        let chip_result = chip_params.add_chip();
+        let mut patch_device_request = ProtoDevice::new();
+        let request_position = new_position(10.0, 20.0, 30.0);
+        let request_orientation = new_orientation(1.0, 2.0, 3.0);
+        patch_device_request.name = chip_params.device_name.into();
+        patch_device_request.visible = false;
+        patch_device_request.position = Some(request_position).into();
+        patch_device_request.orientation = Some(request_orientation).into();
+        patch_device(
+            chip_result.device_id,
+            print_to_string(&patch_device_request).unwrap().as_str(),
+        );
+        match get_devices().devices.get(0) {
+            Some(device) => {
+                assert_eq!(device.position.x, 10.0);
+                assert_eq!(device.orientation.yaw, 1.0);
+                assert!(!device.visible);
+            }
+            None => unreachable!(),
+        }
+        reset(chip_result.device_id);
+        match get_devices().devices.get(0) {
+            Some(device) => {
+                assert_eq!(device.position.x, 0.0);
+                assert_eq!(device.position.y, 0.0);
+                assert_eq!(device.position.z, 0.0);
+                assert_eq!(device.orientation.yaw, 0.0);
+                assert_eq!(device.orientation.pitch, 0.0);
+                assert_eq!(device.orientation.roll, 0.0);
+                assert!(device.visible);
+            }
+            None => unreachable!(),
+        }
     }
 }
