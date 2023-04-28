@@ -28,11 +28,14 @@
 
 #include "aemu/base/process/Command.h"
 #include "android/base/system/System.h"
+#include "android/emulation/control/interceptor/MetricsInterceptor.h"
 #include "grpcpp/channel.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
 #include "util/log.h"
 #include "util/os_utils.h"
+
+using android::control::interceptor::MetricsInterceptorFactory;
 
 namespace netsim::packet {
 namespace {
@@ -52,7 +55,15 @@ std::shared_ptr<grpc::Channel> CreateGrpcChannel() {
 
   if (endpoint.empty()) return nullptr;
   BtsLog("Creating a Grpc channel to %s", endpoint.c_str());
-  return grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials());
+
+  std::vector<
+      std::unique_ptr<grpc::experimental::ClientInterceptorFactoryInterface>>
+      interceptors;
+  interceptors.emplace_back(std::make_unique<MetricsInterceptorFactory>());
+  grpc::ChannelArguments args;
+  return grpc::experimental::CreateCustomChannelWithInterceptors(
+      endpoint, grpc::InsecureChannelCredentials(), args,
+      std::move(interceptors));
 }
 
 bool GrpcChannelReady(const std::shared_ptr<grpc::Channel> &channel) {
