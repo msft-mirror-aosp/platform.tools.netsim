@@ -82,10 +82,10 @@ export interface Scene {
   devices: Device[];
 }
 
-export interface Pcap {
+export interface Capture {
+  /** same as chip_id */
   id: number;
   chipKind: ChipKind;
-  chipId: number;
   /** device AVD name */
   deviceName: string;
   /** capture state */
@@ -94,6 +94,6 @@ export interface Pcap {
   size: number;
   /** number of records in current capture */
   records: number;
-  timestamp: number;
+  timestamp: Date|undefined;
   valid: boolean;
 }
