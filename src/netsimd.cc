@@ -60,8 +60,13 @@ int main(int argc, char *argv[]) {
 #if defined(__linux__)
   signal(SIGSEGV, SignalHandler);
 #endif
+  bool no_web_ui = false;
+  bool no_cli_ui = false;
+
   const char *kShortOpt = "s:dg";
   const option kLongOptions[] = {
+      {"no_cli_ui", no_argument, 0, 'f'},
+      {"no_web_ui", no_argument, 0, 'w'},
       {"rootcanal_default_commands_file", required_argument, 0, 'c'},
       {"rootcanal_controller_properties_file", required_argument, 0, 'p'},
   };
@@ -98,6 +103,14 @@ int main(int argc, char *argv[]) {
         rootcanal_controller_properties_file = std::string(optarg);
         break;
 
+      case 'f':
+        no_cli_ui = true;
+        break;
+
+      case 'w':
+        no_web_ui = true;
+        break;
+
       default:
         ArgError(argv, c);
         return (-2);
@@ -115,7 +128,8 @@ int main(int argc, char *argv[]) {
   auto frontend_stub = netsim::frontend::NewFrontendClient();
   if (frontend_stub == nullptr) {
     // starts netsim servers.
-    netsim::server::Run(dev);
+    netsim::server::Run(
+        {.dev = dev, .no_cli_ui = no_cli_ui, .no_web_ui = no_web_ui});
   } else {
     std::cerr << "Failed to start netsim daemon because a netsim daemon is "
                  "already running\n";
@@ -123,7 +137,8 @@ int main(int argc, char *argv[]) {
 #else
   if (!fd_startup_str.empty()) {
     netsim::RunFdTransport(fd_startup_str);
-    netsim::server::Run(dev);
+    netsim::server::Run(
+        {.dev = dev, .no_cli_ui = no_cli_ui, .no_web_ui = no_web_ui});
     return -1;
   }
 #endif
