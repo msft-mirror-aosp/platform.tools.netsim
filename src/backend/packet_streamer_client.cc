@@ -63,9 +63,12 @@ bool GrpcChannelReady(const std::shared_ptr<grpc::Channel> &channel) {
   return false;
 }
 
-void RunNetsimd() {
+void RunNetsimd(NetsimdOptions options) {
   auto exe = android::base::System::get()->findBundledExecutable("netsimd");
-  auto cmd = android::base::Command::create({exe, "-g"});
+  std::vector<std::string> program_with_args{exe, "-g"};
+  if (options.no_cli_ui) program_with_args.push_back("--no_cli_ui");
+  if (options.no_web_ui) program_with_args.push_back("--no_web_ui");
+  auto cmd = android::base::Command::create(program_with_args);
 
   auto netsimd = cmd.asDeamon().execute();
   if (netsimd) {
@@ -79,7 +82,7 @@ void SetPacketStreamEndpoint(const std::string &endpoint) {
   if (endpoint != "default") custom_packet_stream_endpoint = endpoint;
 }
 
-std::shared_ptr<grpc::Channel> GetChannel() {
+std::shared_ptr<grpc::Channel> GetChannel(NetsimdOptions options) {
   std::lock_guard<std::mutex> lock(channel_mutex);
 
   bool is_netsimd_started = false;
@@ -91,7 +94,7 @@ std::shared_ptr<grpc::Channel> GetChannel() {
 
     if (!is_netsimd_started && custom_packet_stream_endpoint.empty()) {
       BtsLog("Starting netsim.");
-      RunNetsimd();
+      RunNetsimd(options);
       is_netsimd_started = true;
     }
     BtsLog("Retry connecting to netsim in %d second.", second);
@@ -102,10 +105,14 @@ std::shared_ptr<grpc::Channel> GetChannel() {
   return nullptr;
 }
 
+std::shared_ptr<grpc::Channel> CreateChannel(NetsimdOptions options) {
+  return GetChannel(options);
+}
+
 std::shared_ptr<grpc::Channel> CreateChannel(
     std::string _rootcanal_default_commands_file,
     std::string _rootcanal_controller_properties_file) {
-  return GetChannel();
+  return GetChannel({});
 }
 
 }  // namespace netsim::packet
