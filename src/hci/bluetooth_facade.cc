@@ -30,6 +30,7 @@
 #include "model/setup/test_command_handler.h"
 #include "model/setup/test_model.h"
 #include "netsim-cxx/src/lib.rs.h"
+#include "rust/cxx.h"
 #include "util/filesystem.h"
 #include "util/log.h"
 
@@ -89,10 +90,8 @@ size_t phy_classic_index_;
 
 bool mStarted = false;
 std::shared_ptr<rootcanal::AsyncManager> mAsyncManager;
-
 std::unique_ptr<SimTestModel> gTestModel;
-
-std::string controller_properties_ = "";
+rootcanal::ControllerProperties controller_properties_;
 
 bool ChangedState(model::State a, model::State b) {
   return (b != model::State::UNKNOWN && a != b);
@@ -273,29 +272,6 @@ void IncrRx(uint32_t id, rootcanal::Phy::Type phy_type) {
   }
 }
 
-void SetPacketCapture(uint32_t id, bool isOn, std::string device_name) {
-  if (id_to_chip_info_.find(id) == id_to_chip_info_.end()) {
-    BtsLog("Missing chip_info");
-    return;
-  }
-  auto sniffer = id_to_chip_info_[id]->sniffer;
-  if (!sniffer) {
-    return;
-  }
-  if (!isOn) {
-    sniffer->SetOutputStream(nullptr);
-    return;
-  }
-  // TODO: make multi-os
-  // Filename: emulator-5554-hci.pcap
-  auto filename = "/tmp/" + device_name + "-hci.pcap";
-  for (auto i = 0; netsim::filesystem::exists(filename); ++i) {
-    filename = "/tmp/" + device_name + "-hci-" + std::to_string(i) + ".pcap";
-  }
-  auto file = std::make_shared<std::ofstream>(filename, std::ios::binary);
-  sniffer->SetOutputStream(file);
-}
-
 int8_t SimComputeRssi(int send_id, int recv_id, int8_t tx_power) {
   if (id_to_chip_info_.find(send_id) == id_to_chip_info_.end() ||
       id_to_chip_info_.find(recv_id) == id_to_chip_info_.end()) {
@@ -306,6 +282,23 @@ int8_t SimComputeRssi(int send_id, int recv_id, int8_t tx_power) {
   auto b = id_to_chip_info_[recv_id]->simulation_device;
   auto distance = scene_controller::GetDistance(a, b);
   return netsim::DistanceToRssi(tx_power, distance);
+}
+
+void PatchCxx(uint32_t id,
+              const rust::Slice<::std::uint8_t const> proto_bytes) {
+  model::Chip::Bluetooth bluetooth;
+  bluetooth.ParseFromArray(proto_bytes.data(), proto_bytes.size());
+  Patch(id, bluetooth);
+}
+
+rust::Vec<::std::uint8_t> GetCxx(uint32_t id) {
+  auto bluetooth = Get(id);
+  std::vector<uint8_t> proto_bytes(bluetooth.ByteSizeLong());
+  bluetooth.SerializeToArray(proto_bytes.data(), proto_bytes.size());
+  rust::Vec<uint8_t> proto_rust_bytes;
+  std::copy(proto_bytes.begin(), proto_bytes.end(),
+            std::back_inserter(proto_rust_bytes));
+  return proto_rust_bytes;
 }
 
 }  // namespace netsim::hci::facade
