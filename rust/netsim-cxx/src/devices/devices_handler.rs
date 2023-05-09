@@ -213,7 +213,7 @@ fn get_secs_until_idle_shutdown() -> Option<u32> {
 mod tests {
     use std::sync::Mutex;
 
-    use frontend_proto::model::Orientation as ProtoOrientation;
+    use frontend_proto::model::{Orientation as ProtoOrientation, State};
     use protobuf_json_mapping::print_to_string;
 
     use super::*;
@@ -373,7 +373,7 @@ mod tests {
         let request_position = new_position(1.1, 2.2, 3.3);
         let request_orientation = new_orientation(4.4, 5.5, 6.6);
         patch_device_request.name = chip_params.device_name.into();
-        patch_device_request.visible = false;
+        patch_device_request.visible = State::OFF.into();
         patch_device_request.position = Some(request_position.clone()).into();
         patch_device_request.orientation = Some(request_orientation.clone()).into();
         patch_device(
@@ -389,7 +389,7 @@ mod tests {
                 assert_eq!(device.orientation.yaw, request_orientation.yaw);
                 assert_eq!(device.orientation.pitch, request_orientation.pitch);
                 assert_eq!(device.orientation.roll, request_orientation.roll);
-                assert!(!device.visible);
+                assert_eq!(device.visible.enum_value_or_default(), State::OFF);
             }
             None => unreachable!(),
         }
@@ -447,7 +447,7 @@ mod tests {
         let device = scene.devices.get(0).unwrap();
         assert_eq!(device.id, bt_chip_result.device_id);
         assert_eq!(device.name, bt_chip_params.device_name);
-        assert!(device.visible);
+        assert_eq!(device.visible.enum_value_or_default(), State::ON);
         assert!(device.position.is_some());
         assert!(device.orientation.is_some());
         assert_eq!(device.chips.len(), 2);
@@ -476,7 +476,7 @@ mod tests {
         let request_position = new_position(10.0, 20.0, 30.0);
         let request_orientation = new_orientation(1.0, 2.0, 3.0);
         patch_device_request.name = chip_params.device_name.into();
-        patch_device_request.visible = false;
+        patch_device_request.visible = State::OFF.into();
         patch_device_request.position = Some(request_position).into();
         patch_device_request.orientation = Some(request_orientation).into();
         patch_device(
@@ -488,7 +488,7 @@ mod tests {
             Some(device) => {
                 assert_eq!(device.position.x, 10.0);
                 assert_eq!(device.orientation.yaw, 1.0);
-                assert!(!device.visible);
+                assert_eq!(device.visible.enum_value_or_default(), State::OFF);
             }
             None => unreachable!(),
         }
@@ -501,7 +501,7 @@ mod tests {
                 assert_eq!(device.orientation.yaw, 0.0);
                 assert_eq!(device.orientation.pitch, 0.0);
                 assert_eq!(device.orientation.roll, 0.0);
-                assert!(device.visible);
+                assert_eq!(device.visible.enum_value_or_default(), State::ON);
             }
             None => unreachable!(),
         }
