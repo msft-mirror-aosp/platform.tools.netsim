@@ -49,8 +49,7 @@ void SignalHandler(int sig) {
 }
 #endif
 
-// TODO: Change to 6402 after --hci_port is set in netsim_server.cc.
-constexpr int DEFAULT_HCI_PORT = 7300;
+constexpr int DEFAULT_HCI_PORT = 6402;
 
 int get_hci_port(int hci_port_flag) {
   // The following priorities are used to determine the HCI port number:
