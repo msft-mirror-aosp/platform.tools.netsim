@@ -28,7 +28,7 @@
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
-#include "netsim_cxx_generated.h"
+#include "netsim-cxx/src/lib.rs.h"
 #include "util/filesystem.h"
 #include "util/ini_file.h"
 #include "util/log.h"
@@ -72,6 +72,11 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port) {
 }  // namespace
 
 void Run() {
+  // Clear all pcap files in temp directory
+  if (netsim::pcap::ClearPcapFiles()) {
+    BtsLog("netsim generated pcap files in temp directory has been removed.");
+  }
+
   // Environment variable "NETSIM_GRPC_PORT" is set in google3 forge. If set:
   // 1. Use the fixed port for grpc server.
   // 2. Don't start http server.
