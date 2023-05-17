@@ -26,6 +26,6 @@
 #include "packet_streamer.grpc.pb.h"
 
 namespace netsim {
-std::unique_ptr<packet::PacketStreamer::Service> GetBackendService(bool dev);
+std::unique_ptr<packet::PacketStreamer::Service> GetBackendService();
 
 }  // namespace netsim

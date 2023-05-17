@@ -55,8 +55,6 @@ std::string ChipFacade(ChipKind chip_kind, uint32_t facade_id) {
 
 class ServiceImpl final : public packet::PacketStreamer::Service {
  public:
-  ServiceImpl(bool dev = false) : dev_(dev) {}
-
   ::grpc::Status StreamPackets(::grpc::ServerContext *context,
                                Stream *stream) override {
     // Now connected to a peer issuing a bi-directional streaming grpc
@@ -84,7 +82,7 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     uint32_t chip_id = -1;
     uint32_t facade_id = -1;
 
-    if (this->dev_) {
+    if (netsim::config::GetDev()) {
       // Add a new chip to the Rust Device Resource
       // TODO: replace scene_controller::AddChip with this
       std::string chip_kind_string;
@@ -130,7 +128,7 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     // no longer able to send responses to peer
     facade_to_stream.erase(ChipFacade(chip_kind, facade_id));
 
-    if (this->dev_) {
+    if (netsim::config::GetDev()) {
       // Remove the chip from Rust Device Resource
       // TODO: replace scene_controller::RemoveChip with this
       netsim::device::RemoveChipRust(device_id, chip_id);
@@ -191,9 +189,6 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
       }
     }
   }
-
- private:
-  bool dev_;
 };
 }  // namespace
 
@@ -227,7 +222,7 @@ void HandleResponse(ChipKind kind, uint32_t facade_id,
 
 }  // namespace backend
 
-std::unique_ptr<packet::PacketStreamer::Service> GetBackendService(bool dev) {
-  return std::make_unique<backend::ServiceImpl>(dev);
+std::unique_ptr<packet::PacketStreamer::Service> GetBackendService() {
+  return std::make_unique<backend::ServiceImpl>();
 }
 }  // namespace netsim
