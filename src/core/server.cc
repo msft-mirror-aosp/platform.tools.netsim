@@ -57,7 +57,7 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
   }
   builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
 #ifdef NETSIM_ANDROID_EMULATOR
-  static auto backend_service = GetBackendService();
+  static auto backend_service = GetBackendService(dev);
   builder.RegisterService(backend_service.get());
 #endif
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
