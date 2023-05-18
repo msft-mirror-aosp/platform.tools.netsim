@@ -18,6 +18,7 @@
 
 mod bluetooth;
 pub mod captures;
+mod config;
 mod devices;
 mod http_server;
 mod ranging;
@@ -43,6 +44,7 @@ use crate::captures::handlers::{
     clear_pcap_files, handle_capture_cxx, handle_packet_request, handle_packet_response,
     update_captures,
 };
+use crate::config::{get_dev, set_dev};
 use crate::devices::devices_handler::{
     add_chip_rust, get_distance_rust, handle_device_cxx, remove_chip_rust,
 };
@@ -63,6 +65,15 @@ mod ffi {
 
         #[cxx_name = "RunHttpServer"]
         fn run_http_server(dev: bool);
+
+        // Config
+        #[cxx_name = "GetDev"]
+        #[namespace = "netsim::config"]
+        fn get_dev() -> bool;
+
+        #[cxx_name = "SetDev"]
+        #[namespace = "netsim::config"]
+        fn set_dev(flag: bool);
 
         // Ranging
 
