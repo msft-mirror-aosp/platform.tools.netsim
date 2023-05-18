@@ -64,7 +64,7 @@ mod ffi {
         fn run_fd_transport(startup_json: &String);
 
         #[cxx_name = "RunHttpServer"]
-        fn run_http_server(dev: bool);
+        fn run_http_server();
 
         // Config
         #[cxx_name = "GetDev"]
