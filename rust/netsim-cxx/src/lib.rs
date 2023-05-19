@@ -16,7 +16,9 @@
 
 #![allow(dead_code)]
 
+mod bluetooth;
 pub mod captures;
+mod config;
 mod devices;
 mod http_server;
 mod ranging;
@@ -40,6 +42,11 @@ use crate::transport::socket::run_socket_transport;
 
 use crate::captures::handlers::{
     clear_pcap_files, handle_capture_cxx, handle_packet_request, handle_packet_response,
+    update_captures,
+};
+use crate::config::{get_dev, set_dev};
+use crate::devices::devices_handler::{
+    add_chip_rust, get_distance_rust, handle_device_cxx, remove_chip_rust,
 };
 use crate::http_server::run_http_server;
 use crate::ranging::*;
@@ -57,7 +64,16 @@ mod ffi {
         fn run_fd_transport(startup_json: &String);
 
         #[cxx_name = "RunHttpServer"]
-        fn run_http_server(dev: bool);
+        fn run_http_server();
+
+        // Config
+        #[cxx_name = "GetDev"]
+        #[namespace = "netsim::config"]
+        fn get_dev() -> bool;
+
+        #[cxx_name = "SetDev"]
+        #[namespace = "netsim::config"]
+        fn set_dev(flag: bool);
 
         // Ranging
 
@@ -69,10 +85,18 @@ mod ffi {
         #[cxx_name = "GetVersion"]
         fn get_version() -> String;
 
-        // handle_capture_cxx translates each argument into an appropriate Rust type
+        // handlers for gRPC server's invocation of API calls
 
         #[cxx_name = "HandleCaptureCxx"]
         fn handle_capture_cxx(
+            responder: Pin<&mut CxxServerResponseWriter>,
+            method: String,
+            param: String,
+            body: String,
+        );
+
+        #[cxx_name = "HandleDeviceCxx"]
+        fn handle_device_cxx(
             responder: Pin<&mut CxxServerResponseWriter>,
             method: String,
             param: String,
@@ -94,10 +118,34 @@ mod ffi {
             packet_type: u8,
         );
 
+        // Device Resource
+        #[cxx_name = AddChipRust]
+        #[namespace = "netsim::device"]
+        fn add_chip_rust(
+            device_guid: &str,
+            device_name: &str,
+            chip_kind: &CxxString,
+            chip_name: &str,
+            chip_manufacturer: &str,
+            chip_product_name: &str,
+        ) -> UniquePtr<AddChipResult>;
+
+        #[cxx_name = RemoveChipRust]
+        #[namespace = "netsim::device"]
+        fn remove_chip_rust(device_id: u32, chip_id: u32);
+
+        #[cxx_name = GetDistanceRust]
+        #[namespace = "netsim::device"]
+        fn get_distance_rust(a: u32, b: u32) -> f32;
+
         // Capture Resource
 
+        #[cxx_name = UpdateCaptures]
+        #[namespace = "netsim::capture"]
+        fn update_captures();
+
         #[cxx_name = HandleRequest]
-        #[namespace = "netsim::pcap"]
+        #[namespace = "netsim::capture"]
         fn handle_packet_request(
             kind: u32,
             facade_id: u32,
@@ -106,7 +154,7 @@ mod ffi {
         );
 
         #[cxx_name = HandleResponse]
-        #[namespace = "netsim::pcap"]
+        #[namespace = "netsim::capture"]
         fn handle_packet_response(
             kind: u32,
             facade_id: u32,
@@ -117,7 +165,7 @@ mod ffi {
         // Clearing out all pcap Files in temp directory
 
         #[cxx_name = ClearPcapFiles]
-        #[namespace = "netsim::pcap"]
+        #[namespace = "netsim::capture"]
         fn clear_pcap_files() -> bool;
 
         // Uwb Facade.
@@ -164,6 +212,14 @@ mod ffi {
         fn get_chip_id(self: &AddChipResult) -> u32;
         fn get_device_id(self: &AddChipResult) -> u32;
         fn get_facade_id(self: &AddChipResult) -> u32;
+
+        #[rust_name = "new_add_chip_result"]
+        #[namespace = "netsim::scene_controller"]
+        fn NewAddChipResult(
+            device_id: u32,
+            chip_id: u32,
+            facade_id: u32,
+        ) -> UniquePtr<AddChipResult>;
 
         #[rust_name = "add_chip_cxx"]
         #[namespace = "netsim::scene_controller"]

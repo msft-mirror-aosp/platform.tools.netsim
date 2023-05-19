@@ -19,6 +19,7 @@ pub(crate) mod server_response;
 mod thread_pool;
 
 use crate::captures::handlers::*;
+use crate::devices::devices_handler::handle_device;
 use crate::http_server::http_request::HttpRequest;
 use crate::http_server::http_router::Router;
 use crate::http_server::server_response::{
@@ -32,6 +33,8 @@ use crate::ffi::get_devices;
 use crate::ffi::patch_device;
 use crate::ffi::reset;
 use cxx::let_cxx_string;
+use log::{error, info, warn};
+use netsim_common::util::netsim_logger;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs;
@@ -44,26 +47,28 @@ use std::sync::Arc;
 
 const PATH_PREFIXES: [&str; 3] = ["js", "assets", "node_modules/tslib"];
 
-pub fn run_http_server(dev: bool) {
+// TODO: move to main.rs
+pub fn run_http_server() {
+    netsim_logger::init("netsimd");
     let listener = match TcpListener::bind("127.0.0.1:7681") {
         Ok(listener) => listener,
         Err(e) => {
-            eprintln!("netsimd: bind error in netsimd frontend http server. {}", e);
+            error!("bind error in netsimd frontend http server. {}", e);
             return;
         }
     };
     let pool = ThreadPool::new(4);
-    println!("netsimd: Frontend http server is listening on http://localhost:7681");
+    info!("Frontend http server is listening on http://localhost:7681");
     let valid_files = Arc::new(create_filename_hash_set());
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         let valid_files = valid_files.clone();
         pool.execute(move || {
-            handle_connection(stream, valid_files, dev);
+            handle_connection(stream, valid_files);
         });
     }
 
-    println!("netsimd: Shutting down frontend http server.");
+    info!("Shutting down frontend http server.");
 }
 
 fn ui_path(suffix: &str) -> PathBuf {
@@ -85,7 +90,7 @@ fn create_filename_hash_set() -> HashSet<String> {
                 valid_files.insert(entry.path().to_str().unwrap().to_string());
             }
         } else {
-            println!("netsim-ui doesn't exist");
+            warn!("netsim-ui doesn't exist");
         }
     }
     valid_files
@@ -176,11 +181,11 @@ fn handle_devices(request: &HttpRequest, _param: &str, writer: ResponseWritable)
     }
 }
 
-fn handle_debug(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
-    writer.put_ok("text/plain", r"Welcome to netsim debug mode", &[]);
+fn handle_dev(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
+    writer.put_ok("text/plain", r"Welcome to netsim developer mode", &[]);
 }
 
-fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>, dev: bool) {
+fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     let mut router = Router::new();
     router.add_route("/", Box::new(handle_index));
     router.add_route("/version", Box::new(handle_version));
@@ -188,9 +193,11 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>, d
     router.add_route(r"/v1/captures", Box::new(handle_capture));
     router.add_route(r"/v1/captures/{id}", Box::new(handle_capture));
 
-    // Adding additional routes in debug mode.
-    if dev {
-        router.add_route("/debug", Box::new(handle_debug));
+    // Adding additional routes in dev mode.
+    if crate::config::get_dev() {
+        router.add_route("/dev", Box::new(handle_dev));
+        router.add_route("/dev/v1/devices", Box::new(handle_device));
+        router.add_route(r"/dev/v1/devices/{id}", Box::new(handle_device));
     }
 
     // A closure for checking if path is a static file we wish to serve, and call handle_static

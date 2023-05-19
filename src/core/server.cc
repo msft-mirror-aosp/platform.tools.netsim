@@ -28,6 +28,7 @@
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
+#include "hci/bluetooth_facade.h"
 #include "netsim-cxx/src/lib.rs.h"
 #include "util/filesystem.h"
 #include "util/ini_file.h"
@@ -80,9 +81,15 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
 
 void Run(ServerParams params) {
   // Clear all pcap files in temp directory
-  if (netsim::pcap::ClearPcapFiles()) {
+  if (netsim::capture::ClearPcapFiles()) {
     BtsLog("netsim generated pcap files in temp directory has been removed.");
   }
+
+  netsim::hci::facade::Start();
+
+#ifndef NETSIM_ANDROID_EMULATOR
+  netsim::RunFdTransport(params.fd_startup_str);
+#endif
 
   // Environment variable "NETSIM_GRPC_PORT" is set in google3 forge. If set:
   // 1. Use the fixed port for grpc server.
@@ -99,7 +106,7 @@ void Run(ServerParams params) {
   // no_web_ui disables the web server
   if (netsim_grpc_port == 0 && !params.no_web_ui) {
     // Run frontend http server.
-    std::thread(RunHttpServer, params.dev).detach();
+    std::thread(RunHttpServer).detach();
   }
 
   // Run the socket server.
