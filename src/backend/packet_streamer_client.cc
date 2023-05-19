@@ -74,7 +74,8 @@ bool GrpcChannelReady(const std::shared_ptr<grpc::Channel> &channel) {
   return false;
 }
 
-std::unique_ptr<android::base::ObservableProcess>  RunNetsimd(NetsimdOptions options) {
+std::unique_ptr<android::base::ObservableProcess> RunNetsimd(
+    NetsimdOptions options) {
   auto exe = android::base::System::get()->findBundledExecutable("netsimd");
   std::vector<std::string> program_with_args{exe};
   if (options.no_cli_ui) program_with_args.push_back("--no_cli_ui");
@@ -106,7 +107,8 @@ std::shared_ptr<grpc::Channel> GetChannel(NetsimdOptions options) {
 
     packet_stream_channel.reset();
 
-    if ((!netsimProc || !netsimProc->isAlive()) && custom_packet_stream_endpoint.empty() ) {
+    if ((!netsimProc || !netsimProc->isAlive()) &&
+        custom_packet_stream_endpoint.empty()) {
       BtsLog("Starting netsim since %s",
              netsimProc ? "the process died" : "it is not yet launched");
       netsimProc = RunNetsimd(options);
