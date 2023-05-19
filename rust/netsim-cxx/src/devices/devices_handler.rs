@@ -88,38 +88,6 @@ fn notify_all() {
     // TODO
 }
 
-/// Adding a placeholder device into netsim scene.
-/// TODO: Remove once device API implementation is completed.
-fn add_placeholder() -> Result<(), String> {
-    let mut resource = DEVICES.write().unwrap();
-    resource.idle_since = None;
-    let device_id = get_or_create_device(&mut resource, "placeholder0", "placeholder0-device");
-    // This is infrequent, so we can afford to do another lookup for the device.
-    resource.devices.get_mut(&device_id).unwrap().add_chip(
-        "placeholder0-device",
-        ProtoChipKind::BLUETOOTH,
-        "placeholder0-bt-chip",
-        "placeholder0-manufacturer",
-        "placeholder0-bt",
-    )?;
-    resource.devices.get_mut(&device_id).unwrap().add_chip(
-        "placeholder0-device",
-        ProtoChipKind::WIFI,
-        "placeholder0-wifi-chip",
-        "placeholder0-manufacturer",
-        "placeholder0-wifi",
-    )?;
-    let device_id = get_or_create_device(&mut resource, "placeholder1", "placeholder1-device");
-    resource.devices.get_mut(&device_id).unwrap().add_chip(
-        "placeholder1-device",
-        ProtoChipKind::BLUETOOTH,
-        "placeholder1-bt-chip",
-        "placeholder1-manufacturer",
-        "placeholder1-bt",
-    )?;
-    Ok(())
-}
-
 /// Returns a Result<AddChipResult, String> after adding chip to resource.
 /// add_chip is called by the transport layer when a new chip is attached.
 ///
@@ -394,23 +362,10 @@ fn handle_device_reset(writer: ResponseWritable) {
     }
 }
 
-/// For debugging, add a placeholder device
-/// TODO: Remove this route and method after implementation is complete
-pub fn handle_add_placeholder(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
-    match add_placeholder() {
-        Ok(_) => writer.put_ok("text/plain", "added placeholder device", &[]),
-        Err(err) => writer.put_error(404, err.as_str()),
-    }
-}
-
 /// The Rust device handler used directly by Http frontend or handle_device_cxx for LIST, GET, and PATCH
 pub fn handle_device(request: &HttpRequest, param: &str, writer: ResponseWritable) {
-    // TODO: Remove the if block below after implementation is complete
-    if param == "addplaceholder" {
-        return handle_add_placeholder(request, param, writer);
-    }
     // Route handling
-    if request.uri.as_str() == "/dev/v1/devices" {
+    if request.uri.as_str() == "/v1/devices" {
         // Routes with ID not specified
         match request.method.as_str() {
             "GET" => {
@@ -461,9 +416,9 @@ pub fn handle_device_cxx(
         body: body.as_bytes().to_vec(),
     };
     if param.is_empty() {
-        request.uri = "/dev/v1/devices".to_string();
+        request.uri = "/v1/devices".to_string();
     } else {
-        request.uri = format!("dev/v1/devices/{}", param)
+        request.uri = format!("/v1/devices/{}", param)
     }
     handle_device(
         &request,
