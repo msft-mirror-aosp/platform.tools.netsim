@@ -36,7 +36,7 @@ use cxx::CxxString;
 use cxx::UniquePtr;
 use frontend_proto::common::ChipKind as ProtoChipKind;
 use frontend_proto::frontend::ListDeviceResponse;
-use frontend_proto::model::Device as ProtoDevice;
+use frontend_proto::frontend::PatchDeviceRequest;
 use frontend_proto::model::Position as ProtoPosition;
 use frontend_proto::model::Scene as ProtoScene;
 use lazy_static::lazy_static;
@@ -218,10 +218,10 @@ pub fn remove_chip_rust(device_id: u32, chip_id: u32) {
 // lock the devices, find the id and call the patch function
 #[allow(dead_code)]
 fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result<(), String> {
-    let mut proto_device = ProtoDevice::new();
-    if merge_from_str(&mut proto_device, patch_json).is_ok() {
+    let mut patch_device_request = PatchDeviceRequest::new();
+    if merge_from_str(&mut patch_device_request, patch_json).is_ok() {
         let mut resource = DEVICES.write().unwrap();
-
+        let proto_device = patch_device_request.device;
         match id_option {
             Some(id) => match resource.devices.get_mut(&id) {
                 Some(device) => device.patch(&proto_device),
@@ -431,7 +431,7 @@ pub fn handle_device_cxx(
 mod tests {
     use std::sync::{Mutex, Once};
 
-    use frontend_proto::model::{Orientation as ProtoOrientation, State};
+    use frontend_proto::model::{Device as ProtoDevice, Orientation as ProtoOrientation, State};
     use netsim_common::util::netsim_logger::init_for_test;
     use protobuf_json_mapping::print_to_string;
 
@@ -607,13 +607,15 @@ mod tests {
         refresh_resource();
         let chip_params = test_chip_1_bt();
         let chip_result = chip_params.add_chip().unwrap();
-        let mut patch_device_request = ProtoDevice::new();
+        let mut patch_device_request = PatchDeviceRequest::new();
+        let mut proto_device = ProtoDevice::new();
         let request_position = new_position(1.1, 2.2, 3.3);
         let request_orientation = new_orientation(4.4, 5.5, 6.6);
-        patch_device_request.name = chip_params.device_name.into();
-        patch_device_request.visible = State::OFF.into();
-        patch_device_request.position = Some(request_position.clone()).into();
-        patch_device_request.orientation = Some(request_orientation.clone()).into();
+        proto_device.name = chip_params.device_name.into();
+        proto_device.visible = State::OFF.into();
+        proto_device.position = Some(request_position.clone()).into();
+        proto_device.orientation = Some(request_orientation.clone()).into();
+        patch_device_request.device = Some(proto_device.clone()).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
         patch_device(Some(chip_result.device_id), patch_json.as_str()).unwrap();
         match get_devices().unwrap().devices.get(0) {
@@ -630,7 +632,8 @@ mod tests {
         }
 
         // Patch device by name with substring match
-        patch_device_request.name = "test".into();
+        proto_device.name = "test".into();
+        patch_device_request.device = Some(proto_device).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
         assert!(patch_device(None, patch_json.as_str()).is_ok());
     }
@@ -651,7 +654,7 @@ mod tests {
         bt_chip2_params.add_chip().unwrap();
 
         // Incorrect value type
-        let error_json = r#"{"name": "test-device-name-1", "position": 1.1}"#;
+        let error_json = r#"{"device": {"name": "test-device-name-1", "position": 1.1}}"#;
         let patch_result = patch_device(Some(bt_chip_result.device_id), error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -660,7 +663,7 @@ mod tests {
         );
 
         // Incorrect key
-        let error_json = r#"{"name": "test-device-name-1", "hello": "world"}"#;
+        let error_json = r#"{"device": {"name": "test-device-name-1", "hello": "world"}}"#;
         let patch_result = patch_device(Some(bt_chip_result.device_id), error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -669,7 +672,7 @@ mod tests {
         );
 
         // Incorrect Id
-        let error_json = r#"{"name": "test-device-name-1"}"#;
+        let error_json = r#"{"device": {"name": "test-device-name-1"}}"#;
         let patch_result = patch_device(Some(INITIAL_DEVICE_ID - 1), error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -678,13 +681,13 @@ mod tests {
         );
 
         // Incorrect name
-        let error_json = r#"{"name": "wrong-name"}"#;
+        let error_json = r#"{"device": {"name": "wrong-name"}}"#;
         let patch_result = patch_device(None, error_json);
         assert!(patch_result.is_err());
         assert_eq!(patch_result.unwrap_err(), "No such device with name wrong-name");
 
         // Multiple ambiguous matching
-        let error_json = r#"{"name": "test-device"}"#;
+        let error_json = r#"{"device": {"name": "test-device"}}"#;
         let patch_result = patch_device(None, error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -741,13 +744,15 @@ mod tests {
         refresh_resource();
         let chip_params = test_chip_1_bt();
         let chip_result = chip_params.add_chip().unwrap();
-        let mut patch_device_request = ProtoDevice::new();
+        let mut patch_device_request = PatchDeviceRequest::new();
+        let mut proto_device = ProtoDevice::new();
         let request_position = new_position(10.0, 20.0, 30.0);
         let request_orientation = new_orientation(1.0, 2.0, 3.0);
-        patch_device_request.name = chip_params.device_name.into();
-        patch_device_request.visible = State::OFF.into();
-        patch_device_request.position = Some(request_position).into();
-        patch_device_request.orientation = Some(request_orientation).into();
+        proto_device.name = chip_params.device_name.into();
+        proto_device.visible = State::OFF.into();
+        proto_device.position = Some(request_position).into();
+        proto_device.orientation = Some(request_orientation).into();
+        patch_device_request.device = Some(proto_device).into();
         patch_device(
             Some(chip_result.device_id),
             print_to_string(&patch_device_request).unwrap().as_str(),
