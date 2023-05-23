@@ -46,10 +46,6 @@ pub fn netsimd_temp_dir() -> PathBuf {
     path
 }
 
-pub fn netsimd_temp_dir_string() -> String {
-    netsimd_temp_dir().into_os_string().into_string().unwrap()
-}
-
 #[cfg(test)]
 mod tests {
     use super::netsimd_temp_dir;
