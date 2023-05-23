@@ -80,6 +80,9 @@ int main(int argc, char *argv[]) {
 #if defined(__linux__)
   signal(SIGSEGV, SignalHandler);
 #endif
+
+  netsim::osutils::RedirectStdStream(netsim::NetsimdTempDirString().c_str());
+
   bool no_web_ui = false;
   bool no_cli_ui = false;
 
