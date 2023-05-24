@@ -427,6 +427,19 @@ pub fn handle_device_cxx(
     )
 }
 
+/// Get Facade ID from given chip_id
+pub fn get_facade_id(chip_id: i32) -> Result<u32, String> {
+    let resource = DEVICES.read().unwrap();
+    for device in resource.devices.values() {
+        for (id, chip) in &device.chips {
+            if *id == chip_id {
+                return Ok(chip.facade_id);
+            }
+        }
+    }
+    Err(format!("Cannot find facade_id for {chip_id}"))
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Mutex, Once};
@@ -497,7 +510,9 @@ mod tests {
         let mut resource = DEVICES.write().unwrap();
         resource.devices = BTreeMap::new();
         resource.id_factory = IdFactory::new(1000, 1);
-        resource.idle_since = None
+        resource.idle_since = None;
+        crate::bluetooth::refresh_resource();
+        crate::wifi::refresh_resource();
     }
 
     fn test_chip_1_bt() -> TestChipParameters<'static> {
@@ -849,5 +864,50 @@ mod tests {
             Err(err) => assert_eq!(err, "RemoveChip device id 4000 not found"),
         }
         assert_eq!(get_devices().unwrap().devices.len(), 1);
+    }
+
+    #[test]
+    fn test_get_facade_id() {
+        // Avoiding Interleaving Operations
+        let _lock = MUTEX.lock().unwrap();
+
+        // Initializing Logger
+        logger_setup();
+
+        // Add bt, wifi chips of the same device and bt chip of second device
+        refresh_resource();
+        let bt_chip_params = test_chip_1_bt();
+        let bt_chip_result = bt_chip_params.add_chip().unwrap();
+        let wifi_chip_params = test_chip_1_wifi();
+        let wifi_chip_result = wifi_chip_params.add_chip().unwrap();
+        let bt_chip_2_params = test_chip_2_bt();
+        let bt_chip_2_result = bt_chip_2_params.add_chip().unwrap();
+
+        // Invoke get_facade_id from first bt chip
+        match get_facade_id(bt_chip_result.chip_id) {
+            Ok(facade_id) => assert_eq!(facade_id, 0),
+            Err(err) => {
+                error!("{err}");
+                unreachable!();
+            }
+        }
+
+        // Invoke get_facade_id from first wifi chip
+        match get_facade_id(wifi_chip_result.chip_id) {
+            Ok(facade_id) => assert_eq!(facade_id, 0),
+            Err(err) => {
+                error!("{err}");
+                unreachable!();
+            }
+        }
+
+        // Invoke get_facade_id from second bt chip
+        match get_facade_id(bt_chip_2_result.chip_id) {
+            Ok(facade_id) => assert_eq!(facade_id, 1),
+            Err(err) => {
+                error!("{err}");
+                unreachable!();
+            }
+        }
     }
 }
