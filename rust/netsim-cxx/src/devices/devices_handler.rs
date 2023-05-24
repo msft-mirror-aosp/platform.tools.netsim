@@ -49,7 +49,6 @@ use std::collections::BTreeMap;
 use std::pin::Pin;
 use std::sync::RwLock;
 use std::sync::RwLockWriteGuard;
-use std::time::Duration;
 use std::time::Instant;
 
 const INITIAL_DEVICE_ID: DeviceIdentifier = 0;
@@ -63,7 +62,7 @@ const JSON_PRINT_OPTION: PrintOptions = PrintOptions {
 lazy_static! {
     static ref DEVICES: RwLock<Devices> = RwLock::new(Devices::new());
 }
-static IDLE_SECS_FOR_SHUTDOWN: u64 = 120;
+static IDLE_SECS_FOR_SHUTDOWN: u64 = 300;
 
 /// The Device resource is a singleton that manages all devices.
 struct Devices {
@@ -78,7 +77,7 @@ impl Devices {
         Devices {
             devices: BTreeMap::new(),
             id_factory: IdFactory::new(INITIAL_DEVICE_ID, 1),
-            idle_since: None,
+            idle_since: Some(Instant::now()),
         }
     }
 }
@@ -315,16 +314,13 @@ fn reset_all() -> Result<(), String> {
     Ok(())
 }
 
-#[allow(dead_code)]
-fn get_secs_until_idle_shutdown() -> Option<u32> {
-    if let Some(idle_since) = DEVICES.read().unwrap().idle_since {
-        let remaining_secs = idle_since
-            .elapsed()
-            .saturating_sub(Duration::from_secs(IDLE_SECS_FOR_SHUTDOWN))
-            .as_secs();
-        Some(remaining_secs.try_into().unwrap())
-    } else {
-        None
+/// Return true if netsimd is idle for 5 minutes
+pub fn is_shutdown_time_cxx() -> bool {
+    match DEVICES.read().unwrap().idle_since {
+        Some(idle_since) => {
+            IDLE_SECS_FOR_SHUTDOWN.checked_sub(idle_since.elapsed().as_secs()).is_none()
+        }
+        None => false,
     }
 }
 
@@ -441,7 +437,10 @@ pub fn get_facade_id(chip_id: i32) -> Result<u32, String> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Mutex, Once};
+    use std::{
+        sync::{Mutex, Once},
+        time::Duration,
+    };
 
     use frontend_proto::model::{Device as ProtoDevice, Orientation as ProtoOrientation, State};
     use netsim_common::util::netsim_logger::init_for_test;
@@ -509,9 +508,15 @@ mod tests {
         let mut resource = DEVICES.write().unwrap();
         resource.devices = BTreeMap::new();
         resource.id_factory = IdFactory::new(1000, 1);
-        resource.idle_since = None;
+        resource.idle_since = Some(Instant::now());
         crate::bluetooth::refresh_resource();
         crate::wifi::refresh_resource();
+    }
+
+    /// helper function for traveling back n seconds for idle_since
+    fn travel_back_n_seconds_from_now(n: u64) {
+        let mut resource = DEVICES.write().unwrap();
+        resource.idle_since = Some(Instant::now() - Duration::from_secs(n));
     }
 
     fn test_chip_1_bt() -> TestChipParameters<'static> {
@@ -908,5 +913,33 @@ mod tests {
                 unreachable!();
             }
         }
+    }
+
+    #[test]
+    fn test_is_shutdown_time_cxx() {
+        // Avoiding Interleaving Operations
+        let _lock = MUTEX.lock().unwrap();
+
+        // Initializing Logger
+        logger_setup();
+
+        // Refresh Resource
+        refresh_resource();
+
+        // Set the idle_since value to more than 5 minutes before current time
+        travel_back_n_seconds_from_now(301);
+        assert!(is_shutdown_time_cxx());
+
+        // Set the idle_since value to less than 5 minutes before current time
+        travel_back_n_seconds_from_now(299);
+        assert!(!is_shutdown_time_cxx());
+
+        // Refresh Resource again
+        refresh_resource();
+
+        // Add a device and check if idle_since is None
+        let _ = test_chip_1_bt().add_chip();
+        assert!(DEVICES.read().unwrap().idle_since.is_none());
+        assert!(!is_shutdown_time_cxx());
     }
 }
