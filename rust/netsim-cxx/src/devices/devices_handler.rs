@@ -287,8 +287,7 @@ pub fn get_distance_rust(a: u32, b: u32) -> f32 {
     }
 }
 
-#[allow(dead_code)]
-fn get_devices() -> Result<ProtoScene, String> {
+pub fn get_devices() -> Result<ProtoScene, String> {
     let mut scene = ProtoScene::new();
     // iterate over the devices and add each to the scene
     let resource = DEVICES.read().unwrap();
