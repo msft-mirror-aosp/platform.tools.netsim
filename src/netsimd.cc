@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
   bool no_web_ui = false;
   bool no_cli_ui = false;
 
-  const char *kShortOpt = "s:dg";
+  const char *kShortOpt = "s:d";
   const option kLongOptions[] = {
       {"no_cli_ui", no_argument, 0, 'f'},
       {"no_web_ui", no_argument, 0, 'w'},
@@ -101,11 +101,7 @@ int main(int argc, char *argv[]) {
   while ((c = getopt_long(argc, argv, kShortOpt, kLongOptions, nullptr)) !=
          -1) {
     switch (c) {
-#ifdef NETSIM_ANDROID_EMULATOR
-      case 'g':
-        // TODO: Remove the no-op flag after a release cycle.
-        break;
-#else
+#ifndef NETSIM_ANDROID_EMULATOR
       case 's':
         fd_startup_str = std::string(optarg);
         break;
@@ -135,6 +131,17 @@ int main(int argc, char *argv[]) {
         return (-2);
     }
   }
+  if (fd_startup_str.empty()) {
+#ifndef NETSIM_ANDROID_EMULATOR
+    std::cerr << "Failed to start netsim daemon because fd startup flag `-s` "
+                 "is empty\n";
+    return -1;
+#endif
+    // NOTE: Redirect stdout and stderr to files only if netsimd is not invoked
+    // by Cuttlefish. Some Cuttlefish builds fail when writing logs to files.
+    netsim::osutils::RedirectStdStream(netsim::NetsimdTempDirString().c_str());
+  }
+
   netsim::config::SetDev(dev);
   int hci_port = get_hci_port(hci_port_flag);
   // Daemon mode -- start radio managers
@@ -146,14 +153,6 @@ int main(int argc, char *argv[]) {
                  "already running\n";
     return -1;
   }
-
-#ifndef NETSIM_ANDROID_EMULATOR
-  if (fd_startup_str.empty()) {
-    std::cerr << "Failed to start netsim daemon because fd startup flag `-s` "
-                 "is empty\n";
-    return -1;
-  }
-#endif
 
   netsim::server::Run({.fd_startup_str = fd_startup_str,
                        .no_cli_ui = no_cli_ui,

@@ -20,9 +20,7 @@
 #include <string>
 #include <thread>
 
-#ifdef NETSIM_ANDROID_EMULATOR
 #include "backend/grpc_server.h"
-#endif
 #include "controller/controller.h"
 #include "frontend/frontend_server.h"
 #include "grpcpp/security/server_credentials.h"
@@ -53,13 +51,11 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
                            grpc::InsecureServerCredentials(), &selected_port);
   if (!no_cli_ui) {
     static auto frontend_service = GetFrontendService();
-    builder.RegisterService(frontend_service.get());
+    builder.RegisterService(frontend_service.release());
   }
-  builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
-#ifdef NETSIM_ANDROID_EMULATOR
   static auto backend_service = GetBackendService();
-  builder.RegisterService(backend_service.get());
-#endif
+  builder.RegisterService(backend_service.release());
+  builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
   if (server == nullptr) {
     return nullptr;
@@ -115,9 +111,16 @@ void Run(ServerParams params) {
 
   while (true) {
     std::this_thread::sleep_for(InactivityCheckInterval);
-    if (auto seconds_to_shutdown = netsim::scene_controller::GetShutdownTime();
-        seconds_to_shutdown.has_value() &&
-        seconds_to_shutdown.value() < std::chrono::seconds(0)) {
+    if (netsim::config::GetDev()) {
+      if (netsim::device::IsShutdownTimeCxx()) {
+        grpc_server->Shutdown();
+        BtsLog("Netsim has been shutdown due to inactivity.");
+        break;
+      }
+    } else if (auto seconds_to_shutdown =
+                   netsim::scene_controller::GetShutdownTime();
+               seconds_to_shutdown.has_value() &&
+               seconds_to_shutdown.value() < std::chrono::seconds(0)) {
       grpc_server->Shutdown();
       BtsLog("Netsim has been shutdown due to inactivity.");
       break;

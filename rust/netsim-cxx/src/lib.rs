@@ -46,10 +46,11 @@ use crate::captures::handlers::{
 };
 use crate::config::{get_dev, set_dev};
 use crate::devices::devices_handler::{
-    add_chip_rust, get_distance_rust, handle_device_cxx, remove_chip_rust,
+    add_chip_rust, get_distance_rust, handle_device_cxx, is_shutdown_time_cxx, remove_chip_rust,
 };
 use crate::http_server::run_http_server;
 use crate::ranging::*;
+use crate::system::netsimd_temp_dir_string;
 use crate::uwb::facade::*;
 use crate::version::*;
 
@@ -84,6 +85,11 @@ mod ffi {
 
         #[cxx_name = "GetVersion"]
         fn get_version() -> String;
+
+        // System
+
+        #[cxx_name = "NetsimdTempDirString"]
+        fn netsimd_temp_dir_string() -> String;
 
         // handlers for gRPC server's invocation of API calls
 
@@ -137,6 +143,10 @@ mod ffi {
         #[cxx_name = GetDistanceRust]
         #[namespace = "netsim::device"]
         fn get_distance_rust(a: u32, b: u32) -> f32;
+
+        #[cxx_name = IsShutdownTimeCxx]
+        #[namespace = "netsim::device"]
+        fn is_shutdown_time_cxx() -> bool;
 
         // Capture Resource
 

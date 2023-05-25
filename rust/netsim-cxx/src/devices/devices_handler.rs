@@ -36,7 +36,7 @@ use cxx::CxxString;
 use cxx::UniquePtr;
 use frontend_proto::common::ChipKind as ProtoChipKind;
 use frontend_proto::frontend::ListDeviceResponse;
-use frontend_proto::model::Device as ProtoDevice;
+use frontend_proto::frontend::PatchDeviceRequest;
 use frontend_proto::model::Position as ProtoPosition;
 use frontend_proto::model::Scene as ProtoScene;
 use lazy_static::lazy_static;
@@ -49,7 +49,6 @@ use std::collections::BTreeMap;
 use std::pin::Pin;
 use std::sync::RwLock;
 use std::sync::RwLockWriteGuard;
-use std::time::Duration;
 use std::time::Instant;
 
 const INITIAL_DEVICE_ID: DeviceIdentifier = 0;
@@ -63,7 +62,7 @@ const JSON_PRINT_OPTION: PrintOptions = PrintOptions {
 lazy_static! {
     static ref DEVICES: RwLock<Devices> = RwLock::new(Devices::new());
 }
-static IDLE_SECS_FOR_SHUTDOWN: u64 = 120;
+static IDLE_SECS_FOR_SHUTDOWN: u64 = 300;
 
 /// The Device resource is a singleton that manages all devices.
 struct Devices {
@@ -78,7 +77,7 @@ impl Devices {
         Devices {
             devices: BTreeMap::new(),
             id_factory: IdFactory::new(INITIAL_DEVICE_ID, 1),
-            idle_since: None,
+            idle_since: Some(Instant::now()),
         }
     }
 }
@@ -86,38 +85,6 @@ impl Devices {
 #[allow(dead_code)]
 fn notify_all() {
     // TODO
-}
-
-/// Adding a placeholder device into netsim scene.
-/// TODO: Remove once device API implementation is completed.
-fn add_placeholder() -> Result<(), String> {
-    let mut resource = DEVICES.write().unwrap();
-    resource.idle_since = None;
-    let device_id = get_or_create_device(&mut resource, "placeholder0", "placeholder0-device");
-    // This is infrequent, so we can afford to do another lookup for the device.
-    resource.devices.get_mut(&device_id).unwrap().add_chip(
-        "placeholder0-device",
-        ProtoChipKind::BLUETOOTH,
-        "placeholder0-bt-chip",
-        "placeholder0-manufacturer",
-        "placeholder0-bt",
-    )?;
-    resource.devices.get_mut(&device_id).unwrap().add_chip(
-        "placeholder0-device",
-        ProtoChipKind::WIFI,
-        "placeholder0-wifi-chip",
-        "placeholder0-manufacturer",
-        "placeholder0-wifi",
-    )?;
-    let device_id = get_or_create_device(&mut resource, "placeholder1", "placeholder1-device");
-    resource.devices.get_mut(&device_id).unwrap().add_chip(
-        "placeholder1-device",
-        ProtoChipKind::BLUETOOTH,
-        "placeholder1-bt-chip",
-        "placeholder1-manufacturer",
-        "placeholder1-bt",
-    )?;
-    Ok(())
 }
 
 /// Returns a Result<AddChipResult, String> after adding chip to resource.
@@ -250,10 +217,10 @@ pub fn remove_chip_rust(device_id: u32, chip_id: u32) {
 // lock the devices, find the id and call the patch function
 #[allow(dead_code)]
 fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result<(), String> {
-    let mut proto_device = ProtoDevice::new();
-    if merge_from_str(&mut proto_device, patch_json).is_ok() {
+    let mut patch_device_request = PatchDeviceRequest::new();
+    if merge_from_str(&mut patch_device_request, patch_json).is_ok() {
         let mut resource = DEVICES.write().unwrap();
-
+        let proto_device = patch_device_request.device;
         match id_option {
             Some(id) => match resource.devices.get_mut(&id) {
                 Some(device) => device.patch(&proto_device),
@@ -319,8 +286,7 @@ pub fn get_distance_rust(a: u32, b: u32) -> f32 {
     }
 }
 
-#[allow(dead_code)]
-fn get_devices() -> Result<ProtoScene, String> {
+pub fn get_devices() -> Result<ProtoScene, String> {
     let mut scene = ProtoScene::new();
     // iterate over the devices and add each to the scene
     let resource = DEVICES.read().unwrap();
@@ -348,16 +314,13 @@ fn reset_all() -> Result<(), String> {
     Ok(())
 }
 
-#[allow(dead_code)]
-fn get_secs_until_idle_shutdown() -> Option<u32> {
-    if let Some(idle_since) = DEVICES.read().unwrap().idle_since {
-        let remaining_secs = idle_since
-            .elapsed()
-            .saturating_sub(Duration::from_secs(IDLE_SECS_FOR_SHUTDOWN))
-            .as_secs();
-        Some(remaining_secs.try_into().unwrap())
-    } else {
-        None
+/// Return true if netsimd is idle for 5 minutes
+pub fn is_shutdown_time_cxx() -> bool {
+    match DEVICES.read().unwrap().idle_since {
+        Some(idle_since) => {
+            IDLE_SECS_FOR_SHUTDOWN.checked_sub(idle_since.elapsed().as_secs()).is_none()
+        }
+        None => false,
     }
 }
 
@@ -394,23 +357,10 @@ fn handle_device_reset(writer: ResponseWritable) {
     }
 }
 
-/// For debugging, add a placeholder device
-/// TODO: Remove this route and method after implementation is complete
-pub fn handle_add_placeholder(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
-    match add_placeholder() {
-        Ok(_) => writer.put_ok("text/plain", "added placeholder device", &[]),
-        Err(err) => writer.put_error(404, err.as_str()),
-    }
-}
-
 /// The Rust device handler used directly by Http frontend or handle_device_cxx for LIST, GET, and PATCH
 pub fn handle_device(request: &HttpRequest, param: &str, writer: ResponseWritable) {
-    // TODO: Remove the if block below after implementation is complete
-    if param == "addplaceholder" {
-        return handle_add_placeholder(request, param, writer);
-    }
     // Route handling
-    if request.uri.as_str() == "/dev/v1/devices" {
+    if request.uri.as_str() == "/v1/devices" {
         // Routes with ID not specified
         match request.method.as_str() {
             "GET" => {
@@ -461,9 +411,9 @@ pub fn handle_device_cxx(
         body: body.as_bytes().to_vec(),
     };
     if param.is_empty() {
-        request.uri = "/dev/v1/devices".to_string();
+        request.uri = "/v1/devices".to_string();
     } else {
-        request.uri = format!("dev/v1/devices/{}", param)
+        request.uri = format!("/v1/devices/{}", param)
     }
     handle_device(
         &request,
@@ -472,11 +422,27 @@ pub fn handle_device_cxx(
     )
 }
 
+/// Get Facade ID from given chip_id
+pub fn get_facade_id(chip_id: i32) -> Result<u32, String> {
+    let resource = DEVICES.read().unwrap();
+    for device in resource.devices.values() {
+        for (id, chip) in &device.chips {
+            if *id == chip_id {
+                return Ok(chip.facade_id);
+            }
+        }
+    }
+    Err(format!("Cannot find facade_id for {chip_id}"))
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::{Mutex, Once};
+    use std::{
+        sync::{Mutex, Once},
+        time::Duration,
+    };
 
-    use frontend_proto::model::{Orientation as ProtoOrientation, State};
+    use frontend_proto::model::{Device as ProtoDevice, Orientation as ProtoOrientation, State};
     use netsim_common::util::netsim_logger::init_for_test;
     use protobuf_json_mapping::print_to_string;
 
@@ -542,7 +508,15 @@ mod tests {
         let mut resource = DEVICES.write().unwrap();
         resource.devices = BTreeMap::new();
         resource.id_factory = IdFactory::new(1000, 1);
-        resource.idle_since = None
+        resource.idle_since = Some(Instant::now());
+        crate::bluetooth::refresh_resource();
+        crate::wifi::refresh_resource();
+    }
+
+    /// helper function for traveling back n seconds for idle_since
+    fn travel_back_n_seconds_from_now(n: u64) {
+        let mut resource = DEVICES.write().unwrap();
+        resource.idle_since = Some(Instant::now() - Duration::from_secs(n));
     }
 
     fn test_chip_1_bt() -> TestChipParameters<'static> {
@@ -652,13 +626,15 @@ mod tests {
         refresh_resource();
         let chip_params = test_chip_1_bt();
         let chip_result = chip_params.add_chip().unwrap();
-        let mut patch_device_request = ProtoDevice::new();
+        let mut patch_device_request = PatchDeviceRequest::new();
+        let mut proto_device = ProtoDevice::new();
         let request_position = new_position(1.1, 2.2, 3.3);
         let request_orientation = new_orientation(4.4, 5.5, 6.6);
-        patch_device_request.name = chip_params.device_name.into();
-        patch_device_request.visible = State::OFF.into();
-        patch_device_request.position = Some(request_position.clone()).into();
-        patch_device_request.orientation = Some(request_orientation.clone()).into();
+        proto_device.name = chip_params.device_name.into();
+        proto_device.visible = State::OFF.into();
+        proto_device.position = Some(request_position.clone()).into();
+        proto_device.orientation = Some(request_orientation.clone()).into();
+        patch_device_request.device = Some(proto_device.clone()).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
         patch_device(Some(chip_result.device_id), patch_json.as_str()).unwrap();
         match get_devices().unwrap().devices.get(0) {
@@ -675,7 +651,8 @@ mod tests {
         }
 
         // Patch device by name with substring match
-        patch_device_request.name = "test".into();
+        proto_device.name = "test".into();
+        patch_device_request.device = Some(proto_device).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
         assert!(patch_device(None, patch_json.as_str()).is_ok());
     }
@@ -696,7 +673,7 @@ mod tests {
         bt_chip2_params.add_chip().unwrap();
 
         // Incorrect value type
-        let error_json = r#"{"name": "test-device-name-1", "position": 1.1}"#;
+        let error_json = r#"{"device": {"name": "test-device-name-1", "position": 1.1}}"#;
         let patch_result = patch_device(Some(bt_chip_result.device_id), error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -705,7 +682,7 @@ mod tests {
         );
 
         // Incorrect key
-        let error_json = r#"{"name": "test-device-name-1", "hello": "world"}"#;
+        let error_json = r#"{"device": {"name": "test-device-name-1", "hello": "world"}}"#;
         let patch_result = patch_device(Some(bt_chip_result.device_id), error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -714,7 +691,7 @@ mod tests {
         );
 
         // Incorrect Id
-        let error_json = r#"{"name": "test-device-name-1"}"#;
+        let error_json = r#"{"device": {"name": "test-device-name-1"}}"#;
         let patch_result = patch_device(Some(INITIAL_DEVICE_ID - 1), error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -723,13 +700,13 @@ mod tests {
         );
 
         // Incorrect name
-        let error_json = r#"{"name": "wrong-name"}"#;
+        let error_json = r#"{"device": {"name": "wrong-name"}}"#;
         let patch_result = patch_device(None, error_json);
         assert!(patch_result.is_err());
         assert_eq!(patch_result.unwrap_err(), "No such device with name wrong-name");
 
         // Multiple ambiguous matching
-        let error_json = r#"{"name": "test-device"}"#;
+        let error_json = r#"{"device": {"name": "test-device"}}"#;
         let patch_result = patch_device(None, error_json);
         assert!(patch_result.is_err());
         assert_eq!(
@@ -786,13 +763,15 @@ mod tests {
         refresh_resource();
         let chip_params = test_chip_1_bt();
         let chip_result = chip_params.add_chip().unwrap();
-        let mut patch_device_request = ProtoDevice::new();
+        let mut patch_device_request = PatchDeviceRequest::new();
+        let mut proto_device = ProtoDevice::new();
         let request_position = new_position(10.0, 20.0, 30.0);
         let request_orientation = new_orientation(1.0, 2.0, 3.0);
-        patch_device_request.name = chip_params.device_name.into();
-        patch_device_request.visible = State::OFF.into();
-        patch_device_request.position = Some(request_position).into();
-        patch_device_request.orientation = Some(request_orientation).into();
+        proto_device.name = chip_params.device_name.into();
+        proto_device.visible = State::OFF.into();
+        proto_device.position = Some(request_position).into();
+        proto_device.orientation = Some(request_orientation).into();
+        patch_device_request.device = Some(proto_device).into();
         patch_device(
             Some(chip_result.device_id),
             print_to_string(&patch_device_request).unwrap().as_str(),
@@ -889,5 +868,78 @@ mod tests {
             Err(err) => assert_eq!(err, "RemoveChip device id 4000 not found"),
         }
         assert_eq!(get_devices().unwrap().devices.len(), 1);
+    }
+
+    #[test]
+    fn test_get_facade_id() {
+        // Avoiding Interleaving Operations
+        let _lock = MUTEX.lock().unwrap();
+
+        // Initializing Logger
+        logger_setup();
+
+        // Add bt, wifi chips of the same device and bt chip of second device
+        refresh_resource();
+        let bt_chip_params = test_chip_1_bt();
+        let bt_chip_result = bt_chip_params.add_chip().unwrap();
+        let wifi_chip_params = test_chip_1_wifi();
+        let wifi_chip_result = wifi_chip_params.add_chip().unwrap();
+        let bt_chip_2_params = test_chip_2_bt();
+        let bt_chip_2_result = bt_chip_2_params.add_chip().unwrap();
+
+        // Invoke get_facade_id from first bt chip
+        match get_facade_id(bt_chip_result.chip_id) {
+            Ok(facade_id) => assert_eq!(facade_id, 0),
+            Err(err) => {
+                error!("{err}");
+                unreachable!();
+            }
+        }
+
+        // Invoke get_facade_id from first wifi chip
+        match get_facade_id(wifi_chip_result.chip_id) {
+            Ok(facade_id) => assert_eq!(facade_id, 0),
+            Err(err) => {
+                error!("{err}");
+                unreachable!();
+            }
+        }
+
+        // Invoke get_facade_id from second bt chip
+        match get_facade_id(bt_chip_2_result.chip_id) {
+            Ok(facade_id) => assert_eq!(facade_id, 1),
+            Err(err) => {
+                error!("{err}");
+                unreachable!();
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_shutdown_time_cxx() {
+        // Avoiding Interleaving Operations
+        let _lock = MUTEX.lock().unwrap();
+
+        // Initializing Logger
+        logger_setup();
+
+        // Refresh Resource
+        refresh_resource();
+
+        // Set the idle_since value to more than 5 minutes before current time
+        travel_back_n_seconds_from_now(301);
+        assert!(is_shutdown_time_cxx());
+
+        // Set the idle_since value to less than 5 minutes before current time
+        travel_back_n_seconds_from_now(299);
+        assert!(!is_shutdown_time_cxx());
+
+        // Refresh Resource again
+        refresh_resource();
+
+        // Add a device and check if idle_since is None
+        let _ = test_chip_1_bt().add_chip();
+        assert!(DEVICES.read().unwrap().idle_since.is_none());
+        assert!(!is_shutdown_time_cxx());
     }
 }
