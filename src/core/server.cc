@@ -32,6 +32,7 @@
 #include "util/ini_file.h"
 #include "util/log.h"
 #include "util/os_utils.h"
+#include "wifi/wifi_facade.h"
 #ifdef _WIN32
 #include <Windows.h>
 #else
@@ -82,6 +83,7 @@ void Run(ServerParams params) {
   }
 
   netsim::hci::facade::Start();
+  netsim::wifi::facade::Start();
 
 #ifndef NETSIM_ANDROID_EMULATOR
   netsim::RunFdTransport(params.fd_startup_str);
