@@ -128,6 +128,7 @@ if(TARGET Rust::Rustc)
         wifi/wifi_packet_hub.h
     DEPS android-emu-base
          android-emu-base-headers
+         android-wifi-service
          grpc++
          libbt-rootcanal
          netsim-cxx

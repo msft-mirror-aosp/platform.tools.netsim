@@ -33,6 +33,10 @@
 #include "packet_streamer.pb.h"
 #include "util/log.h"
 
+#ifdef NETSIM_ANDROID_EMULATOR
+#include "android-qemu2-glue/netsim/libslirp_driver.h"
+#endif
+
 namespace netsim {
 namespace backend {
 namespace {
@@ -139,6 +143,13 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
 
                                   *packet,
                                   packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
+#ifdef NETSIM_ANDROID_EMULATOR
+        // main_loop_wait is a non-blocking call where fds maintained by the
+        // WiFi service (slirp) are polled and serviced for I/O. When any fd
+        // become ready for I/O, slirp_pollfds_poll() will be invoked to read
+        // from the open sockets therefore incoming packets are serviced.
+        android::qemu2::libslirp_main_loop_wait(true);
+#endif
       } else {
         // TODO: add UWB here
         BtsLog("grpc_server: unknown chip kind");
