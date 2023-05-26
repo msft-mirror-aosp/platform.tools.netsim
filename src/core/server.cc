@@ -21,14 +21,14 @@
 #include <thread>
 
 #ifdef NETSIM_ANDROID_EMULATOR
-#include "backend/backend_server.h"
+#include "backend/grpc_server.h"
 #endif
 #include "controller/controller.h"
 #include "frontend/frontend_server.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
-#include "netsim_cxx_generated.h"
+#include "netsim-cxx/src/lib.rs.h"
 #include "util/filesystem.h"
 #include "util/ini_file.h"
 #include "util/log.h"
@@ -72,6 +72,11 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port) {
 }  // namespace
 
 void Run() {
+  // Clear all pcap files in temp directory
+  if (netsim::pcap::ClearPcapFiles()) {
+    BtsLog("netsim generated pcap files in temp directory has been removed.");
+  }
+
   // Environment variable "NETSIM_GRPC_PORT" is set in google3 forge. If set:
   // 1. Use the fixed port for grpc server.
   // 2. Don't start http server.
@@ -80,7 +85,7 @@ void Run() {
   auto grpc_server = RunGrpcServer(netsim_grpc_port);
   if (netsim_grpc_port == 0) {
     // Run frontend http server.
-    std::thread(RunFrontendHttpServer).detach();
+    std::thread(RunHttpServer).detach();
   }
 
   while (true) {

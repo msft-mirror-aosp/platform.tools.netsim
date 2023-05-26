@@ -18,18 +18,19 @@
 
 // Use gRPC HCI PacketType definitions so we don't expose Rootcanal's version
 // outside of the Bluetooth Facade.
-#include "packet_streamer.pb.h"
+#include "common.pb.h"
+#include "hci_packet.pb.h"
 
 namespace netsim {
 namespace backend {
-namespace grpc {
 
-/* Handle packet requests for the backend. */
+using netsim::common::ChipKind;
 
-void handle_bt_response(uint32_t facade_id,
-                        packet::HCIPacket_PacketType packet_type,
-                        const std::shared_ptr<std::vector<uint8_t>> packet);
+/* Handle packet responses for the backend. */
 
-}  // namespace grpc
+void HandleResponse(ChipKind kind, uint32_t facade_id,
+                    const std::vector<uint8_t> &packet,
+                    /* optional */ packet::HCIPacket_PacketType packet_type);
+
 }  // namespace backend
 }  // namespace netsim
