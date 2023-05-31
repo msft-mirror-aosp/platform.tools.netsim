@@ -63,8 +63,8 @@ std::tuple<uint32_t, uint32_t, uint32_t> SceneController::AddChip(
       break;
   }
   std::unique_ptr<scene_controller::AddChipResult> add_chip_result_ptr =
-      netsim::device::AddChipRust(guid, device_name, chip_kind_string,
-                                  chip_name, manufacturer, product_name);
+      netsim::device::AddChipCxx(guid, device_name, chip_kind_string, chip_name,
+                                 manufacturer, product_name);
   uint32_t device_id = add_chip_result_ptr->device_id;
   uint32_t chip_id = add_chip_result_ptr->chip_id;
   uint32_t facade_id = add_chip_result_ptr->facade_id;
@@ -97,7 +97,7 @@ void SceneController::RemoveDevice(uint32_t id) {
 
 void SceneController::RemoveChip(uint32_t device_id, uint32_t chip_id) {
   std::unique_lock<std::mutex> lock(this->mutex_);
-  netsim::device::RemoveChipRust(device_id, chip_id);
+  netsim::device::RemoveChipCxx(device_id, chip_id);
   netsim::capture::UpdateCaptures();
   return;
 }
@@ -140,7 +140,7 @@ bool SceneController::PatchDevice(const model::Device &request) {
 
 // Euclidian distance between two devices.
 float SceneController::GetDistance(uint32_t id, uint32_t other_id) {
-  return netsim::device::GetDistanceRust(id, other_id);
+  return netsim::device::GetDistanceCxx(id, other_id);
 }
 
 void SceneController::Reset() {
