@@ -92,8 +92,7 @@ fn notify_all() {
 ///
 /// The guid is a transport layer identifier for the device (host:port)
 /// that is adding the chip.
-#[allow(dead_code)]
-fn add_chip(
+pub fn add_chip(
     device_guid: &str,
     device_name: &str,
     chip_kind: ProtoChipKind,
@@ -116,7 +115,7 @@ fn add_chip(
 
 /// An AddChip function for Rust Device API.
 /// The backend gRPC code will be invoking this method.
-pub fn add_chip_rust(
+pub fn add_chip_cxx(
     device_guid: &str,
     device_name: &str,
     chip_kind: &CxxString,
@@ -188,8 +187,7 @@ fn remove_device(
 /// Remove a chip from a device.
 ///
 /// Called when the packet transport for the chip shuts down.
-#[allow(dead_code)]
-fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Result<(), String> {
+pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Result<(), String> {
     let mut resource = DEVICES.write().unwrap();
     let is_empty = match resource.devices.entry(device_id) {
         Entry::Occupied(mut entry) => {
@@ -207,7 +205,7 @@ fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Result<(
 
 /// A RemoveChip function for Rust Device API.
 /// The backend gRPC code will be invoking this method.
-pub fn remove_chip_rust(device_id: u32, chip_id: u32) {
+pub fn remove_chip_cxx(device_id: u32, chip_id: u32) {
     match remove_chip(device_id as i32, chip_id as i32) {
         Ok(_) => info!("Rust Device API Remove Chip Success"),
         Err(err) => error!("Rust Device API Remove Chip Failure: {err}"),
@@ -259,8 +257,8 @@ fn distance(a: &ProtoPosition, b: &ProtoPosition) -> f32 {
     ((b.x - a.x).powf(2.0) + (b.y - a.y).powf(2.0) + (b.z - a.z).powf(2.0)).sqrt()
 }
 
-#[allow(dead_code)]
-fn get_distance(id: DeviceIdentifier, other_id: DeviceIdentifier) -> Result<f32, String> {
+/// Get distance between two devices with device_id of id and other_id.
+pub fn get_distance(id: DeviceIdentifier, other_id: DeviceIdentifier) -> Result<f32, String> {
     print!("get_distance({:?}, {:?}) = ", id, other_id);
     let devices = &DEVICES.read().unwrap().devices;
     let a = devices
@@ -276,7 +274,7 @@ fn get_distance(id: DeviceIdentifier, other_id: DeviceIdentifier) -> Result<f32,
 
 /// A GetDistance function for Rust Device API.
 /// The backend gRPC code will be invoking this method.
-pub fn get_distance_rust(a: u32, b: u32) -> f32 {
+pub fn get_distance_cxx(a: u32, b: u32) -> f32 {
     match get_distance(a as i32, b as i32) {
         Ok(distance) => distance,
         Err(err) => {
