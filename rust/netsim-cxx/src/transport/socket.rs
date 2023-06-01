@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ffi::{add_chip_cxx, handle_request_cxx, remove_chip};
+use crate::devices::devices_handler::{add_chip, remove_chip};
+use crate::ffi::handle_request_cxx;
 use crate::transport::h4;
-use cxx::let_cxx_string;
+use frontend_proto::common::ChipKind;
 use lazy_static::lazy_static;
+use log::{error, info};
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
@@ -59,14 +61,6 @@ fn accept_incoming(hci_port: u16) -> std::io::Result<()> {
     Ok(())
 }
 
-#[derive(Copy, Clone)]
-enum ChipKind {
-    UNSPECIFIED = 0,
-    BLUETOOTH = 1,
-    WIFI = 2,
-    UWB = 3,
-}
-
 // TRANSPORTS is a singleton that contains the outpurepr: et FiFo
 lazy_static! {
     static ref TRANSPORTS: RwLock<HashMap<String, TcpStream>> = RwLock::new(HashMap::new());
@@ -92,33 +86,32 @@ pub fn handle_response(kind: u32, facade_id: u32, packet: &cxx::CxxVector<u8>, p
 
 fn handle_hci_client(stream: TcpStream) {
     // ...
-    let_cxx_string!(guid = stream.peer_addr().unwrap().port().to_string());
-    let_cxx_string!(device_name = format!("socket-{}", stream.peer_addr().unwrap()));
-    let_cxx_string!(name = format!("socket-{}", stream.peer_addr().unwrap()));
-    let_cxx_string!(manufacturer = "Google");
-    let_cxx_string!(product_name = "Google");
-    let result = add_chip_cxx(
-        &guid,
-        &device_name,
-        ChipKind::BLUETOOTH as u32,
-        &name,
-        &manufacturer,
-        &product_name,
-    );
-    let key = get_key(ChipKind::BLUETOOTH as u32, result.get_facade_id());
+    let result = match add_chip(
+        &stream.peer_addr().unwrap().port().to_string(),
+        &format!("socket-{}", stream.peer_addr().unwrap()),
+        ChipKind::BLUETOOTH,
+        &format!("socket-{}", stream.peer_addr().unwrap()),
+        "Google",
+        "Google",
+    ) {
+        Ok(chip_result) => chip_result,
+        Err(err) => {
+            error!("{err}");
+            return;
+        }
+    };
+    let key = get_key(ChipKind::BLUETOOTH as u32, result.facade_id);
     let tcp_rx = stream.try_clone().unwrap();
     {
         TRANSPORTS.write().unwrap().insert(key.clone(), stream);
     }
 
-    let _ = reader(tcp_rx, ChipKind::BLUETOOTH, result.get_facade_id());
+    let _ = reader(tcp_rx, ChipKind::BLUETOOTH, result.facade_id);
 
-    println!(
-        "netsimd: remove chip: device {}, chip {}",
-        result.get_device_id(),
-        result.get_chip_id()
-    );
-    remove_chip(result.get_device_id(), result.get_chip_id());
+    info!("remove chip: device {}, chip {}", result.device_id, result.chip_id);
+    if let Err(err) = remove_chip(result.device_id, result.chip_id) {
+        error!("{err}");
+    };
     TRANSPORTS.write().unwrap().remove(&key);
 }
 
