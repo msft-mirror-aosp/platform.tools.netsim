@@ -70,9 +70,11 @@ std::string GetDiscoveryDirectory() {
 }
 
 std::string GetNetsimIniFilepath() {
-  return GetDiscoveryDirectory()
-      .append(netsim::filesystem::slash)
-      .append("netsim.ini");
+  auto discovery_dir = GetDiscoveryDirectory();
+  // Check if directory has a trailing slash.
+  if (discovery_dir.back() != netsim::filesystem::slash.back())
+    discovery_dir.append(netsim::filesystem::slash);
+  return discovery_dir.append("netsim.ini");
 }
 
 std::optional<std::string> GetServerAddress(bool frontend_server) {
@@ -88,6 +90,15 @@ std::optional<std::string> GetServerAddress(bool frontend_server) {
   IniFile iniFile(filepath);
   iniFile.Read();
   return iniFile.Get("grpc.port");
+}
+
+void RedirectStdStream(std::string netsim_temp_dir) {
+  // Check if directory has a trailing slash.
+  if (netsim_temp_dir.back() != netsim::filesystem::slash.back())
+    netsim_temp_dir.append(netsim::filesystem::slash);
+
+  std::freopen((netsim_temp_dir + "netsim_stdout.log").c_str(), "w", stdout);
+  std::freopen((netsim_temp_dir + "netsim_stderr.log").c_str(), "w", stderr);
 }
 }  // namespace osutils
 }  // namespace netsim
