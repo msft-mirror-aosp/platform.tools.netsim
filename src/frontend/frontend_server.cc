@@ -21,7 +21,6 @@
 #include <string>
 #include <utility>
 
-#include "controller/scene_controller.h"
 #include "frontend.grpc.pb.h"
 #include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"

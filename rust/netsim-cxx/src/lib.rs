@@ -230,30 +230,6 @@ mod ffi {
             facade_id: u32,
         ) -> UniquePtr<AddChipResult>;
 
-        #[rust_name = "get_devices"]
-        #[namespace = "netsim::scene_controller"]
-        fn GetDevices(
-            request: &CxxString,
-            response: Pin<&mut CxxString>,
-            error_message: Pin<&mut CxxString>,
-        ) -> u32;
-
-        #[rust_name = "get_devices_bytes"]
-        #[namespace = "netsim::scene_controller"]
-        fn GetDevicesBytes(vec: &mut Vec<u8>) -> bool;
-
-        #[rust_name = "get_facade_id"]
-        #[namespace = "netsim::scene_controller"]
-        fn GetFacadeId(chip_id: i32) -> i32;
-
-        #[rust_name = "patch_device"]
-        #[namespace = "netsim::scene_controller"]
-        fn PatchDevice(
-            request: &CxxString,
-            response: Pin<&mut CxxString>,
-            error_message: Pin<&mut CxxString>,
-        ) -> u32;
-
         /// A C++ class which can be used to respond to a request.
         include!("frontend/server_response_writable.h");
 
@@ -277,10 +253,6 @@ mod ffi {
         #[rust_name = "handle_request_cxx"]
         #[namespace = "netsim::packet_hub"]
         fn HandleRequestCxx(kind: u32, facade_id: u32, packet: &Vec<u8>, packet_type: u8);
-
-        #[rust_name = "reset"]
-        #[namespace = "netsim::scene_controller"]
-        fn Reset();
 
         // Grpc server.
         include!("backend/backend_packet_hub.h");
