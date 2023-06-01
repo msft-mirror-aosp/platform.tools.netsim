@@ -46,7 +46,7 @@ use crate::captures::handlers::{
 };
 use crate::config::{get_dev, set_dev};
 use crate::devices::devices_handler::{
-    add_chip_rust, get_distance_rust, handle_device_cxx, is_shutdown_time_cxx, remove_chip_rust,
+    add_chip_cxx, get_distance_cxx, handle_device_cxx, is_shutdown_time_cxx, remove_chip_cxx,
 };
 use crate::http_server::run_http_server;
 use crate::ranging::*;
@@ -124,9 +124,9 @@ mod ffi {
         fn unregister_grpc_transport(kind: u32, facade_id: u32);
 
         // Device Resource
-        #[cxx_name = AddChipRust]
+        #[cxx_name = AddChipCxx]
         #[namespace = "netsim::device"]
-        fn add_chip_rust(
+        fn add_chip_cxx(
             device_guid: &str,
             device_name: &str,
             chip_kind: &CxxString,
@@ -135,13 +135,13 @@ mod ffi {
             chip_product_name: &str,
         ) -> UniquePtr<AddChipResult>;
 
-        #[cxx_name = RemoveChipRust]
+        #[cxx_name = RemoveChipCxx]
         #[namespace = "netsim::device"]
-        fn remove_chip_rust(device_id: u32, chip_id: u32);
+        fn remove_chip_cxx(device_id: u32, chip_id: u32);
 
-        #[cxx_name = GetDistanceRust]
+        #[cxx_name = GetDistanceCxx]
         #[namespace = "netsim::device"]
-        fn get_distance_rust(a: u32, b: u32) -> f32;
+        fn get_distance_cxx(a: u32, b: u32) -> f32;
 
         #[cxx_name = IsShutdownTimeCxx]
         #[namespace = "netsim::device"]

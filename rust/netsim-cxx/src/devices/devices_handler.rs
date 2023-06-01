@@ -122,7 +122,7 @@ pub fn add_chip(
 
 /// An AddChip function for Rust Device API.
 /// The backend gRPC code will be invoking this method.
-pub fn add_chip_rust(
+pub fn add_chip_cxx(
     device_guid: &str,
     device_name: &str,
     chip_kind: &CxxString,
@@ -218,7 +218,7 @@ pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Resu
 
 /// A RemoveChip function for Rust Device API.
 /// The backend gRPC code will be invoking this method.
-pub fn remove_chip_rust(device_id: u32, chip_id: u32) {
+pub fn remove_chip_cxx(device_id: u32, chip_id: u32) {
     match remove_chip(device_id as i32, chip_id as i32) {
         Ok(_) => info!("Rust Device API Remove Chip Success"),
         Err(err) => error!("Rust Device API Remove Chip Failure: {err}"),
@@ -287,7 +287,7 @@ fn get_distance(id: DeviceIdentifier, other_id: DeviceIdentifier) -> Result<f32,
 
 /// A GetDistance function for Rust Device API.
 /// The backend gRPC code will be invoking this method.
-pub fn get_distance_rust(a: u32, b: u32) -> f32 {
+pub fn get_distance_cxx(a: u32, b: u32) -> f32 {
     match get_distance(a as i32, b as i32) {
         Ok(distance) => distance,
         Err(err) => {
