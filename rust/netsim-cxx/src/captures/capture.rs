@@ -32,6 +32,7 @@ use frontend_proto::{
 use log::error;
 use protobuf::well_known_types::timestamp::Timestamp;
 
+use crate::ffi::get_facade_id;
 use crate::system;
 
 use super::pcap_util::write_pcap_header;
@@ -85,12 +86,15 @@ impl CaptureInfo {
     /// Create an instance of CaptureInfo
     pub fn new(chip_kind: ChipKind, chip_id: ChipId, device_name: String) -> Self {
         CaptureInfo {
-            facade_id: match crate::devices::devices_handler::get_facade_id(chip_id) {
-                Ok(id) => id as i32,
-                Err(err) => {
-                    error!("{err}");
-                    i32::MAX
-                }
+            facade_id: match crate::config::get_dev() {
+                true => match crate::devices::devices_handler::get_facade_id(chip_id) {
+                    Ok(id) => id as i32,
+                    Err(err) => {
+                        error!("{err}");
+                        i32::MAX
+                    }
+                },
+                false => get_facade_id(chip_id),
             },
             id: chip_id,
             chip_kind,
