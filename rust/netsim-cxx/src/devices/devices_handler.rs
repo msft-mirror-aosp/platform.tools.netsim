@@ -93,8 +93,7 @@ fn notify_all() {
 ///
 /// The guid is a transport layer identifier for the device (host:port)
 /// that is adding the chip.
-#[allow(dead_code)]
-fn add_chip(
+pub fn add_chip(
     device_guid: &str,
     device_name: &str,
     chip_kind: ProtoChipKind,
@@ -195,8 +194,7 @@ fn remove_device(
 /// Remove a chip from a device.
 ///
 /// Called when the packet transport for the chip shuts down.
-#[allow(dead_code)]
-fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Result<(), String> {
+pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Result<(), String> {
     let result = {
         let mut resource = DEVICES.write().unwrap();
         let is_empty = match resource.devices.entry(device_id) {

@@ -230,21 +230,6 @@ mod ffi {
             facade_id: u32,
         ) -> UniquePtr<AddChipResult>;
 
-        #[rust_name = "add_chip_cxx"]
-        #[namespace = "netsim::scene_controller"]
-        fn AddChipCxx(
-            guid: &CxxString,
-            device_name: &CxxString,
-            chip_kind: u32,
-            chip_name: &CxxString,
-            manufacturer: &CxxString,
-            product_name: &CxxString,
-        ) -> UniquePtr<AddChipResult>;
-
-        #[rust_name = "remove_chip"]
-        #[namespace = "netsim::scene_controller"]
-        fn RemoveChip(device_id: u32, chip_id: u32);
-
         #[rust_name = "get_devices"]
         #[namespace = "netsim::scene_controller"]
         fn GetDevices(
