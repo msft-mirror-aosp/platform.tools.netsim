@@ -25,6 +25,7 @@
 use super::chip::ChipIdentifier;
 use super::device::DeviceIdentifier;
 use super::id_factory::IdFactory;
+use crate::captures::handlers::update_captures;
 use crate::devices::device::AddChipResult;
 use crate::devices::device::Device;
 use crate::ffi::CxxServerResponseWriter;
@@ -101,17 +102,23 @@ fn add_chip(
     chip_manufacturer: &str,
     chip_product_name: &str,
 ) -> Result<AddChipResult, String> {
-    let mut resource = DEVICES.write().unwrap();
-    resource.idle_since = None;
-    let device_id = get_or_create_device(&mut resource, device_guid, device_name);
-    // This is infrequent, so we can afford to do another lookup for the device.
-    resource.devices.get_mut(&device_id).unwrap().add_chip(
-        device_name,
-        chip_kind,
-        chip_name,
-        chip_manufacturer,
-        chip_product_name,
-    )
+    let result = {
+        let mut resource = DEVICES.write().unwrap();
+        resource.idle_since = None;
+        let device_id = get_or_create_device(&mut resource, device_guid, device_name);
+        // This is infrequent, so we can afford to do another lookup for the device.
+        resource.devices.get_mut(&device_id).unwrap().add_chip(
+            device_name,
+            chip_kind,
+            chip_name,
+            chip_manufacturer,
+            chip_product_name,
+        )
+    };
+    if result.is_ok() {
+        update_captures();
+    }
+    result
 }
 
 /// An AddChip function for Rust Device API.
@@ -190,19 +197,25 @@ fn remove_device(
 /// Called when the packet transport for the chip shuts down.
 #[allow(dead_code)]
 fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Result<(), String> {
-    let mut resource = DEVICES.write().unwrap();
-    let is_empty = match resource.devices.entry(device_id) {
-        Entry::Occupied(mut entry) => {
-            let device = entry.get_mut();
-            device.remove_chip(chip_id)?;
-            device.chips.is_empty()
+    let result = {
+        let mut resource = DEVICES.write().unwrap();
+        let is_empty = match resource.devices.entry(device_id) {
+            Entry::Occupied(mut entry) => {
+                let device = entry.get_mut();
+                device.remove_chip(chip_id)?;
+                device.chips.is_empty()
+            }
+            Entry::Vacant(_) => return Err(format!("RemoveChip device id {device_id} not found")),
+        };
+        if is_empty {
+            remove_device(&mut resource, device_id)?;
         }
-        Entry::Vacant(_) => return Err(format!("RemoveChip device id {device_id} not found")),
+        Ok(())
     };
-    if is_empty {
-        remove_device(&mut resource, device_id)?;
+    if result.is_ok() {
+        update_captures();
     }
-    Ok(())
+    result
 }
 
 /// A RemoveChip function for Rust Device API.
