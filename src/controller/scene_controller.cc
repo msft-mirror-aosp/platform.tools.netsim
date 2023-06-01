@@ -47,29 +47,39 @@ std::tuple<uint32_t, uint32_t, uint32_t> SceneController::AddChip(
     const std::string &guid, const std::string &device_name,
     common::ChipKind chip_kind, const std::string &chip_name,
     const std::string &manufacturer, const std::string &product_name) {
-  std::string chip_kind_string;
-  switch (chip_kind) {
-    case common::ChipKind::BLUETOOTH:
-      chip_kind_string = "BLUETOOTH";
-      break;
-    case common::ChipKind::WIFI:
-      chip_kind_string = "WIFI";
-      break;
-    case common::ChipKind::UWB:
-      chip_kind_string = "UWB";
-      break;
-    default:
-      chip_kind_string = "UNSPECIFIED";
-      break;
+  if (netsim::config::GetDev()) {
+    std::string chip_kind_string;
+    switch (chip_kind) {
+      case common::ChipKind::BLUETOOTH:
+        chip_kind_string = "BLUETOOTH";
+        break;
+      case common::ChipKind::WIFI:
+        chip_kind_string = "WIFI";
+        break;
+      case common::ChipKind::UWB:
+        chip_kind_string = "UWB";
+        break;
+      default:
+        chip_kind_string = "UNSPECIFIED";
+        break;
+    }
+    std::unique_ptr<scene_controller::AddChipResult> add_chip_result_ptr =
+        netsim::device::AddChipRust(guid, device_name, chip_kind_string,
+                                    chip_name, manufacturer, product_name);
+    uint32_t device_id = add_chip_result_ptr->device_id;
+    uint32_t chip_id = add_chip_result_ptr->chip_id;
+    uint32_t facade_id = add_chip_result_ptr->facade_id;
+    netsim::capture::UpdateCaptures();
+    return {device_id, chip_id, facade_id};
   }
-  std::unique_ptr<scene_controller::AddChipResult> add_chip_result_ptr =
-      netsim::device::AddChipCxx(guid, device_name, chip_kind_string, chip_name,
-                                 manufacturer, product_name);
-  uint32_t device_id = add_chip_result_ptr->device_id;
-  uint32_t chip_id = add_chip_result_ptr->chip_id;
-  uint32_t facade_id = add_chip_result_ptr->facade_id;
+  auto device = GetDevice(guid, device_name);
+  // TODO: catch case of similar name chips
+  auto [chip_id, facade_id] =
+      device->AddChip(chip_kind, chip_name, manufacturer, product_name);
+  // notify capture handler a Chip was added
   netsim::capture::UpdateCaptures();
-  return {device_id, chip_id, facade_id};
+  inactive_timestamp_.reset();
+  return {device->id, chip_id, facade_id};
 }
 
 std::shared_ptr<Device> SceneController::GetDevice(const std::string &guid,
@@ -97,9 +107,25 @@ void SceneController::RemoveDevice(uint32_t id) {
 
 void SceneController::RemoveChip(uint32_t device_id, uint32_t chip_id) {
   std::unique_lock<std::mutex> lock(this->mutex_);
-  netsim::device::RemoveChipCxx(device_id, chip_id);
-  netsim::capture::UpdateCaptures();
-  return;
+  if (netsim::config::GetDev()) {
+    netsim::device::RemoveChipRust(device_id, chip_id);
+    netsim::capture::UpdateCaptures();
+    return;
+  }
+  BtsLog("Scene RemoveChip %d", chip_id);
+  if (devices_.find(device_id) != devices_.end()) {
+    auto device = devices_[device_id];
+    if (device->RemoveChip(chip_id)) {
+      BtsLog("SceneController::RemoveChip device %d, no more chips", device_id);
+      this->RemoveDevice(device_id);
+      if (devices_.empty())
+        inactive_timestamp_.emplace(std::chrono::system_clock::now());
+    }
+    // notify capture handler a Chip was removed
+    netsim::capture::UpdateCaptures();
+  } else {
+    std::cerr << "Trying to remove chip from unknown device" << std::endl;
+  }
 }
 
 // Returns a Device shared_ptr or nullptr
@@ -140,7 +166,18 @@ bool SceneController::PatchDevice(const model::Device &request) {
 
 // Euclidian distance between two devices.
 float SceneController::GetDistance(uint32_t id, uint32_t other_id) {
-  return netsim::device::GetDistanceCxx(id, other_id);
+  if (netsim::config::GetDev()) {
+    return netsim::device::GetDistanceRust(id, other_id);
+  }
+  if (devices_.find(id) == devices_.end() ||
+      devices_.find(other_id) == devices_.end()) {
+    BtsLog("Error in GetDistance %d, %d", id, other_id);
+    return 0.0;
+  }
+  auto a = devices_[id]->position;
+  auto b = devices_[other_id]->position;
+  return sqrt(
+      (pow(a.x() - b.x(), 2) + pow(a.y() - b.y(), 2) + pow(a.z() - b.z(), 2)));
 }
 
 void SceneController::Reset() {
