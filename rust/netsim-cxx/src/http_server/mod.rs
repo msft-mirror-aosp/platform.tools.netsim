@@ -142,8 +142,8 @@ fn handle_version(_request: &HttpRequest, _param: &str, writer: ResponseWritable
     writer.put_ok("text/plain", body.as_str(), &[]);
 }
 
-fn handle_dev(_request: &HttpRequest, _param: &str, writer: ResponseWritable) {
-    writer.put_ok("text/plain", r"Welcome to netsim developer mode", &[]);
+fn handle_dev(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
+    handle_file(&request.method, "dev.html", writer)
 }
 
 fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
