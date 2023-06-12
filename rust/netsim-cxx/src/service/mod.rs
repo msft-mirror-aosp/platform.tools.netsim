@@ -12,26 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod dispatcher;
-#[cfg(feature = "cuttlefish")]
-pub mod fd;
-pub mod grpc;
-mod h4;
-pub mod socket;
-#[cfg(feature = "cuttlefish")]
-mod uci;
-pub mod websocket;
+/// Module to control startup, run, and cleanup netsimd services.
+// TODO: Replace Run() in server.cc.
 
-// This provides no-op implementations of fd transport for non-unix systems.
-#[cfg(not(feature = "cuttlefish"))]
-pub mod fd {
-    pub fn handle_response(
-        _kind: u32,
-        _facade_id: u32,
-        _packet: &cxx::CxxVector<u8>,
-        _packet_type: u8,
-    ) {
+pub struct Service {
+    // netsimd states, like device resource.
+}
+
+impl Service {
+    pub fn new() -> Service {
+        Service {}
     }
-    #[allow(clippy::ptr_arg)]
-    pub fn run_fd_transport(_startup_json: &String) {}
+
+    /// Sets up the states for netsimd.
+    pub fn set_up(&self) {
+        // TODO: Set up netsim logger, clean pcap files.
+    }
+
+    /// Runs the netsimd services.
+    pub fn run(&self) {
+        // TODO: run servers, like calling run_http_server().
+    }
+}
+
+// For cxx.
+pub fn create_service() -> Box<Service> {
+    Box::new(Service {})
 }
