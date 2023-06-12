@@ -34,7 +34,6 @@ use crate::http_server::http_request::HttpRequest;
 use crate::http_server::server_response::ResponseWritable;
 use crate::CxxServerResponseWriterWrapper;
 use cxx::CxxString;
-use cxx::UniquePtr;
 use frontend_proto::common::ChipKind as ProtoChipKind;
 use frontend_proto::frontend::ListDeviceResponse;
 use frontend_proto::frontend::PatchDeviceRequest;
@@ -120,6 +119,36 @@ pub fn add_chip(
     result
 }
 
+/// AddChipResult for C++ to handle
+pub struct AddChipResultCxx {
+    device_id: u32,
+    chip_id: u32,
+    facade_id: u32,
+    is_error: bool,
+}
+
+impl AddChipResultCxx {
+    fn new(device_id: u32, chip_id: u32, facade_id: u32, is_error: bool) -> AddChipResultCxx {
+        AddChipResultCxx { device_id, chip_id, facade_id, is_error }
+    }
+
+    pub fn get_device_id(&self) -> u32 {
+        self.device_id
+    }
+
+    pub fn get_chip_id(&self) -> u32 {
+        self.chip_id
+    }
+
+    pub fn get_facade_id(&self) -> u32 {
+        self.facade_id
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.is_error
+    }
+}
+
 /// An AddChip function for Rust Device API.
 /// The backend gRPC code will be invoking this method.
 pub fn add_chip_cxx(
@@ -129,7 +158,7 @@ pub fn add_chip_cxx(
     chip_name: &str,
     chip_manufacturer: &str,
     chip_product_name: &str,
-) -> UniquePtr<crate::ffi::AddChipResult> {
+) -> Box<AddChipResultCxx> {
     let chip_kind_proto = match chip_kind.to_string().as_str() {
         "BLUETOOTH" => ProtoChipKind::BLUETOOTH,
         "WIFI" => ProtoChipKind::WIFI,
@@ -146,15 +175,21 @@ pub fn add_chip_cxx(
     ) {
         Ok(result) => {
             info!("Rust Device API Add Chip Success");
-            crate::ffi::new_add_chip_result(
-                result.device_id as u32,
-                result.chip_id as u32,
-                result.facade_id,
-            )
+            Box::new(AddChipResultCxx {
+                device_id: result.device_id as u32,
+                chip_id: result.chip_id as u32,
+                facade_id: result.facade_id,
+                is_error: false,
+            })
         }
         Err(err) => {
             error!("Rust Device API Add Chip Error: {err}");
-            crate::ffi::new_add_chip_result(u32::MAX, u32::MAX, u32::MAX)
+            Box::new(AddChipResultCxx {
+                device_id: u32::MAX,
+                chip_id: u32::MAX,
+                facade_id: u32::MAX,
+                is_error: true,
+            })
         }
     }
 }
