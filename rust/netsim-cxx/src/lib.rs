@@ -30,6 +30,10 @@ mod uwb;
 mod version;
 mod wifi;
 
+// This feature is enabled only for CMake builds
+#[cfg(feature = "local_ssl")]
+mod openssl;
+
 use std::pin::Pin;
 
 use cxx::let_cxx_string;
