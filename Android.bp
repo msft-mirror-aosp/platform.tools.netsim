@@ -73,6 +73,7 @@ rust_defaults {
         "libserde_json",
         "liblazy_static",
         "liblog_rust",
+        "libopenssl",
     ],
     srcs: ["rust/netsim-cxx/src/lib.rs"],
 }
