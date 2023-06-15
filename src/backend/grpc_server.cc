@@ -23,7 +23,6 @@
 #include <unordered_map>
 
 #include "common.pb.h"
-#include "controller/controller.h"
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
@@ -32,6 +31,10 @@
 #include "packet_streamer.grpc.pb.h"
 #include "packet_streamer.pb.h"
 #include "util/log.h"
+
+#ifdef NETSIM_ANDROID_EMULATOR
+#include "android-qemu2-glue/netsim/libslirp_driver.h"
+#endif
 
 namespace netsim {
 namespace backend {
@@ -93,12 +96,16 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
         chip_kind_string = "UNSPECIFIED";
         break;
     }
-    std::unique_ptr<scene_controller::AddChipResult> result_ptr =
+    auto result =
         netsim::device::AddChipCxx(peer, device_name, chip_kind_string,
                                    chip_name, manufacturer, product_name);
-    uint32_t device_id = result_ptr->device_id;
-    uint32_t chip_id = result_ptr->chip_id;
-    uint32_t facade_id = result_ptr->facade_id;
+    if (result->IsError()) {
+      return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
+                            "AddChipCxx failed to add chip into netsim");
+    }
+    uint32_t device_id = result->GetDeviceId();
+    uint32_t chip_id = result->GetChipId();
+    uint32_t facade_id = result->GetFacadeId();
 
     BtsLog("grpc_server: adding chip %d with facade %d to %s", chip_id,
            facade_id, device_name.c_str());
@@ -158,6 +165,13 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
         auto packet = ToSharedVec(request.mutable_packet());
         packet_hub::HandleRequest(chip_kind, facade_id, *packet,
                                   packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
+#ifdef NETSIM_ANDROID_EMULATOR
+        // main_loop_wait is a non-blocking call where fds maintained by the
+        // WiFi service (slirp) are polled and serviced for I/O. When any fd
+        // become ready for I/O, slirp_pollfds_poll() will be invoked to read
+        // from the open sockets therefore incoming packets are serviced.
+        android::qemu2::libslirp_main_loop_wait(true);
+#endif
       } else {
         // TODO: add UWB here
         BtsLog("grpc_server: unknown chip kind");

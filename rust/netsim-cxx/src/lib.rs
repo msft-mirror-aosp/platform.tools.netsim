@@ -23,11 +23,16 @@ mod devices;
 mod http_server;
 mod ranging;
 mod resource;
+mod service;
 mod system;
 mod transport;
 mod uwb;
 mod version;
 mod wifi;
+
+// This feature is enabled only for CMake builds
+#[cfg(feature = "local_ssl")]
+mod openssl;
 
 use std::pin::Pin;
 
@@ -48,9 +53,11 @@ use crate::captures::handlers::{
 use crate::config::{get_dev, set_dev};
 use crate::devices::devices_handler::{
     add_chip_cxx, get_distance_cxx, handle_device_cxx, is_shutdown_time_cxx, remove_chip_cxx,
+    AddChipResultCxx,
 };
 use crate::http_server::run_http_server;
 use crate::ranging::*;
+use crate::service::{create_service, Service};
 use crate::system::netsimd_temp_dir_string;
 use crate::uwb::facade::*;
 use crate::version::*;
@@ -86,6 +93,16 @@ mod ffi {
 
         #[cxx_name = "GetVersion"]
         fn get_version() -> String;
+
+        // Service
+
+        type Service;
+        #[cxx_name = "CreateService"]
+        fn create_service() -> Box<Service>;
+        #[cxx_name = "SetUp"]
+        fn set_up(self: &Service);
+        #[cxx_name = "Run"]
+        fn run(self: &Service);
 
         // System
 
@@ -125,6 +142,16 @@ mod ffi {
         fn unregister_grpc_transport(kind: u32, facade_id: u32);
 
         // Device Resource
+        type AddChipResultCxx;
+        #[cxx_name = "GetDeviceId"]
+        fn get_device_id(self: &AddChipResultCxx) -> u32;
+        #[cxx_name = "GetChipId"]
+        fn get_chip_id(self: &AddChipResultCxx) -> u32;
+        #[cxx_name = "GetFacadeId"]
+        fn get_facade_id(self: &AddChipResultCxx) -> u32;
+        #[cxx_name = "IsError"]
+        fn is_error(self: &AddChipResultCxx) -> bool;
+
         #[cxx_name = AddChipCxx]
         #[namespace = "netsim::device"]
         fn add_chip_cxx(
@@ -134,7 +161,7 @@ mod ffi {
             chip_name: &str,
             chip_manufacturer: &str,
             chip_product_name: &str,
-        ) -> UniquePtr<AddChipResult>;
+        ) -> Box<AddChipResultCxx>;
 
         #[cxx_name = RemoveChipCxx]
         #[namespace = "netsim::device"]
@@ -215,22 +242,6 @@ mod ffi {
     }
 
     unsafe extern "C++" {
-        include!("controller/controller.h");
-
-        #[namespace = "netsim::scene_controller"]
-        type AddChipResult;
-        fn get_chip_id(self: &AddChipResult) -> u32;
-        fn get_device_id(self: &AddChipResult) -> u32;
-        fn get_facade_id(self: &AddChipResult) -> u32;
-
-        #[rust_name = "new_add_chip_result"]
-        #[namespace = "netsim::scene_controller"]
-        fn NewAddChipResult(
-            device_id: u32,
-            chip_id: u32,
-            facade_id: u32,
-        ) -> UniquePtr<AddChipResult>;
-
         /// A C++ class which can be used to respond to a request.
         include!("frontend/server_response_writable.h");
 
@@ -364,6 +375,9 @@ impl ServerResponseWritable for CxxServerResponseWriterWrapper<'_> {
     }
 
     fn put_ok_with_vec(&mut self, _mime_type: &str, _body: Vec<u8>, _headers: StrHeaders) {
+        todo!()
+    }
+    fn put_ok_switch_protocol(&mut self, _connection: &str) {
         todo!()
     }
 }

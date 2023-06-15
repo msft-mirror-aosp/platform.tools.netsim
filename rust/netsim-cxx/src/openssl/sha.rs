@@ -12,26 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod dispatcher;
-#[cfg(feature = "cuttlefish")]
-pub mod fd;
-pub mod grpc;
-mod h4;
-pub mod socket;
-#[cfg(feature = "cuttlefish")]
-mod uci;
-pub mod websocket;
+use std::ffi::*;
+use std::mem::MaybeUninit;
 
-// This provides no-op implementations of fd transport for non-unix systems.
-#[cfg(not(feature = "cuttlefish"))]
-pub mod fd {
-    pub fn handle_response(
-        _kind: u32,
-        _facade_id: u32,
-        _packet: &cxx::CxxVector<u8>,
-        _packet_type: u8,
-    ) {
+extern "C" {
+    fn SHA1(d: *const c_uchar, n: usize, md: *mut c_uchar) -> *mut c_uchar;
+}
+
+pub fn sha1(data: &[u8]) -> [u8; 20] {
+    unsafe {
+        let mut hash = MaybeUninit::<[u8; 20]>::uninit();
+        SHA1(data.as_ptr(), data.len(), hash.as_mut_ptr() as *mut _);
+        hash.assume_init()
     }
-    #[allow(clippy::ptr_arg)]
-    pub fn run_fd_transport(_startup_json: &String) {}
 }
