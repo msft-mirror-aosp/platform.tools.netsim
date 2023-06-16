@@ -23,14 +23,16 @@ class ProtoBuild(build_py):
 
     def run(self):
         here = path.abspath(path.dirname(__file__))
-        proto_dir = path.join(path.dirname(path.dirname(here)), "src", "proto")
+        root_dir = path.dirname(path.dirname(here))
+        proto_dir = path.join(root_dir, "proto")
         out_dir = path.join(here, "src", "netsim", "proto")
 
-        for protofile in filter(
-            lambda x: x.endswith(".proto"), os.listdir(proto_dir)
+        for proto_file in filter(
+            lambda x: x.endswith(".proto"), os.listdir(path.join(proto_dir, "netsim"))
         ):
-            source = path.join(proto_dir, protofile)
-            output = path.join(out_dir, protofile).replace(".proto", "_pb2.py")
+            source = path.join(proto_dir, "netsim", proto_file)
+            output = path.join(out_dir, "netsim", proto_file).replace(".proto", "_pb2.py")
+            output_grpc = path.join(out_dir, "netsim", proto_file).replace(".proto", "_pb2_grpc.py")
 
             if not path.exists(output) or (
                 path.getmtime(source) > path.getmtime(output)
@@ -48,6 +50,24 @@ class ProtoBuild(build_py):
                         source,
                     ]
                 )
+
+                # Patch import in the generated grpc and protobuf backends.
+                # The default plugin will generate 'import "netsim/common.proto"'
+                # as 'from netsim import common' but that generates many
+                # issues for nested modules.
+                # Replace these import statements with a local import:
+                # 'from . import common' to ensure that the generated files can be
+                # relocated.
+                def patch_import(file_name):
+                    with open(file_name, 'r') as f:
+                        contents = f.read()
+                    contents = contents.replace("from netsim import", "from . import")
+                    with open(file_name, 'w') as f:
+                        f.write(contents)
+
+                patch_import(output)
+                patch_import(output_grpc)
+
         super().run()
 
 
