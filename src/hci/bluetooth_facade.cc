@@ -317,12 +317,10 @@ void Remove(uint32_t id) {
 
   // Use the `AsyncManager` to ensure that the `RemoveDevice` method is
   // invoked atomically, preventing data races.
-  mAsyncManager->ExecAsync(
-    gSocketUserId, std::chrono::milliseconds(0),
-    [id]() {
-      // rootcanal will call HciPacketTransport::Close().
-      gTestModel->RemoveDevice(id);
-    });
+  mAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0), [id]() {
+    // rootcanal will call HciPacketTransport::Close().
+    gTestModel->RemoveDevice(id);
+  });
 }
 
 // Rename AddChip(model::Chip, device, transport)
