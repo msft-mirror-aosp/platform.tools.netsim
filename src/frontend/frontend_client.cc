@@ -103,6 +103,14 @@ class FrontendClientImpl : public FrontendClient {
     return make_result(status, response);
   }
 
+  // Gets the list of device information
+  std::unique_ptr<ClientResult> ListDevice() const override {
+    frontend::ListDeviceResponse response;
+    grpc::ClientContext context_;
+    auto status = stub_->ListDevice(&context_, {}, &response);
+    return make_result(status, response);
+  }
+
   std::unique_ptr<ClientResult> Reset() const override {
     grpc::ClientContext context_;
     google::protobuf::Empty response;
@@ -200,6 +208,8 @@ class FrontendClientImpl : public FrontendClient {
         return PatchDevice(request_byte_vec);
       case frontend::GrpcMethod::GetDevices:
         return GetDevices();
+      case frontend::GrpcMethod::ListDevice:
+        return ListDevice();
       case frontend::GrpcMethod::Reset:
         return Reset();
       case frontend::GrpcMethod::ListCapture:
