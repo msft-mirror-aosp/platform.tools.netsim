@@ -64,7 +64,6 @@ rust_defaults {
     features: ["cuttlefish"],
     rlibs: [
         "libcxx",
-        "libdata_encoding",
         "libfrontend_proto",
         "libnetsim_common",
         "libprotobuf",
@@ -72,7 +71,6 @@ rust_defaults {
         "libregex",
         "libserde",
         "libserde_json",
-        "libtungstenite",
         "liblazy_static",
         "liblog_rust",
         "libopenssl",
