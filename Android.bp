@@ -72,7 +72,6 @@ rust_defaults {
         "libregex",
         "libserde",
         "libserde_json",
-        "libtungstenite",
         "liblazy_static",
         "liblog_rust",
         "libopenssl",
