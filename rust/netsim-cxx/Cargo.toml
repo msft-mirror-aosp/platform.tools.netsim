@@ -11,7 +11,6 @@ test = false
 
 [dependencies]
 cxx = { version = ">=1.0.85", features = ["c++17"] }
-data-encoding = "2.4.0"
 frontend-proto = { path = "../frontend-proto" }
 netsim-common = { path = "../netsim-common" }
 protobuf = "3.2.0"
