@@ -26,7 +26,6 @@
 #include <utility>
 
 #include "hci/hci_packet_transport.h"
-#include "model/hci/hci_sniffer.h"
 #include "model/setup/async_manager.h"
 #include "model/setup/test_command_handler.h"
 #include "model/setup/test_model.h"
@@ -96,7 +95,7 @@ size_t phy_classic_index_;
 bool mStarted = false;
 std::shared_ptr<rootcanal::AsyncManager> mAsyncManager;
 rootcanal::AsyncUserId gSocketUserId{};
-std::unique_ptr<SimTestModel> gTestModel;
+std::shared_ptr<SimTestModel> gTestModel;
 rootcanal::ControllerProperties controller_properties_;
 
 #ifndef NETSIM_ANDROID_EMULATOR
@@ -126,18 +125,15 @@ void SetUpTestChannel() {
   gTestChannelTransport = std::make_unique<rootcanal::TestChannelTransport>();
   gTestChannelTransport->RegisterCommandHandler(
       [](const std::string &name, const std::vector<std::string> &args) {
-        mAsyncManager->ExecAsync(
-            gSocketUserId, std::chrono::milliseconds(0), [name, args]() {
-              BtsLog("CommandHandle name:%s", name.c_str());
-              std::string args_str = "";
-              for (auto arg : args) args_str += " " + arg;
-              BtsLog("arg:%s", args_str.c_str());
-              if (name == "END_SIMULATION") {
-                BtsLog("END_SIMULATION");
-              } else {
-                gTestChannel->HandleCommand(name, args);
-              }
-            });
+        mAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0),
+                                 [name, args]() {
+                                   std::string args_str = "";
+                                   for (auto arg : args) args_str += " " + arg;
+                                   if (name == "END_SIMULATION") {
+                                   } else {
+                                     gTestChannel->HandleCommand(name, args);
+                                   }
+                                 });
       });
 
   bool transport_configured = gTestChannelTransport->SetUp(
@@ -172,11 +168,11 @@ void SetUpTestChannel() {
   gTestChannel->StartTimer({});
 
   if (!transport_configured) {
-    BtsLog("Error: Test channel SetUp failed.");
+    BtsLog("Error: Failed to set up test channel.");
     return;
   }
 
-  BtsLog("Test channel SetUp() successful");
+  BtsLog("Set up test channel.");
 }
 #endif
 
@@ -249,22 +245,15 @@ void PatchPhy(int device_id, bool isAddToPhy, bool isLowEnergy) {
 class ChipInfo {
  public:
   uint32_t simulation_device;
-  std::shared_ptr<rootcanal::HciSniffer> sniffer;
   std::shared_ptr<model::Chip::Bluetooth> model;
-  std::shared_ptr<HciPacketTransport> transport;
   int le_tx_count = 0;
   int classic_tx_count = 0;
   int le_rx_count = 0;
   int classic_rx_count = 0;
 
   ChipInfo(uint32_t simulation_device,
-           std::shared_ptr<rootcanal::HciSniffer> sniffer,
-           std::shared_ptr<model::Chip::Bluetooth> model,
-           std::shared_ptr<HciPacketTransport> transport)
-      : simulation_device(simulation_device),
-        sniffer(sniffer),
-        model(model),
-        transport(transport) {}
+           std::shared_ptr<model::Chip::Bluetooth> model)
+      : simulation_device(simulation_device), model(model) {}
 };
 
 std::unordered_map<uint32_t, std::shared_ptr<ChipInfo>> id_to_chip_info_;
@@ -320,21 +309,23 @@ void Patch(uint32_t id, const model::Chip::Bluetooth &request) {
 }
 
 void Remove(uint32_t id) {
-  BtsLog("Removing HCI chip for %d", id);
+  BtsLog("Removing HCI chip %d.", id);
   id_to_chip_info_.erase(id);
-  gTestModel->RemoveDevice(id);
-  // rootcanal will call HciPacketTransport::Close().
+
+  // Use the `AsyncManager` to ensure that the `RemoveDevice` method is
+  // invoked atomically, preventing data races.
+  mAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0), [id]() {
+    // rootcanal will call HciPacketTransport::Close().
+    gTestModel->RemoveDevice(id);
+  });
 }
 
 // Rename AddChip(model::Chip, device, transport)
 
 uint32_t Add(uint32_t simulation_device) {
   auto transport = std::make_shared<HciPacketTransport>(mAsyncManager);
-  // rewrap the transport to include a sniffer
-  auto sniffer = std::static_pointer_cast<HciSniffer>(
-      rootcanal::HciSniffer::Create(transport));
   auto hci_device =
-      std::make_shared<rootcanal::HciDevice>(sniffer, controller_properties_);
+      std::make_shared<rootcanal::HciDevice>(transport, controller_properties_);
 
   // Use the `AsyncManager` to ensure that the `AddHciConnection` method is
   // invoked atomically, preventing data races.
@@ -355,9 +346,30 @@ uint32_t Add(uint32_t simulation_device) {
   model->mutable_low_energy()->set_state(model::State::ON);
 
   id_to_chip_info_.emplace(
-      facade_id,
-      std::make_shared<ChipInfo>(simulation_device, sniffer, model, transport));
+      facade_id, std::make_shared<ChipInfo>(simulation_device, model));
   return facade_id;
+}
+
+rust::Box<AddRustDeviceResult> AddRustDevice(
+    uint32_t simulation_device,
+    rust::Box<DynRustBluetoothChipCallbacks> callbacks, const std::string &type,
+    const std::string &address) {
+  auto rust_device =
+      std::make_shared<RustDevice>(std::move(callbacks), type, address);
+
+  // TODO: Use the `AsyncManager` to ensure that the `AddDevice` and
+  // `AddDeviceToPhy` methods are invoked atomically, preventing data races.
+  // For unknown reason, use `AsyncManager` hangs.
+  auto facade_id = gTestModel->AddDevice(rust_device);
+  gTestModel->AddDeviceToPhy(facade_id, phy_low_energy_index_);
+
+  auto model = std::make_shared<model::Chip::Bluetooth>();
+  // Only enable ble for beacon.
+  model->mutable_low_energy()->set_state(model::State::ON);
+  id_to_chip_info_.emplace(
+      facade_id, std::make_shared<ChipInfo>(simulation_device, model));
+  return CreateAddRustDeviceResult(
+      facade_id, std::make_unique<RustBluetoothChip>(rust_device));
 }
 
 void IncrTx(uint32_t id, rootcanal::Phy::Type phy_type) {

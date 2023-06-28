@@ -24,6 +24,8 @@
 
 use std::io::Write;
 
+use log::error;
+
 use crate::http_server::http_response::HttpResponse;
 
 use super::http_request::StrHeaders;
@@ -38,27 +40,39 @@ pub trait ServerResponseWritable {
     fn put_ok(&mut self, mime_type: &str, body: &str, headers: StrHeaders);
     fn put_error(&mut self, error_code: u16, error_message: &str);
     fn put_ok_with_vec(&mut self, mime_type: &str, body: Vec<u8>, headers: StrHeaders);
+    fn put_ok_switch_protocol(&mut self, connection: &str);
 }
 
 // A response writer that can contain a TCP stream or other writable.
 pub struct ServerResponseWriter<'a> {
     writer: &'a mut dyn Write,
+    response: Option<HttpResponse>,
 }
 
 impl<'a> ServerResponseWriter<'a> {
     pub fn new<W: Write>(writer: &mut W) -> ServerResponseWriter {
-        ServerResponseWriter { writer }
+        ServerResponseWriter { writer, response: None }
     }
     pub fn put_response(&mut self, response: HttpResponse) {
-        let mut buffer = format!("HTTP/1.1 {}\r\n", response.status_code).into_bytes();
+        let reason = match response.status_code {
+            101 => "Switching Protocols",
+            200 => "OK",
+            404 => "Not Found",
+            _ => "Unknown Reason",
+        };
+        let mut buffer = format!("HTTP/1.1 {} {}\r\n", response.status_code, reason).into_bytes();
         for (name, value) in response.headers.iter() {
             buffer.extend_from_slice(format!("{name}: {value}\r\n").as_bytes());
         }
         buffer.extend_from_slice(b"\r\n");
         buffer.extend_from_slice(&response.body);
         if let Err(e) = self.writer.write_all(&buffer) {
-            println!("netsim: handle_connection error {e}");
+            error!("handle_connection error {e}");
         };
+        self.response = Some(response);
+    }
+    pub fn get_response(self) -> Option<HttpResponse> {
+        self.response
     }
 }
 
@@ -72,7 +86,7 @@ impl ServerResponseWritable for ServerResponseWriter<'_> {
     }
     fn put_chunk(&mut self, chunk: &[u8]) {
         if let Err(e) = self.writer.write_all(chunk) {
-            println!("netsim: handle_connection error {e}");
+            error!("handle_connection error {e}");
         };
         self.writer.flush().unwrap();
     }
@@ -91,6 +105,10 @@ impl ServerResponseWritable for ServerResponseWriter<'_> {
         response.add_headers(headers);
         self.put_response(response);
     }
+    fn put_ok_switch_protocol(&mut self, connection: &str) {
+        let response = HttpResponse::new_ok_switch_protocol(connection);
+        self.put_response(response);
+    }
 }
 
 #[cfg(test)]
@@ -105,7 +123,7 @@ mod tests {
         writer.put_error(404, "Hello World");
         let written_bytes = stream.get_ref();
         let expected_bytes =
-            b"HTTP/1.1 404\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nHello World";
+            b"HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nHello World";
         assert_eq!(written_bytes, expected_bytes);
     }
 
@@ -116,7 +134,7 @@ mod tests {
         writer.put_ok("text/plain", "Hello World", &[]);
         let written_bytes = stream.get_ref();
         let expected_bytes =
-            b"HTTP/1.1 200\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nHello World";
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\nHello World";
         assert_eq!(written_bytes, expected_bytes);
     }
 }

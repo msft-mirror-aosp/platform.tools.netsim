@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(proto)
-
 android_add_library(
   TARGET util-lib
   LICENSE Apache-2.0
@@ -95,8 +93,6 @@ if(TARGET Rust::Rustc)
         backend/backend_packet_hub.h
         backend/grpc_server.cc
         backend/grpc_server.h
-        controller/controller.cc
-        controller/controller.h
         core/server.cc
         core/server.h
         frontend/frontend_client_stub.cc
@@ -107,6 +103,8 @@ if(TARGET Rust::Rustc)
         hci/async_manager.cc
         hci/bluetooth_facade.cc
         hci/bluetooth_facade.h
+        hci/rust_device.h
+        hci/rust_device.cc
         hci/hci_debug.cc
         hci/hci_debug.h
         hci/hci_packet_transport.cc
@@ -120,6 +118,7 @@ if(TARGET Rust::Rustc)
         wifi/wifi_packet_hub.h
     DEPS android-emu-base
          android-emu-base-headers
+         android-wifi-service
          grpc++
          libbt-rootcanal
          netsim-cxx

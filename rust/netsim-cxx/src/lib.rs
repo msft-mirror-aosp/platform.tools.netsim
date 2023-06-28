@@ -23,14 +23,22 @@ mod devices;
 mod http_server;
 mod ranging;
 mod resource;
+mod service;
 mod system;
 mod transport;
 mod uwb;
 mod version;
 mod wifi;
 
+// This feature is enabled only for CMake builds
+#[cfg(feature = "local_ssl")]
+mod openssl;
+
 use std::pin::Pin;
 
+use bluetooth::chip::{
+    create_add_rust_device_result, AddRustDeviceResult, RustBluetoothChipCallbacks,
+};
 use cxx::let_cxx_string;
 use ffi::CxxServerResponseWriter;
 use http_server::http_request::StrHeaders;
@@ -48,9 +56,11 @@ use crate::captures::handlers::{
 use crate::config::{get_dev, set_dev};
 use crate::devices::devices_handler::{
     add_chip_cxx, get_distance_cxx, handle_device_cxx, is_shutdown_time_cxx, remove_chip_cxx,
+    AddChipResultCxx,
 };
 use crate::http_server::run_http_server;
 use crate::ranging::*;
+use crate::service::{create_service, Service};
 use crate::system::netsimd_temp_dir_string;
 use crate::uwb::facade::*;
 use crate::version::*;
@@ -86,6 +96,16 @@ mod ffi {
 
         #[cxx_name = "GetVersion"]
         fn get_version() -> String;
+
+        // Service
+
+        type Service;
+        #[cxx_name = "CreateService"]
+        fn create_service() -> Box<Service>;
+        #[cxx_name = "SetUp"]
+        fn set_up(self: &Service);
+        #[cxx_name = "Run"]
+        fn run(self: &Service);
 
         // System
 
@@ -125,6 +145,16 @@ mod ffi {
         fn unregister_grpc_transport(kind: u32, facade_id: u32);
 
         // Device Resource
+        type AddChipResultCxx;
+        #[cxx_name = "GetDeviceId"]
+        fn get_device_id(self: &AddChipResultCxx) -> u32;
+        #[cxx_name = "GetChipId"]
+        fn get_chip_id(self: &AddChipResultCxx) -> u32;
+        #[cxx_name = "GetFacadeId"]
+        fn get_facade_id(self: &AddChipResultCxx) -> u32;
+        #[cxx_name = "IsError"]
+        fn is_error(self: &AddChipResultCxx) -> bool;
+
         #[cxx_name = AddChipCxx]
         #[namespace = "netsim::device"]
         fn add_chip_cxx(
@@ -134,7 +164,7 @@ mod ffi {
             chip_name: &str,
             chip_manufacturer: &str,
             chip_product_name: &str,
-        ) -> UniquePtr<AddChipResult>;
+        ) -> Box<AddChipResultCxx>;
 
         #[cxx_name = RemoveChipCxx]
         #[namespace = "netsim::device"]
@@ -178,6 +208,34 @@ mod ffi {
         #[namespace = "netsim::capture"]
         fn clear_pcap_files() -> bool;
 
+        // Rust Bluetooth device.
+        #[namespace = "netsim::hci::facade"]
+        type DynRustBluetoothChipCallbacks;
+
+        #[cxx_name = Tick]
+        #[namespace = "netsim::hci::facade"]
+        fn tick(dyn_callbacks: &mut DynRustBluetoothChipCallbacks);
+
+        #[cxx_name = ReceiveLinkLayerPacket]
+        #[namespace = "netsim::hci::facade"]
+        fn receive_link_layer_packet(
+            dyn_callbacks: &mut DynRustBluetoothChipCallbacks,
+            source_address: String,
+            destination_address: String,
+            packet_type: u8,
+            packet: &[u8],
+        );
+
+        // Bluetooth facade.
+        #[namespace = "netsim::hci::facade"]
+        type AddRustDeviceResult;
+        #[cxx_name = "CreateAddRustDeviceResult"]
+        #[namespace = "netsim::hci"]
+        fn create_add_rust_device_result(
+            facade_id: u32,
+            rust_chip: UniquePtr<RustBluetoothChip>,
+        ) -> Box<AddRustDeviceResult>;
+
         // Uwb Facade.
 
         #[cxx_name = HandleUwbRequestCxx]
@@ -215,22 +273,6 @@ mod ffi {
     }
 
     unsafe extern "C++" {
-        include!("controller/controller.h");
-
-        #[namespace = "netsim::scene_controller"]
-        type AddChipResult;
-        fn get_chip_id(self: &AddChipResult) -> u32;
-        fn get_device_id(self: &AddChipResult) -> u32;
-        fn get_facade_id(self: &AddChipResult) -> u32;
-
-        #[rust_name = "new_add_chip_result"]
-        #[namespace = "netsim::scene_controller"]
-        fn NewAddChipResult(
-            device_id: u32,
-            chip_id: u32,
-            facade_id: u32,
-        ) -> UniquePtr<AddChipResult>;
-
         /// A C++ class which can be used to respond to a request.
         include!("frontend/server_response_writable.h");
 
@@ -269,6 +311,32 @@ mod ffi {
         #[namespace = "netsim::hci"]
         fn HandleBtRequestCxx(facade_id: u32, packet_type: u8, packet: &Vec<u8>);
 
+        // Rust Bluetooth device.
+        include!("hci/rust_device.h");
+
+        #[namespace = "netsim::hci::facade"]
+        type RustBluetoothChip;
+        #[rust_name = send_link_layer_packet]
+        #[namespace = "netsim::hci::facade"]
+        fn SendLinkLayerPacket(
+            self: &RustBluetoothChip,
+            packet: &[u8],
+            packet_type: u8,
+            tx_power: i8,
+        );
+
+        #[rust_name = generate_advertising_packet]
+        #[namespace = "netsim::hci::facade"]
+        fn GenerateAdvertisingPacket(address: &String, packet: &[u8]) -> Vec<u8>;
+
+        #[rust_name = generate_scan_response_packet]
+        #[namespace = "netsim::hci::facade"]
+        fn GenerateScanResponsePacket(
+            source_address: &String,
+            destination_address: &String,
+            packet: &[u8],
+        ) -> Vec<u8>;
+
         include!("hci/bluetooth_facade.h");
 
         #[rust_name = bluetooth_patch_cxx]
@@ -290,6 +358,26 @@ mod ffi {
         #[rust_name = bluetooth_add]
         #[namespace = "netsim::hci::facade"]
         pub fn Add(_chip_id: u32) -> u32;
+
+        /*
+        From https://cxx.rs/binding/box.html#restrictions,
+        ```
+        If T is an opaque Rust type, the Rust type is required to be Sized i.e. size known at compile time. In the future we may introduce support for dynamically sized opaque Rust types.
+        ```
+
+        The workaround is using Box<dyn MyData> (fat pointer) as the opaque type.
+        Reference:
+        - Passing trait objects to C++. https://github.com/dtolnay/cxx/issues/665.
+        - Exposing trait methods to C++. https://github.com/dtolnay/cxx/issues/667
+                */
+        #[rust_name = bluetooth_add_rust_device]
+        #[namespace = "netsim::hci::facade"]
+        pub fn AddRustDevice(
+            device_id: u32,
+            callbacks: Box<DynRustBluetoothChipCallbacks>,
+            string_type: &CxxString,
+            address: &CxxString,
+        ) -> Box<AddRustDeviceResult>;
 
         #[rust_name = bluetooth_start]
         #[namespace = "netsim::hci::facade"]
@@ -339,6 +427,31 @@ mod ffi {
     }
 }
 
+// It's required so `RustBluetoothChip` can be sent between threads safely.
+//Ref: How to use opaque types in threads? https://github.com/dtolnay/cxx/issues/1175
+unsafe impl Send for ffi::RustBluetoothChip {}
+
+type DynRustBluetoothChipCallbacks = Box<dyn RustBluetoothChipCallbacks>;
+
+fn tick(dyn_callbacks: &mut DynRustBluetoothChipCallbacks) {
+    (**dyn_callbacks).tick();
+}
+
+fn receive_link_layer_packet(
+    dyn_callbacks: &mut DynRustBluetoothChipCallbacks,
+    source_address: String,
+    destination_address: String,
+    packet_type: u8,
+    packet: &[u8],
+) {
+    (**dyn_callbacks).receive_link_layer_packet(
+        source_address,
+        destination_address,
+        packet_type,
+        packet,
+    );
+}
+
 /// CxxServerResponseWriter is defined in server_response_writable.h
 /// Wrapper struct allows the impl to discover the respective C++ methods
 struct CxxServerResponseWriterWrapper<'a> {
@@ -364,6 +477,9 @@ impl ServerResponseWritable for CxxServerResponseWriterWrapper<'_> {
     }
 
     fn put_ok_with_vec(&mut self, _mime_type: &str, _body: Vec<u8>, _headers: StrHeaders) {
+        todo!()
+    }
+    fn put_ok_switch_protocol(&mut self, _connection: &str) {
         todo!()
     }
 }

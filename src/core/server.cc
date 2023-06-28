@@ -21,7 +21,6 @@
 #include <thread>
 
 #include "backend/grpc_server.h"
-#include "controller/controller.h"
 #include "frontend/frontend_server.h"
 #include "grpcpp/security/server_credentials.h"
 #include "grpcpp/server.h"
@@ -32,6 +31,7 @@
 #include "util/ini_file.h"
 #include "util/log.h"
 #include "util/os_utils.h"
+#include "wifi/wifi_facade.h"
 #ifdef _WIN32
 #include <Windows.h>
 #else
@@ -76,12 +76,16 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
 }  // namespace
 
 void Run(ServerParams params) {
+  auto rust_service = netsim::CreateService();
+  rust_service->SetUp();
+
   // Clear all pcap files in temp directory
   if (netsim::capture::ClearPcapFiles()) {
     BtsLog("netsim generated pcap files in temp directory has been removed.");
   }
 
   netsim::hci::facade::Start();
+  netsim::wifi::facade::Start();
 
 #ifndef NETSIM_ANDROID_EMULATOR
   netsim::RunFdTransport(params.fd_startup_str);
@@ -98,6 +102,8 @@ void Run(ServerParams params) {
     BtsLog("Failed to start Grpc server");
     return;
   }
+
+  rust_service->Run();
 
   // no_web_ui disables the web server
   if (netsim_grpc_port == 0 && !params.no_web_ui) {

@@ -20,6 +20,7 @@ mod h4;
 pub mod socket;
 #[cfg(feature = "cuttlefish")]
 mod uci;
+pub mod websocket;
 
 // This provides no-op implementations of fd transport for non-unix systems.
 #[cfg(not(feature = "cuttlefish"))]
