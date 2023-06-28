@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    collections::HashMap,
-    io::Cursor,
-    net::TcpStream,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, io::Cursor, net::TcpStream};
 
 use frontend_proto::common::ChipKind;
 use log::{error, info};
@@ -69,7 +65,7 @@ pub fn handle_websocket(request: &HttpRequest, param: &str, writer: ResponseWrit
 }
 
 struct WebSocketTransport {
-    shared_websocket: Arc<Mutex<WebSocket<TcpStream>>>,
+    websocket_writer: Arc<Mutex<WebSocket<TcpStream>>>,
 }
 
 impl Response for WebSocketTransport {
@@ -77,25 +73,22 @@ impl Response for WebSocketTransport {
         let mut buffer = Vec::new();
         buffer.push(packet_type);
         buffer.extend(packet);
-        let mut shared_lock = self.shared_websocket.lock().unwrap();
-        if let Err(err) = shared_lock.write_message(Message::Binary(buffer)) {
+        if let Err(err) =
+            self.websocket_writer.lock().unwrap().write_message(Message::Binary(buffer))
+        {
             error!("{err}");
         };
     }
 }
 
+/// Run websocket transport for packet flow in netsim
 pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) {
-    let websocket = WebSocket::from_raw_socket(stream, Role::Server, None);
-    handle_hci_client(websocket, queries);
-}
-
-fn handle_hci_client(websocket: WebSocket<TcpStream>, queries: HashMap<&str, &str>) {
     // Add Chip
     let result = match add_chip(
-        &websocket.get_ref().peer_addr().unwrap().port().to_string(),
+        &stream.peer_addr().unwrap().port().to_string(),
         queries.get("name").unwrap(),
         ChipKind::BLUETOOTH,
-        &format!("websocket-{}", websocket.get_ref().peer_addr().unwrap()),
+        &format!("websocket-{}", stream.peer_addr().unwrap()),
         "Google",
         "Google",
     ) {
@@ -106,22 +99,26 @@ fn handle_hci_client(websocket: WebSocket<TcpStream>, queries: HashMap<&str, &st
         }
     };
 
-    // shared_websocket will be passed into register_transport for packet responses
-    let shared_websocket = Arc::new(Mutex::new(websocket));
-    // cloned_websocket will be used for packet requests coming from client
-    let cloned_websocket = shared_websocket.clone();
+    // Create websocket_writer to handle packet responses, write pong or close messages
+    let websocket_writer = Arc::new(Mutex::new(WebSocket::from_raw_socket(
+        stream.try_clone().unwrap(),
+        Role::Server,
+        None,
+    )));
+    // Websocket reader
+    let mut websocket_reader = WebSocket::from_raw_socket(stream, Role::Server, None);
 
+    // Sending cloned websocket into packet dispatcher
     register_transport(
         ChipKind::BLUETOOTH as u32,
         result.facade_id,
-        Box::new(WebSocketTransport { shared_websocket }),
+        Box::new(WebSocketTransport { websocket_writer: websocket_writer.clone() }),
     );
 
     // Running Websocket server
     loop {
-        let mut websocket_lock = cloned_websocket.lock().unwrap();
         let packet_msg =
-            match websocket_lock.read_message().map_err(|_| "Failed to read Websocket message") {
+            match websocket_reader.read_message().map_err(|_| "Failed to read Websocket message") {
                 Ok(message) => message,
                 Err(err) => {
                     error!("{err}");
@@ -133,27 +130,32 @@ fn handle_hci_client(websocket: WebSocket<TcpStream>, queries: HashMap<&str, &st
             match h4::read_h4_packet(&mut cursor) {
                 Ok(packet) => {
                     let kind = ChipKind::BLUETOOTH as u32;
-                    // The websocket_lock needs to be dropped to avoid deadlock with shared_websocket
-                    drop(websocket_lock);
                     handle_request_cxx(kind, result.facade_id, &packet.payload, packet.h4_type);
                 }
                 Err(error) => {
                     error!(
                         "netsimd: end websocket reader {}: {:?}",
-                        websocket_lock.get_ref().peer_addr().unwrap(),
+                        websocket_reader.get_ref().peer_addr().unwrap(),
                         error
                     );
                     break;
                 }
             }
         } else if packet_msg.is_ping() {
-            if let Err(err) = websocket_lock.write_message(Message::Pong(packet_msg.into_data())) {
+            if let Err(err) = websocket_writer
+                .lock()
+                .unwrap()
+                .write_message(Message::Pong(packet_msg.into_data()))
+            {
                 error!("{err}");
             }
         } else if packet_msg.is_close() {
             if let Message::Close(close_frame) = packet_msg {
-                if let Err(err) =
-                    websocket_lock.close(close_frame).map_err(|_| "Failed to close Websocket")
+                if let Err(err) = websocket_writer
+                    .lock()
+                    .unwrap()
+                    .close(close_frame)
+                    .map_err(|_| "Failed to close Websocket")
                 {
                     error!("{err}");
                 }
