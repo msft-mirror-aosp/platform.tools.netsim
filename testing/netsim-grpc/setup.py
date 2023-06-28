@@ -18,21 +18,21 @@ from setuptools.command.build_py import build_py
 class ProtoBuild(build_py):
     """
     This command automatically compiles all netsim .proto files with `protoc` compiler
-    and places generated files under src/netsim/proto
+    and places generated files under src/netsim_grpc/proto/
     """
 
     def run(self):
         here = path.abspath(path.dirname(__file__))
         root_dir = path.dirname(path.dirname(here))
-        proto_dir = path.join(root_dir, "proto")
-        out_dir = path.join(here, "src", "netsim", "proto")
+        proto_root_dir = path.join(root_dir, "proto")
+        proto_dir = path.join(proto_root_dir, "netsim")
+        out_dir = path.join(here, "src", "netsim_grpc", "proto")
 
         for proto_file in filter(
-            lambda x: x.endswith(".proto"), os.listdir(path.join(proto_dir, "netsim"))
+            lambda x: x.endswith(".proto"), os.listdir(proto_dir)
         ):
-            source = path.join(proto_dir, "netsim", proto_file)
+            source = path.join(proto_dir, proto_file)
             output = path.join(out_dir, "netsim", proto_file).replace(".proto", "_pb2.py")
-            output_grpc = path.join(out_dir, "netsim", proto_file).replace(".proto", "_pb2_grpc.py")
 
             if not path.exists(output) or (
                 path.getmtime(source) > path.getmtime(output)
@@ -44,29 +44,12 @@ class ProtoBuild(build_py):
                         sys.executable,
                         "-m",
                         "grpc_tools.protoc",
-                        f"-I{proto_dir}",
+                        f"-I{proto_root_dir}",
                         f"--python_out={out_dir}",
                         f"--grpc_python_out={out_dir}",
                         source,
                     ]
                 )
-
-                # Patch import in the generated grpc and protobuf backends.
-                # The default plugin will generate 'import "netsim/common.proto"'
-                # as 'from netsim import common' but that generates many
-                # issues for nested modules.
-                # Replace these import statements with a local import:
-                # 'from . import common' to ensure that the generated files can be
-                # relocated.
-                def patch_import(file_name):
-                    with open(file_name, 'r') as f:
-                        contents = f.read()
-                    contents = contents.replace("from netsim import", "from . import")
-                    with open(file_name, 'w') as f:
-                        f.write(contents)
-
-                patch_import(output)
-                patch_import(output_grpc)
 
         super().run()
 
