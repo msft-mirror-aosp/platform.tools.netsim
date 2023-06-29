@@ -101,7 +101,13 @@ mod ffi {
 
         type Service;
         #[cxx_name = "CreateService"]
-        fn create_service() -> Box<Service>;
+        fn create_service(
+            fd_startup_str: String,
+            no_cli_ui: bool,
+            no_web_ui: bool,
+            hci_port: u16,
+            dev: bool,
+        ) -> Box<Service>;
         #[cxx_name = "SetUp"]
         fn set_up(self: &Service);
         #[cxx_name = "Run"]
