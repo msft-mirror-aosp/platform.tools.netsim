@@ -54,6 +54,10 @@ class SceneController {
 
   void Reset();
 
+  std::optional<std::chrono::seconds> GetShutdownTime();
+
+  std::unordered_map<uint32_t, std::shared_ptr<Device>> devices_;
+
  protected:
   friend class SceneControllerTest;
   friend class FrontendServerTest;
@@ -67,8 +71,9 @@ class SceneController {
 
   void RemoveDevice(uint32_t device_id);
 
-  std::unordered_map<uint32_t, std::shared_ptr<Device>> devices_;
   std::mutex mutex_;
+  std::optional<std::chrono::time_point<std::chrono::system_clock>>
+      inactive_timestamp_{std::chrono::system_clock::now()};
 };
 
 }  // namespace controller

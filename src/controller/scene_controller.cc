@@ -14,14 +14,19 @@
 
 #include "controller/scene_controller.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 
 #include "controller/device_notify_manager.h"
 #include "util/log.h"
 
 namespace netsim {
 namespace controller {
+namespace {
+constexpr std::chrono::seconds kInactiveLimitToShutdown(300);
+}
 
 /* static */
 SceneController &SceneController::Singleton() {
@@ -45,6 +50,7 @@ std::tuple<uint32_t, uint32_t, uint32_t> SceneController::AddChip(
   // TODO: catch case of similar name chips
   auto [chip_id, facade_id] =
       device->AddChip(chip_kind, chip_name, manufacturer, product_name);
+  inactive_timestamp_.reset();
   return {device->id, chip_id, facade_id};
 }
 
@@ -79,6 +85,8 @@ void SceneController::RemoveChip(uint32_t device_id, uint32_t chip_id) {
     if (device->RemoveChip(chip_id)) {
       BtsLog("SceneController::RemoveChip device %d, no more chips", device_id);
       this->RemoveDevice(device_id);
+      if (devices_.empty())
+        inactive_timestamp_.emplace(std::chrono::system_clock::now());
     }
   } else {
     std::cerr << "Trying to remove chip from unknown device" << std::endl;
@@ -87,22 +95,25 @@ void SceneController::RemoveChip(uint32_t device_id, uint32_t chip_id) {
 
 // Returns a Device shared_ptr or nullptr
 std::shared_ptr<Device> SceneController::MatchDevice(const std::string &name) {
-  std::shared_ptr<Device> found = nullptr;
+  std::shared_ptr<Device> target = nullptr;
+  bool multiple_matches = false;
   if (name.empty()) {
     return nullptr;
   }
   for (auto &[_, device] : devices_) {
-    // query && name -> rename, only match by id
-    // query && !name -> match by query
-    // !query && name -> match by name
+    // match by device name
     auto pos = device->name.find(name);
     if (pos != std::string::npos) {
-      // check for multiple matches
-      if (found != nullptr) return nullptr;
-      found = device;
+      // check for exact match
+      if (device->name == name) return device;
+      // record if multiple ambiguous matches were found
+      if (target != nullptr) multiple_matches = true;
+      target = device;
     }
   }
-  return found;
+  // return nullptr if multiple ambiguous matches were found
+  if (multiple_matches) return nullptr;
+  return target;
 }
 
 // UI requesting a change in device info
@@ -139,5 +150,13 @@ void SceneController::Reset() {
   DeviceNotifyManager::Get().Notify();
 }
 
+std::optional<std::chrono::seconds> SceneController::GetShutdownTime() {
+  if (!inactive_timestamp_.has_value()) return std::nullopt;
+
+  auto inactive_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::system_clock::now() - inactive_timestamp_.value());
+  auto remaining_seconds = kInactiveLimitToShutdown - inactive_seconds;
+  return std::optional<std::chrono::seconds>(remaining_seconds);
+}
 }  // namespace controller
 }  // namespace netsim

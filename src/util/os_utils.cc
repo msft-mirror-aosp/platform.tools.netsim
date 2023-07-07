@@ -69,10 +69,18 @@ std::string GetDiscoveryDirectory() {
   return std::string(env_p) + netsim::filesystem::slash + discovery.subdir;
 }
 
+std::string GetNetsimIniFilepath() {
+  auto discovery_dir = GetDiscoveryDirectory();
+  // Check if directory has a trailing slash.
+  if (discovery_dir.back() != netsim::filesystem::slash.back())
+    discovery_dir.append(netsim::filesystem::slash);
+  return discovery_dir.append("netsim.ini");
+}
+
 std::optional<std::string> GetServerAddress(bool frontend_server) {
-  auto filepath = osutils::GetDiscoveryDirectory().append("netsim.ini");
+  auto filepath = GetNetsimIniFilepath();
   if (!netsim::filesystem::exists(filepath)) {
-    BtsLog("Unable to find discovery directory: %s", filepath.c_str());
+    BtsLog("Unable to find netsim ini file: %s", filepath.c_str());
     return std::nullopt;
   }
   if (!netsim::filesystem::is_regular_file(filepath)) {

@@ -33,10 +33,9 @@ cc_library {
     srcs: [
         "common.proto",
         "frontend.proto",
-        "internal.proto",
         "model.proto",
         "startup.proto",
-        "hci_packet.proto"
+        "hci_packet.proto",
     ],
 }
 

@@ -38,7 +38,7 @@ class Device {
   model::Orientation orientation;
 
   Device(uint32_t id, const std::string &guid, const std::string &name)
-      : id(id), guid(guid), name(name) {}
+      : id(id), guid(guid), name(name), visible(true) {}
 
   model::Device Get();
   void Patch(const model::Device &request);
@@ -50,7 +50,6 @@ class Device {
   void Reset();
   void Remove();
 
- private:
   std::unordered_map<uint32_t, std::shared_ptr<Chip>> chips_;
 };
 

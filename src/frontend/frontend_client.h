@@ -19,14 +19,16 @@
 
 #include <memory>
 #include <string_view>
+#include <vector>
 
-#include "../../rust/frontend-client-cxx/cxx/cxx.h"
 #include "frontend.grpc.pb.h"
+#include "rust/cxx.h"
 
 namespace netsim {
 namespace frontend {
 
 enum class GrpcMethod : ::std::uint8_t;
+struct ClientResponseReader;
 
 class ClientResult {
  public:
@@ -55,6 +57,12 @@ class FrontendClient {
   virtual std::unique_ptr<ClientResult> PatchDevice(
       rust::Vec<rust::u8> const &request_byte_vec) const = 0;
   virtual std::unique_ptr<ClientResult> Reset() const = 0;
+  virtual std::unique_ptr<ClientResult> ListCapture() const = 0;
+  virtual std::unique_ptr<ClientResult> PatchCapture(
+      rust::Vec<rust::u8> const &request_byte_vec) const = 0;
+  virtual std::unique_ptr<ClientResult> GetCapture(
+      rust::Vec<::rust::u8> const &request_byte_vec,
+      ClientResponseReader const &client_reader) const = 0;
 };
 
 std::unique_ptr<FrontendClient> NewFrontendClient();
