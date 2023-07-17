@@ -25,7 +25,6 @@ mod http_server;
 mod ranging;
 mod resource;
 mod service;
-mod system;
 mod transport;
 mod uwb;
 mod version;
@@ -60,9 +59,9 @@ use crate::devices::devices_handler::{
 };
 use crate::ranging::*;
 use crate::service::{create_service, Service};
-use crate::system::netsimd_temp_dir_string;
 use crate::uwb::facade::*;
 use crate::version::*;
+use netsim_common::system::netsimd_temp_dir_string;
 
 #[cxx::bridge(namespace = "netsim")]
 mod ffi {
