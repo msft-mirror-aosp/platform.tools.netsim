@@ -25,7 +25,7 @@ use crate::http_server::http_router::Router;
 use crate::http_server::server_response::{
     ResponseWritable, ServerResponseWritable, ServerResponseWriter,
 };
-use crate::transport::websocket::run_websocket_transport;
+use crate::transport::websocket::{handle_websocket, run_websocket_transport};
 use crate::version::VERSION;
 
 use crate::http_server::thread_pool::ThreadPool;
@@ -40,30 +40,33 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread;
 
 const PATH_PREFIXES: [&str; 3] = ["js", "assets", "node_modules/tslib"];
 
-// TODO: move to main.rs
-pub fn run_http_server() {
-    let listener = match TcpListener::bind("127.0.0.1:7681") {
-        Ok(listener) => listener,
-        Err(e) => {
-            error!("bind error in netsimd frontend http server. {}", e);
-            return;
-        }
-    };
-    let pool = ThreadPool::new(4);
-    info!("Frontend http server is listening on http://localhost:7681");
-    let valid_files = Arc::new(create_filename_hash_set());
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        let valid_files = valid_files.clone();
-        pool.execute(move || {
-            handle_connection(stream, valid_files);
-        });
-    }
+/// Start the HTTP Server.
 
-    info!("Shutting down frontend http server.");
+pub fn run_http_server() {
+    let _ = thread::Builder::new().name("http_server".to_string()).spawn(move || {
+        let listener = match TcpListener::bind("127.0.0.1:7681") {
+            Ok(listener) => listener,
+            Err(e) => {
+                error!("bind error in netsimd frontend http server. {}", e);
+                return;
+            }
+        };
+        let pool = ThreadPool::new(4);
+        info!("Frontend http server is listening on http://localhost:7681");
+        let valid_files = Arc::new(create_filename_hash_set());
+        for stream in listener.incoming() {
+            let stream = stream.unwrap();
+            let valid_files = valid_files.clone();
+            pool.execute(move || {
+                handle_connection(stream, valid_files);
+            });
+        }
+        info!("Shutting down frontend http server.");
+    });
 }
 
 fn ui_path(suffix: &str) -> PathBuf {
@@ -142,7 +145,7 @@ fn handle_version(_request: &HttpRequest, _param: &str, writer: ResponseWritable
 }
 
 /// Collect queries and output key and values into Vec
-fn collect_query(param: &str) -> Result<HashMap<&str, &str>, &str> {
+pub fn collect_query(param: &str) -> Result<HashMap<&str, &str>, &str> {
     let mut result = HashMap::new();
     for word in param.split('&') {
         let equal = word.find('=');
@@ -157,30 +160,6 @@ fn collect_query(param: &str) -> Result<HashMap<&str, &str>, &str> {
     }
     // TODO: Check if initial ChipInfo is included
     Ok(result)
-}
-
-// handler for websocket server connection
-fn handle_websocket(_request: &HttpRequest, param: &str, writer: ResponseWritable) {
-    match collect_query(param) {
-        Ok(queries) => {
-            let mut name_exists = false;
-            let mut kind_exists = false;
-            for (key, _) in queries {
-                if key == "name" {
-                    name_exists = true;
-                }
-                if key == "kind" {
-                    kind_exists = true;
-                }
-            }
-            if name_exists && kind_exists {
-                writer.put_ok_switch_protocol("websocket")
-            } else {
-                writer.put_error(404, "Missing name(device_name) and/or kind(chip_kind). Query must include name=a&kind=b.")
-            }
-        }
-        Err(err) => writer.put_error(404, err),
-    }
 }
 
 fn handle_dev(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
