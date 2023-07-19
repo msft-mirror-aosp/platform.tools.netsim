@@ -61,7 +61,7 @@ const JSON_PRINT_OPTION: PrintOptions = PrintOptions {
     _future_options: (),
 };
 
-static IDLE_SECS_FOR_SHUTDOWN: u64 = 300;
+static IDLE_SECS_FOR_SHUTDOWN: u64 = 15;
 
 /// The Device resource is a singleton that manages all devices.
 pub struct Devices {
@@ -1040,12 +1040,12 @@ mod tests {
         // Refresh Resource
         refresh_resource();
 
-        // Set the idle_since value to more than 5 minutes before current time
-        travel_back_n_seconds_from_now(301);
+        // Set the idle_since value to more than 15 seconds before current time
+        travel_back_n_seconds_from_now(16);
         assert!(is_shutdown_time_cxx());
 
-        // Set the idle_since value to less than 5 minutes before current time
-        travel_back_n_seconds_from_now(299);
+        // Set the idle_since value to less than 15 seconds before current time
+        travel_back_n_seconds_from_now(14);
         assert!(!is_shutdown_time_cxx());
 
         // Refresh Resource again
