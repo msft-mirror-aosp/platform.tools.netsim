@@ -25,13 +25,12 @@ use crate::http_server::http_router::Router;
 use crate::http_server::server_response::{
     ResponseWritable, ServerResponseWritable, ServerResponseWriter,
 };
-use crate::transport::websocket::run_websocket_transport;
+use crate::transport::websocket::{handle_websocket, run_websocket_transport};
 use crate::version::VERSION;
 
 use crate::http_server::thread_pool::ThreadPool;
 
 use log::{error, info, warn};
-use netsim_common::util::netsim_logger;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fs;
@@ -46,7 +45,6 @@ const PATH_PREFIXES: [&str; 3] = ["js", "assets", "node_modules/tslib"];
 
 // TODO: move to main.rs
 pub fn run_http_server() {
-    netsim_logger::init("netsimd");
     let listener = match TcpListener::bind("127.0.0.1:7681") {
         Ok(listener) => listener,
         Err(e) => {
@@ -144,7 +142,7 @@ fn handle_version(_request: &HttpRequest, _param: &str, writer: ResponseWritable
 }
 
 /// Collect queries and output key and values into Vec
-fn collect_query(param: &str) -> Result<HashMap<&str, &str>, &str> {
+pub fn collect_query(param: &str) -> Result<HashMap<&str, &str>, &str> {
     let mut result = HashMap::new();
     for word in param.split('&') {
         let equal = word.find('=');
@@ -159,30 +157,6 @@ fn collect_query(param: &str) -> Result<HashMap<&str, &str>, &str> {
     }
     // TODO: Check if initial ChipInfo is included
     Ok(result)
-}
-
-// handler for websocket server connection
-fn handle_websocket(_request: &HttpRequest, param: &str, writer: ResponseWritable) {
-    match collect_query(param) {
-        Ok(queries) => {
-            let mut name_exists = false;
-            let mut kind_exists = false;
-            for (key, _) in queries {
-                if key == "name" {
-                    name_exists = true;
-                }
-                if key == "kind" {
-                    kind_exists = true;
-                }
-            }
-            if name_exists && kind_exists {
-                writer.put_ok_switch_protocol("websocket")
-            } else {
-                writer.put_error(404, "Missing name(device_name) and/or kind(chip_kind). Query must include name=a&kind=b.")
-            }
-        }
-        Err(err) => writer.put_error(404, err),
-    }
 }
 
 fn handle_dev(request: &HttpRequest, _param: &str, writer: ResponseWritable) {
