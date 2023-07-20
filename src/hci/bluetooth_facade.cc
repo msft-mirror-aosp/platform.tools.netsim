@@ -325,8 +325,8 @@ void Remove(uint32_t id) {
 
 uint32_t Add(uint32_t simulation_device) {
   auto transport = std::make_shared<HciPacketTransport>(mAsyncManager);
-  auto hci_device =
-      std::make_shared<rootcanal::HciDevice>(transport, *controller_properties_);
+  auto hci_device = std::make_shared<rootcanal::HciDevice>(
+      transport, *controller_properties_);
 
   // Use the `AsyncManager` to ensure that the `AddHciConnection` method is
   // invoked atomically, preventing data races.

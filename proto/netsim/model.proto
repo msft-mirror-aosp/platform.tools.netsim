@@ -82,7 +82,8 @@ message Chip {
     message AdvertiseData {
       // Whether the device name should be included in advertise packet.
       bool include_device_name = 2;
-      // Whether the transmission power level should be included in the advertise packet.
+      // Whether the transmission power level should be included in the
+      // advertise packet.
       bool include_tx_power_level = 3;
       // Add manufacturer specific data.
       bytes manufacturer_data = 4;
