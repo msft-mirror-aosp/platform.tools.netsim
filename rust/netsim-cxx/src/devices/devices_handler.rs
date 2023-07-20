@@ -119,7 +119,7 @@ pub fn add_chip(
         Ok((device_id, chip_id)) => {
             let facade_id = match chip_kind {
                 ProtoChipKind::BLUETOOTH => bluetooth_facade::bluetooth_add(device_id),
-                ProtoChipKind::BLUETOOTH_BEACON => bluetooth_facade::beacon::bluetooth_beacon_add(
+                ProtoChipKind::BLUETOOTH_BEACON => bluetooth_facade::bluetooth_beacon_add(
                     device_id,
                     chip_id,
                     "beacon".to_string(),
@@ -560,7 +560,9 @@ mod tests {
     use netsim_common::util::netsim_logger::init_for_test;
     use protobuf_json_mapping::print_to_string;
 
-    use crate::http_server::server_response::ServerResponseWriter;
+    use crate::{
+        bluetooth::ADVERTISING_INTERVAL_MS, http_server::server_response::ServerResponseWriter,
+    };
 
     use super::*;
 
@@ -1200,5 +1202,103 @@ mod tests {
         let _lock = MUTEX.lock().unwrap();
 
         // regenerate_golden_files_helper();
+    }
+
+    use crate::bluetooth::refresh_resource as refresh_bluetooth_resource;
+    use frontend_proto::model::chip::Chip::BleBeacon;
+    use frontend_proto::model::chip::{bluetooth_beacon::AdvertiseSettings, BluetoothBeacon, Chip};
+    use frontend_proto::model::chip_create;
+    use frontend_proto::model::Chip as ChipProto;
+    use frontend_proto::model::Device as DeviceProto;
+    use frontend_proto::model::{ChipCreate, DeviceCreate};
+    use protobuf::{EnumOrUnknown, MessageField};
+
+    fn bluetooth_beacon_create() -> AddChipResult {
+        bluetooth_facade::new_beacon(&DeviceCreate {
+            chips: vec![ChipCreate {
+                chip: Some(chip_create::Chip::BleBeacon(chip_create::BluetoothBeaconCreate {
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .expect("Error creating beacon device for testing: {err}")
+    }
+
+    #[test]
+    fn test_get_beacon_device() {
+        let _lock = MUTEX.lock().unwrap();
+
+        logger_setup();
+
+        refresh_resource();
+        refresh_bluetooth_resource();
+
+        let ids = bluetooth_beacon_create();
+        let devices = clone_devices();
+        let devices_guard = devices.read().unwrap();
+        let device = devices_guard
+            .entries
+            .get(&ids.device_id)
+            .expect("Could not find test bluetooth beacon device");
+
+        let device_proto = device.get();
+        assert!(device_proto.is_ok(), "{}", device_proto.unwrap_err());
+
+        if let BleBeacon(beacon_proto) = device_proto.unwrap().chips[0].chip.as_ref().unwrap() {
+            assert_eq!(ADVERTISING_INTERVAL_MS, beacon_proto.settings.interval);
+        } else {
+            panic!("Expected a bluetooth beacon chip in test device")
+        }
+    }
+
+    #[test]
+    fn test_patch_beacon_device() {
+        let _lock = MUTEX.lock().unwrap();
+
+        logger_setup();
+
+        let interval = 1000;
+
+        refresh_resource();
+        refresh_bluetooth_resource();
+
+        let ids = bluetooth_beacon_create();
+        let devices = clone_devices();
+        let mut devices_guard = devices.write().unwrap();
+        let device = devices_guard
+            .entries
+            .get_mut(&ids.device_id)
+            .expect("Could not find test bluetooth beacon device");
+
+        if let Err(err) = device.patch(&DeviceProto {
+            id: ids.device_id,
+            chips: vec![ChipProto {
+                id: ids.chip_id,
+                kind: EnumOrUnknown::new(ProtoChipKind::BLUETOOTH_BEACON),
+                chip: Some(Chip::BleBeacon(BluetoothBeacon {
+                    bt: MessageField::some(Default::default()),
+                    settings: MessageField::some(AdvertiseSettings {
+                        interval,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }) {
+            panic!("{err}");
+        }
+
+        let patched_device = device.get();
+        assert!(patched_device.is_ok(), "{}", patched_device.unwrap_err());
+
+        if let BleBeacon(patched_beacon) = patched_device.unwrap().chips[0].chip.as_ref().unwrap() {
+            assert_eq!(interval, patched_beacon.settings.interval);
+        } else {
+            panic!("Expected a bluetooth beacon chip in test device")
+        }
     }
 }
