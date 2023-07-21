@@ -44,7 +44,6 @@ use crate::ffi::CxxServerResponseWriter;
 use crate::http_server::http_request::{HttpHeaders, HttpRequest};
 use crate::http_server::server_response::ResponseWritable;
 use crate::resource::clone_captures;
-use crate::system;
 use crate::CxxServerResponseWriterWrapper;
 
 use super::capture::CaptureInfo;
@@ -135,7 +134,7 @@ pub fn update_captures() {
 
 /// Helper function for getting file name from the given fields.
 fn get_file(id: ChipId, device_name: String, chip_kind: ChipKind) -> Result<File> {
-    let mut filename = system::netsimd_temp_dir();
+    let mut filename = netsim_common::system::netsimd_temp_dir();
     filename.push("pcaps");
     filename.push(format!("{:?}-{:}-{:?}.pcap", id, device_name, chip_kind));
     File::open(filename)
@@ -370,7 +369,7 @@ pub fn handle_packet_response(kind: u32, facade_id: u32, packet: &CxxVector<u8>,
 
 /// Cxx Method for clearing pcap files in temp directory
 pub fn clear_pcap_files() -> bool {
-    let mut path = system::netsimd_temp_dir();
+    let mut path = netsim_common::system::netsimd_temp_dir();
     path.push("pcaps");
 
     // Check if the directory exists.
