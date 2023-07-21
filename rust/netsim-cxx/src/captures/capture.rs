@@ -27,6 +27,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::pcap_util::write_pcap_header;
 use frontend_proto::{
     common::ChipKind,
     model::{Capture as ProtoCapture, State},
@@ -35,10 +36,6 @@ use log::{error, info};
 use protobuf::well_known_types::timestamp::Timestamp;
 
 use crate::events::Event;
-use crate::system;
-
-use super::pcap_util::write_pcap_header;
-
 /// ChipId: i32 (for distinguishing identifiers)
 pub type ChipId = i32;
 /// FacadeId: i32 (for distinguishing identifiers)
@@ -115,7 +112,7 @@ impl CaptureInfo {
         if self.file.is_some() {
             return Ok(());
         }
-        let mut filename = system::netsimd_temp_dir();
+        let mut filename = netsim_common::system::netsimd_temp_dir();
         filename.push("pcaps");
         std::fs::create_dir_all(&filename)?;
         filename.push(format!("{:?}-{:}-{:?}.pcap", self.id, self.device_name, self.chip_kind));
