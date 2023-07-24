@@ -14,7 +14,7 @@
 
 use std::cmp::max;
 
-use crate::args::{self, Capture, Command, OnOffState};
+use crate::args::{self, Beacon, BeaconPatch, Capture, Command, OnOffState};
 use frontend_proto::{
     common::ChipKind,
     frontend::{ListCaptureResponse, ListDeviceResponse, VersionResponse},
@@ -86,6 +86,19 @@ impl args::Command {
             Command::Artifact => {
                 unimplemented!("No Grpc Response for Artifact Command.");
             }
+            Command::Beacon(action) => match action {
+                Beacon::Create(_) => todo!("Beacon create response not yet implemented."),
+                Beacon::Patch(kind) => match kind {
+                    BeaconPatch::Ble(args) => {
+                        if verbose {
+                            if let Some(interval) = args.settings.interval {
+                                println!("Set interval to {}", interval)
+                            }
+                        }
+                    }
+                },
+                Beacon::Remove(_) => todo!("Beacon remove response not yet implemented."),
+            },
         }
     }
 
