@@ -14,8 +14,8 @@
 
 use super::adv_data;
 use super::chip::{rust_bluetooth_add, RustBluetoothChipCallbacks};
-use crate::devices::chip::ChipIdentifier;
-use crate::devices::device::AddChipResult;
+use crate::devices::chip::{ChipIdentifier, FacadeIdentifier};
+use crate::devices::device::{AddChipResult, DeviceIdentifier};
 use crate::devices::{devices_handler::add_chip, id_factory::IdFactory};
 use crate::ffi::{generate_advertising_packet, generate_scan_response_packet, RustBluetoothChip};
 use cxx::{let_cxx_string, UniquePtr};
@@ -115,15 +115,28 @@ impl BeaconChip {
     }
 }
 
-impl RustBluetoothChipCallbacks for BeaconChip {
+// BEACON_CHIPS has ownership of all the BeaconChips, so we need a separate class to hold the callbacks.
+// This class will be owned by rootcanal.
+pub struct BeaconChipCallbacks {
+    chip_id: ChipIdentifier,
+}
+
+impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
     fn tick(&mut self) {
-        if let Some(last) = self.advertising_last {
-            if last.elapsed() <= self.advertising_interval {
+        let guard = BEACON_CHIPS.read().unwrap();
+        let mut beacon = guard
+            .get(&self.chip_id)
+            .expect("could not find bluetooth beacon with chip id {chip_id}")
+            .lock()
+            .unwrap();
+
+        if let Some(last) = beacon.advertising_last {
+            if last.elapsed() <= beacon.advertising_interval {
                 return;
             }
         }
 
-        self.advertising_last = Some(Instant::now());
+        beacon.advertising_last = Some(Instant::now());
         // TODO(jmes): Call generate_advertising_packet and send_link_layer_packet after b/290232432 is fixed.
         warn!("Sending packets from beacons is currently unsupported due to b/290232432.")
     }
@@ -147,20 +160,28 @@ impl RustBluetoothChipCallbacks for BeaconChip {
 /// Similar to `bluetooth_add()`.
 #[cfg(not(test))]
 pub fn bluetooth_beacon_add(
-    device_id: u32,
+    device_id: DeviceIdentifier,
     chip_id: ChipIdentifier,
     device_type: String,
     address: String,
-) -> u32 {
-    let mut beacon_chip = BeaconChip::new(chip_id, address.clone());
-    let callbacks: Box<dyn RustBluetoothChipCallbacks> = Box::new(beacon_chip);
-    let mut add_rust_device_result = rust_bluetooth_add(device_id, callbacks, device_type, address);
+) -> Result<FacadeIdentifier, String> {
+    let beacon_chip = BeaconChip::new(chip_id, address.clone());
+
+    if BEACON_CHIPS.write().unwrap().insert(chip_id, Mutex::new(beacon_chip)).is_some() {
+        return Err(String::from(
+            "Failed to create a Bluetooth beacon chip with ID {chip_id}: chip ID already exists.",
+        ));
+    }
+
+    let callbacks: Box<dyn RustBluetoothChipCallbacks> = Box::new(BeaconChipCallbacks { chip_id });
+    let add_rust_device_result = rust_bluetooth_add(device_id, callbacks, device_type, address);
     let rust_chip = add_rust_device_result.rust_chip;
     let facade_id = add_rust_device_result.facade_id;
 
     info!("Creating HCI facade {} for device {} chip {}", facade_id, device_id, chip_id);
     BT_CHIPS.write().unwrap().insert(chip_id, Mutex::new(rust_chip));
-    facade_id
+
+    Ok(facade_id)
 }
 
 // TODO(jmes) Support removing Beacon (b/292234625).
@@ -214,31 +235,86 @@ pub fn new_beacon(device_proto: &DeviceCreateProto) -> Result<AddChipResult, Str
         _ => return Err(String::from("a beacon device must contain exactly one chip")),
     };
 
-    let chip_kind = match chip_proto.chip {
-        Some(ChipProto::BleBeacon(_)) => ChipKind::BLUETOOTH_BEACON,
+    let (chip_kind, beacon_proto) = match &chip_proto.chip {
+        Some(ChipProto::BleBeacon(beacon_proto)) => (ChipKind::BLUETOOTH_BEACON, beacon_proto),
         Some(_) | None => {
             return Err(String::from("a beacon device must contain a bluetooth beacon chip"))
         }
     };
 
     let mut device_guid = BEACON_DEVICE_GUID_FACTORY.lock().unwrap().next_id();
-    add_chip(
+    let ids = add_chip(
         &format!("beacon-device-{}", device_guid),
         &device_proto.name,
         chip_kind,
         &chip_proto.name,
         &chip_proto.manufacturer,
         &chip_proto.product_name,
-    )
+    )?;
+
+    bluetooth_beacon_patch(
+        ids.chip_id,
+        // TODO(jmes, hyunjaemoon) proto cleanup should prevent us from doing this conversion and clone
+        &BluetoothBeaconProto {
+            address: beacon_proto.address.clone(),
+            settings: beacon_proto.settings.clone(),
+            adv_data: beacon_proto.adv_data.clone(),
+            ..Default::default()
+        },
+    )?;
+
+    Ok(ids)
 }
 
 #[cfg(test)]
 pub mod tests {
+    use frontend_proto::model::chip::bluetooth_beacon::AdvertiseData as AdvertiseDataProto;
+
     use super::*;
     use crate::bluetooth::{bluetooth_beacon_add, refresh_resource};
 
     lazy_static! {
-        static ref MUTEX: Mutex<()> = Mutex::new(());
+        pub(crate) static ref MUTEX: Mutex<()> = Mutex::new(());
+    }
+
+    #[test]
+    pub fn test_new_beacon() {
+        let _lock = MUTEX.lock().unwrap();
+        refresh_resource();
+
+        let interval = 9999;
+        let ids = new_beacon(&DeviceCreateProto {
+            name: String::from("test-beacon-device"),
+            chips: vec![ChipCreateProto {
+                name: String::from("test-beacon-chip"),
+                chip: Some(ChipProto::BleBeacon(BluetoothBeaconCreateProto {
+                    address: String::from("00:00:00:00:00:00"),
+                    settings: MessageField::some(AdvertiseSettingsProto {
+                        interval,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+
+        assert!(ids.is_ok());
+        let chip_id = ids.unwrap().chip_id;
+
+        let guard = BEACON_CHIPS.read().unwrap();
+        let beacon = guard
+            .get(&chip_id)
+            .expect("could not get bluetooth beacon with chip id {chip_id}")
+            .lock()
+            .unwrap();
+
+        assert_eq!(
+            interval,
+            <u128 as std::convert::TryInto<u64>>::try_into(beacon.advertising_interval.as_millis())
+                .unwrap()
+        );
     }
 
     #[test]
