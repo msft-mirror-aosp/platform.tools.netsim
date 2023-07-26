@@ -96,7 +96,7 @@ bool mStarted = false;
 std::shared_ptr<rootcanal::AsyncManager> mAsyncManager;
 rootcanal::AsyncUserId gSocketUserId{};
 std::shared_ptr<SimTestModel> gTestModel;
-rootcanal::ControllerProperties controller_properties_;
+std::unique_ptr<rootcanal::ControllerProperties> controller_properties_;
 
 #ifndef NETSIM_ANDROID_EMULATOR
 // test port
@@ -189,7 +189,8 @@ void Start() {
   // before a HCI Reset. The flag below causes a hardware error event that
   // triggers the Reset from the Bluetooth Stack.
 
-  controller_properties_.quirks.hardware_error_before_reset = true;
+  controller_properties_ = std::make_unique<rootcanal::ControllerProperties>();
+  controller_properties_->quirks.hardware_error_before_reset = true;
 
   mAsyncManager = std::make_shared<rootcanal::AsyncManager>();
   // Get a user ID for tasks scheduled within the test environment.
@@ -325,7 +326,7 @@ void Remove(uint32_t id) {
 uint32_t Add(uint32_t simulation_device) {
   auto transport = std::make_shared<HciPacketTransport>(mAsyncManager);
   auto hci_device =
-      std::make_shared<rootcanal::HciDevice>(transport, controller_properties_);
+      std::make_shared<rootcanal::HciDevice>(transport, *controller_properties_);
 
   // Use the `AsyncManager` to ensure that the `AddHciConnection` method is
   // invoked atomically, preventing data races.
