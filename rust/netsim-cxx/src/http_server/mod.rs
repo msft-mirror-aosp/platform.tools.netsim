@@ -43,12 +43,14 @@ use std::sync::Arc;
 use std::thread;
 
 const PATH_PREFIXES: [&str; 4] = ["js", "js/netsim", "assets", "node_modules/tslib"];
+const DEFAULT_HTTP_PORT: u16 = 7681;
 
 /// Start the HTTP Server.
 
-pub fn run_http_server() {
+pub fn run_http_server(instance_num: u16) {
     let _ = thread::Builder::new().name("http_server".to_string()).spawn(move || {
-        let listener = match TcpListener::bind("127.0.0.1:7681") {
+        let http_port = DEFAULT_HTTP_PORT + instance_num;
+        let listener = match TcpListener::bind(format!("127.0.0.1:{}", http_port)) {
             Ok(listener) => listener,
             Err(e) => {
                 warn!("bind error in netsimd frontend http server. {}", e);
@@ -56,7 +58,7 @@ pub fn run_http_server() {
             }
         };
         let pool = ThreadPool::new(4);
-        info!("Frontend http server is listening on http://localhost:7681");
+        info!("Frontend http server is listening on http://localhost:{}", http_port);
         let valid_files = Arc::new(create_filename_hash_set());
         for stream in listener.incoming() {
             let stream = stream.unwrap();
