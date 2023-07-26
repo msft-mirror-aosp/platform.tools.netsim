@@ -116,9 +116,9 @@ bool ChangedState(model::State a, model::State b) {
 
 using ::android::net::PosixAsyncSocketServer;
 
-void SetUpTestChannel() {
+void SetUpTestChannel(uint16_t instance_num) {
   gTestSocketServer = std::make_shared<PosixAsyncSocketServer>(
-      kDefaultTestPort, mAsyncManager.get());
+      kDefaultTestPort + instance_num, mAsyncManager.get());
 
   gTestChannel = std::make_unique<rootcanal::TestCommandHandler>(*gTestModel);
 
@@ -179,7 +179,7 @@ void SetUpTestChannel() {
 }  // namespace
 
 // Initialize the rootcanal library.
-void Start() {
+void Start(uint16_t instance_num) {
   if (mStarted) return;
 
   // When emulators restore from a snapshot the PacketStreamer connection to
@@ -222,7 +222,7 @@ void Start() {
   testCommands.SetTimerPeriod({"5"});
   testCommands.StartTimer({});
 #else
-  SetUpTestChannel();
+  SetUpTestChannel(instance_num);
 #endif
   mStarted = true;
 };
