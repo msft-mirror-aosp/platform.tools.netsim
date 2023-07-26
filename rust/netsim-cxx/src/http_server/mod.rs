@@ -174,11 +174,11 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     router.add_route(r"/v1/devices/{id}", Box::new(handle_device));
     router.add_route(r"/v1/captures", Box::new(handle_capture));
     router.add_route(r"/v1/captures/{id}", Box::new(handle_capture));
+    router.add_route(r"/v1/websocket?", Box::new(handle_websocket));
 
     // Adding additional routes in dev mode.
     if crate::config::get_dev() {
         router.add_route("/dev", Box::new(handle_dev));
-        router.add_route(r"/v1/websocket?", Box::new(handle_websocket));
     }
 
     // A closure for checking if path is a static file we wish to serve, and call handle_static
