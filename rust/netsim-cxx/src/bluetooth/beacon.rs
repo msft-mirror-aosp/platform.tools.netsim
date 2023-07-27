@@ -12,12 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::adv_data::Builder;
+use super::adv_data;
 use super::chip::{rust_bluetooth_add, RustBluetoothChipCallbacks};
-use crate::devices::devices_handler::add_chip;
+use crate::devices::{devices_handler::add_chip, id_factory::IdFactory};
 use crate::ffi::{generate_advertising_packet, generate_scan_response_packet, RustBluetoothChip};
 use cxx::{let_cxx_string, UniquePtr};
 use frontend_proto::common::ChipKind;
+use frontend_proto::model::chip::bluetooth_beacon::{
+    AdvertiseData as AdvertiseDataProto, AdvertiseSettings as AdvertiseSettingsProto,
+};
+use frontend_proto::model::chip_create::{
+    BluetoothBeaconCreate as BluetoothBeaconCreateProto, Chip as ChipProto,
+};
+use frontend_proto::model::{ChipCreate as ChipCreateProto, DeviceCreate as DeviceCreateProto};
 use lazy_static::lazy_static;
 use log::{error, info, warn};
 use std::alloc::System;
@@ -34,17 +41,20 @@ static PHY_TYPE_LE: u8 = 0;
 // From Beacon::Beacon constructor referenced in $ROOTCANAL/model/devices/beacon.cc
 static ADVERTISING_INTERVAL_MS: u64 = 1280;
 
-// A singleton that contains a hash map from chip id to RustBluetoothChip.
-// It's used by `BeaconChip` to access `RustBluetoothChip` to call send_link_layer_packet().
 lazy_static! {
+    // A singleton that contains a hash map from chip id to RustBluetoothChip.
+    // It's used by `BeaconChip` to access `RustBluetoothChip` to call send_link_layer_packet().
     static ref BLUETOOTH_BEACON_CHIPS: RwLock<HashMap<u32, Mutex<UniquePtr<RustBluetoothChip>>>> =
         RwLock::new(HashMap::new());
+    // Factory for beacon device GUIDs.
+    static ref BEACON_DEVICE_GUID_FACTORY: Mutex<IdFactory<usize>> = Mutex::new(IdFactory::new(0, 1));
 }
 
 /// BeaconChip class.
 pub struct BeaconChip {
     chip_id: u32,
     address: String,
+    advertising_data: Vec<u8>,
     advertising_last: Option<Instant>,
     advertising_interval: Duration,
 }
@@ -54,9 +64,33 @@ impl BeaconChip {
         BeaconChip {
             chip_id,
             address,
+            advertising_data: Vec::new(),
             advertising_last: None,
             advertising_interval: Duration::from_millis(ADVERTISING_INTERVAL_MS),
         }
+    }
+
+    pub fn from_proto(
+        device_name: String,
+        chip_id: u32,
+        beacon_proto: &BluetoothBeaconCreateProto,
+    ) -> Result<Self, String> {
+        Ok(BeaconChip {
+            chip_id,
+            address: beacon_proto.address.clone(),
+            advertising_data: adv_data::Builder::from_proto(
+                device_name,
+                beacon_proto
+                    .settings
+                    .tx_power_level
+                    .try_into()
+                    .map_err(|_| "tx_power_level was too large, it must fit in an i8")?,
+                &beacon_proto.adv_data,
+            )
+            .build()?,
+            advertising_last: None,
+            advertising_interval: Duration::from_millis(beacon_proto.settings.interval),
+        })
     }
 
     pub fn send_link_layer_packet(&mut self, packet: &[u8], packet_type: u8, tx_power: i8) {
@@ -82,7 +116,6 @@ impl RustBluetoothChipCallbacks for BeaconChip {
         }
 
         self.advertising_last = Some(Instant::now());
-        let adv_data = Builder::new().device_name(String::from("gDevice-beacon")).build().unwrap();
         // TODO(jmes): Call generate_advertising_packet and send_link_layer_packet after b/290232432 is fixed.
         warn!("Sending packets from beacons is currently unsupported due to b/290232432.")
     }
@@ -121,29 +154,33 @@ pub fn bluetooth_beacon_add(
     facade_id
 }
 
-// TODO: Support removing Beacon.
+// TODO(jmes) Support removing Beacon.
 
 /// Create a new beacon device. Used by CLI or web.
-pub fn new_beacon(beacon_name: String, address: String) {
-    // TODO: Support passing BluetoothBeacon and call patch_device().
+pub fn new_beacon(device_proto: &DeviceCreateProto) -> Result<(), String> {
+    // TODO(jmes): Support passing BluetoothBeacon and call patch_device().
 
-    let device_guid = format!("{}_device_guid", &beacon_name);
-    let device_name = format!("{}_device_name", &beacon_name);
-    let chip_name = address; // Use chip_name to store address.
-    let chip_manufacturer = format!("{}_chip_manufacturer", &beacon_name);
-    let chip_product_name = format!("{}_chip_product_name", &beacon_name);
-    let result = match add_chip(
-        &device_guid,
-        &device_name,
-        ChipKind::BLUETOOTH_BEACON,
-        &chip_name,
-        &chip_manufacturer,
-        &chip_product_name,
-    ) {
-        Ok(chip_result) => chip_result,
-        Err(err) => {
-            warn!("{err}");
-            return;
+    let chip_proto = match device_proto.chips.as_slice() {
+        [chip_proto] => chip_proto,
+        _ => return Err(String::from("a beacon device must contain exactly one chip")),
+    };
+
+    let chip_kind = match chip_proto.chip {
+        Some(ChipProto::BleBeacon(_)) => ChipKind::BLUETOOTH_BEACON,
+        Some(_) | None => {
+            return Err(String::from("a beacon device must contain a bluetooth beacon chip"))
         }
     };
+
+    let mut device_guid = BEACON_DEVICE_GUID_FACTORY.lock().unwrap().next_id();
+    add_chip(
+        &format!("beacon-device-{}", device_guid),
+        &device_proto.name,
+        chip_kind,
+        &chip_proto.name,
+        &chip_proto.manufacturer,
+        &chip_proto.product_name,
+    )?;
+
+    Ok(())
 }
