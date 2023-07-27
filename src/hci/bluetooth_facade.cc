@@ -38,6 +38,10 @@
 #include "net/posix/posix_async_socket_server.h"
 #endif
 
+namespace rootcanal::log {
+void SetLogColorEnable(bool);
+}
+
 using netsim::model::State;
 
 namespace netsim::hci::facade {
@@ -181,6 +185,9 @@ void SetUpTestChannel(uint16_t instance_num) {
 // Initialize the rootcanal library.
 void Start(uint16_t instance_num) {
   if (mStarted) return;
+
+  // output is to a file, so no color wanted
+  rootcanal::log::SetLogColorEnable(false);
 
   // When emulators restore from a snapshot the PacketStreamer connection to
   // netsim is recreated with a new (uninitialized) Rootcanal device. However
