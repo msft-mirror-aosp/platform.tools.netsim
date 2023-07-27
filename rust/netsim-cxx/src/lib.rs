@@ -41,8 +41,8 @@ use bluetooth::chip::{
 };
 use cxx::let_cxx_string;
 use ffi::CxxServerResponseWriter;
-use http_server::http_request::StrHeaders;
 use http_server::server_response::ServerResponseWritable;
+use http_server::server_response::StrHeaders;
 
 use crate::transport::dispatcher::handle_response;
 use crate::transport::fd::run_fd_transport;
