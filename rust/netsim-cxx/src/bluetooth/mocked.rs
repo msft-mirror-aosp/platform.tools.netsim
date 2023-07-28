@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crate::bluetooth::{BeaconChip, BEACON_CHIPS};
-use crate::devices::chip::ChipIdentifier;
-use crate::devices::device::AddChipResult;
+use crate::devices::chip::{ChipIdentifier, FacadeIdentifier};
+use crate::devices::device::{AddChipResult, DeviceIdentifier};
 use frontend_proto::model::chip::{Bluetooth, BluetoothBeacon};
 use frontend_proto::model::DeviceCreate;
 
@@ -85,23 +85,24 @@ pub fn refresh_resource() {
     *id_factory = crate::bluetooth::mocked::FacadeIds::new();
 }
 
+// Avoid crossing cxx boundary in tests
 pub fn bluetooth_beacon_add(
-    device_id: u32,
+    device_id: DeviceIdentifier,
     chip_id: ChipIdentifier,
     device_type: String,
     address: String,
-) -> u32 {
-    if BEACON_CHIPS
-        .write()
-        .unwrap()
-        .insert(chip_id, Mutex::new(BeaconChip::new(chip_id, address)))
-        .is_some()
-    {
-        panic!("created a new bluetooth beacon chip with id {chip_id} that was already in use by another beacon chip");
+) -> Result<FacadeIdentifier, String> {
+    let beacon_chip = BeaconChip::new(chip_id, address.clone());
+
+    if BEACON_CHIPS.write().unwrap().insert(chip_id, Mutex::new(beacon_chip)).is_some() {
+        return Err(String::from(
+            "Failed to create a Bluetooth beacon chip with ID {chip_id}: chip ID already exists.",
+        ));
     }
 
     let mut resource = crate::bluetooth::mocked::IDS.write().unwrap();
     let facade_id = resource.current_id;
     resource.current_id += 1;
-    facade_id
+
+    Ok(facade_id)
 }
