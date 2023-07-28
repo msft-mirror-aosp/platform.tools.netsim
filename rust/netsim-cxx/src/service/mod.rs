@@ -20,6 +20,7 @@ use crate::http_server::run_http_server;
 use crate::resource;
 use crate::wifi as wifi_facade;
 use log::info;
+use log::warn;
 use netsim_common::util::netsim_logger;
 use std::env;
 
@@ -77,15 +78,8 @@ impl Service {
         }
 
         if get_dev() {
-            // Create two beacon devices in dev mode.
-            bluetooth_facade::beacon::new_beacon(
-                "test_beacon1".to_string(),
-                "be:ac:01:55:00:01".to_string(),
-            );
-            bluetooth_facade::beacon::new_beacon(
-                "test_beacon2".to_string(),
-                "be:ac:01:55:00:02".to_string(),
-            );
+            new_test_beacon(0);
+            new_test_beacon(1);
         }
     }
 }
@@ -102,4 +96,42 @@ pub fn create_service(
     let service_params =
         ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev };
     Box::new(Service::new(service_params))
+}
+
+pub fn new_test_beacon(idx: u32) {
+    use crate::bluetooth::beacon::new_beacon;
+    use frontend_proto::model::chip::bluetooth_beacon::{
+        AdvertiseData as AdvertiseDataProto, AdvertiseSettings as AdvertiseSettingsProto,
+    };
+    use frontend_proto::model::chip_create::{
+        BluetoothBeaconCreate as BluetoothBeaconCreateProto, Chip as ChipProto,
+    };
+    use frontend_proto::model::{ChipCreate as ChipCreateProto, DeviceCreate as DeviceCreateProto};
+    use protobuf::MessageField;
+
+    if let Err(err) = new_beacon(&DeviceCreateProto {
+        name: format!("test-beacon-device-{idx}"),
+        chips: vec![ChipCreateProto {
+            name: format!("test-beacon-chip-{idx}"),
+            chip: Some(ChipProto::BleBeacon(BluetoothBeaconCreateProto {
+                address: format!("00:00:00:00:00:{:x}", idx),
+                settings: MessageField::some(AdvertiseSettingsProto {
+                    tx_power_level: 0,
+                    interval: 1280,
+                    ..Default::default()
+                }),
+                adv_data: MessageField::some(AdvertiseDataProto {
+                    include_device_name: true,
+                    include_tx_power_level: true,
+                    manufacturer_data: vec![1u8, 2, 3, 4],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }],
+        ..Default::default()
+    }) {
+        warn!("Failed to create beacon device {idx}: {err}");
+    }
 }

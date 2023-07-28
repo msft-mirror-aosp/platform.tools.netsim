@@ -79,6 +79,7 @@ pub fn refresh_resource() {
 
 pub mod beacon {
     use super::IDS;
+    use frontend_proto::model::DeviceCreate as DeviceCreateProto;
 
     pub fn bluetooth_beacon_add(
         device_id: u32,
@@ -92,5 +93,7 @@ pub mod beacon {
         facade_id
     }
 
-    pub fn new_beacon(beacon_name: String, address: String) {}
+    pub fn new_beacon(device_proto: &DeviceCreateProto) -> Result<(), String> {
+        Ok(())
+    }
 }
