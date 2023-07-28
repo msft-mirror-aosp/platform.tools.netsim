@@ -12,17 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use frontend_proto::model::chip::Bluetooth;
+use crate::bluetooth::{BeaconChip, BEACON_CHIPS};
+use crate::devices::chip::ChipIdentifier;
+use crate::devices::device::AddChipResult;
+use frontend_proto::model::chip::{Bluetooth, BluetoothBeacon};
+use frontend_proto::model::DeviceCreate;
+
 use lazy_static::lazy_static;
 use log::info;
+use std::sync::Mutex;
 use std::sync::RwLock;
+use std::{collections::HashMap, ptr::null};
 
 lazy_static! {
     static ref IDS: RwLock<FacadeIds> = RwLock::new(FacadeIds::new());
 }
 
 struct FacadeIds {
-    current_id: u32,
+    pub current_id: u32,
 }
 
 impl FacadeIds {
@@ -73,27 +80,28 @@ pub fn bluetooth_stop() {
 
 /// Refresh Resource for Rust tests
 pub fn refresh_resource() {
-    let mut resource = IDS.write().unwrap();
-    resource.current_id = 0;
+    BEACON_CHIPS.write().unwrap().clear();
+    let mut id_factory = crate::bluetooth::mocked::IDS.write().unwrap();
+    *id_factory = crate::bluetooth::mocked::FacadeIds::new();
 }
 
-pub mod beacon {
-    use super::IDS;
-    use frontend_proto::model::DeviceCreate as DeviceCreateProto;
-
-    pub fn bluetooth_beacon_add(
-        device_id: u32,
-        chip_id: u32,
-        device_type: String,
-        address: String,
-    ) -> u32 {
-        let mut resource = IDS.write().unwrap();
-        let facade_id = resource.current_id;
-        resource.current_id += 1;
-        facade_id
+pub fn bluetooth_beacon_add(
+    device_id: u32,
+    chip_id: ChipIdentifier,
+    device_type: String,
+    address: String,
+) -> u32 {
+    if BEACON_CHIPS
+        .write()
+        .unwrap()
+        .insert(chip_id, Mutex::new(BeaconChip::new(chip_id, address)))
+        .is_some()
+    {
+        panic!("created a new bluetooth beacon chip with id {chip_id} that was already in use by another beacon chip");
     }
 
-    pub fn new_beacon(device_proto: &DeviceCreateProto) -> Result<(), String> {
-        Ok(())
-    }
+    let mut resource = crate::bluetooth::mocked::IDS.write().unwrap();
+    let facade_id = resource.current_id;
+    resource.current_id += 1;
+    facade_id
 }
