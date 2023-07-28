@@ -99,7 +99,7 @@ pub fn create_service(
 }
 
 pub fn new_test_beacon(idx: u32) {
-    use crate::bluetooth::beacon::new_beacon;
+    use crate::bluetooth::new_beacon;
     use frontend_proto::model::chip::bluetooth_beacon::{
         AdvertiseData as AdvertiseDataProto, AdvertiseSettings as AdvertiseSettingsProto,
     };
