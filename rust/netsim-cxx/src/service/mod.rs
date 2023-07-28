@@ -64,7 +64,14 @@ impl Service {
 
     /// Runs the netsimd services.
     pub fn run(&self) {
-        // TODO: run servers, like calling run_http_server().
+        // TODO: run grpc server.
+
+        if !self.service_params.fd_startup_str.is_empty() {
+            unsafe {
+                use crate::transport::fd::run_fd_transport;
+                run_fd_transport(&self.service_params.fd_startup_str);
+            }
+        }
 
         // Environment variable "NETSIM_GRPC_PORT" is set in forge
         // jobs. We do not run http server on forge.
