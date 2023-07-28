@@ -14,12 +14,16 @@
 
 use super::adv_data;
 use super::chip::{rust_bluetooth_add, RustBluetoothChipCallbacks};
+use crate::devices::chip::ChipIdentifier;
+use crate::devices::device::AddChipResult;
 use crate::devices::{devices_handler::add_chip, id_factory::IdFactory};
 use crate::ffi::{generate_advertising_packet, generate_scan_response_packet, RustBluetoothChip};
 use cxx::{let_cxx_string, UniquePtr};
 use frontend_proto::common::ChipKind;
-use frontend_proto::model::chip::bluetooth_beacon::{
-    AdvertiseData as AdvertiseDataProto, AdvertiseSettings as AdvertiseSettingsProto,
+use frontend_proto::model::chip::{
+    bluetooth_beacon::AdvertiseData as AdvertiseDataProto,
+    bluetooth_beacon::AdvertiseSettings as AdvertiseSettingsProto,
+    BluetoothBeacon as BluetoothBeaconProto,
 };
 use frontend_proto::model::chip_create::{
     BluetoothBeaconCreate as BluetoothBeaconCreateProto, Chip as ChipProto,
@@ -27,6 +31,7 @@ use frontend_proto::model::chip_create::{
 use frontend_proto::model::{ChipCreate as ChipCreateProto, DeviceCreate as DeviceCreateProto};
 use lazy_static::lazy_static;
 use log::{error, info, warn};
+use protobuf::MessageField;
 use std::alloc::System;
 use std::sync::{Mutex, RwLock};
 use std::time::{Duration, Instant};
@@ -39,12 +44,15 @@ static DEFAULT_TX_POWER: i8 = 0;
 // PhyType::LOW_ENERGY defined in $ROOTCANAL/include/phy.h
 static PHY_TYPE_LE: u8 = 0;
 // From Beacon::Beacon constructor referenced in $ROOTCANAL/model/devices/beacon.cc
-static ADVERTISING_INTERVAL_MS: u64 = 1280;
+pub static ADVERTISING_INTERVAL_MS: u64 = 1280;
 
 lazy_static! {
     // A singleton that contains a hash map from chip id to RustBluetoothChip.
     // It's used by `BeaconChip` to access `RustBluetoothChip` to call send_link_layer_packet().
-    static ref BLUETOOTH_BEACON_CHIPS: RwLock<HashMap<u32, Mutex<UniquePtr<RustBluetoothChip>>>> =
+    static ref BT_CHIPS: RwLock<HashMap<ChipIdentifier, Mutex<UniquePtr<RustBluetoothChip>>>> =
+        RwLock::new(HashMap::new());
+    // Used to find beacon chip based on it's id from static methods.
+    pub(crate) static ref BEACON_CHIPS: RwLock<HashMap<ChipIdentifier, Mutex<BeaconChip>>> =
         RwLock::new(HashMap::new());
     // Factory for beacon device GUIDs.
     static ref BEACON_DEVICE_GUID_FACTORY: Mutex<IdFactory<usize>> = Mutex::new(IdFactory::new(0, 1));
@@ -52,7 +60,7 @@ lazy_static! {
 
 /// BeaconChip class.
 pub struct BeaconChip {
-    chip_id: u32,
+    chip_id: ChipIdentifier,
     address: String,
     advertising_data: Vec<u8>,
     advertising_last: Option<Instant>,
@@ -60,7 +68,7 @@ pub struct BeaconChip {
 }
 
 impl BeaconChip {
-    pub fn new(chip_id: u32, address: String) -> Self {
+    pub fn new(chip_id: ChipIdentifier, address: String) -> Self {
         BeaconChip {
             chip_id,
             address,
@@ -72,7 +80,7 @@ impl BeaconChip {
 
     pub fn from_proto(
         device_name: String,
-        chip_id: u32,
+        chip_id: ChipIdentifier,
         beacon_proto: &BluetoothBeaconCreateProto,
     ) -> Result<Self, String> {
         Ok(BeaconChip {
@@ -94,7 +102,7 @@ impl BeaconChip {
     }
 
     pub fn send_link_layer_packet(&mut self, packet: &[u8], packet_type: u8, tx_power: i8) {
-        let binding = BLUETOOTH_BEACON_CHIPS.read().unwrap();
+        let binding = BT_CHIPS.read().unwrap();
         if let Some(rust_bluetooth_chip) = binding.get(&self.chip_id) {
             rust_bluetooth_chip.lock().unwrap().pin_mut().send_link_layer_packet(
                 packet,
@@ -137,9 +145,10 @@ impl RustBluetoothChipCallbacks for BeaconChip {
 /// Called by `devices/chip.rs`.
 ///
 /// Similar to `bluetooth_add()`.
+#[cfg(not(test))]
 pub fn bluetooth_beacon_add(
     device_id: u32,
-    chip_id: u32,
+    chip_id: ChipIdentifier,
     device_type: String,
     address: String,
 ) -> u32 {
@@ -150,14 +159,54 @@ pub fn bluetooth_beacon_add(
     let facade_id = add_rust_device_result.facade_id;
 
     info!("Creating HCI facade {} for device {} chip {}", facade_id, device_id, chip_id);
-    BLUETOOTH_BEACON_CHIPS.write().unwrap().insert(chip_id, Mutex::new(rust_chip));
+    BT_CHIPS.write().unwrap().insert(chip_id, Mutex::new(rust_chip));
     facade_id
 }
 
-// TODO(jmes) Support removing Beacon.
+// TODO(jmes) Support removing Beacon (b/292234625).
+
+pub fn bluetooth_beacon_patch(
+    chip_id: ChipIdentifier,
+    patch: &BluetoothBeaconProto,
+) -> Result<(), String> {
+    let guard = BEACON_CHIPS.read().unwrap();
+    let mut beacon = guard
+        .get(&chip_id)
+        .ok_or("could not find bluetooth beacon with chip id {chip_id} for patching")?
+        .lock()
+        .unwrap();
+
+    // TODO(jmes): Support patching other beacon parameters
+    beacon.advertising_interval = Duration::from_millis(patch.settings.interval);
+
+    Ok(())
+}
+
+pub fn bluetooth_beacon_get(chip_id: ChipIdentifier) -> Result<BluetoothBeaconProto, String> {
+    let guard = BEACON_CHIPS.read().unwrap();
+    let beacon = guard
+        .get(&chip_id)
+        .ok_or("could not get bluetooth beacon with chip id {chip_id}")?
+        .lock()
+        .unwrap();
+
+    Ok(BluetoothBeaconProto {
+        address: beacon.address.clone(),
+        settings: MessageField::some(AdvertiseSettingsProto {
+            interval: beacon
+                .advertising_interval
+                .as_millis()
+                .try_into()
+                .map_err(|err| String::from("{err}"))?,
+            ..Default::default()
+        }),
+        adv_data: MessageField::none(),
+        ..Default::default()
+    })
+}
 
 /// Create a new beacon device. Used by CLI or web.
-pub fn new_beacon(device_proto: &DeviceCreateProto) -> Result<(), String> {
+pub fn new_beacon(device_proto: &DeviceCreateProto) -> Result<AddChipResult, String> {
     // TODO(jmes): Support passing BluetoothBeacon and call patch_device().
 
     let chip_proto = match device_proto.chips.as_slice() {
@@ -180,7 +229,58 @@ pub fn new_beacon(device_proto: &DeviceCreateProto) -> Result<(), String> {
         &chip_proto.name,
         &chip_proto.manufacturer,
         &chip_proto.product_name,
-    )?;
+    )
+}
 
-    Ok(())
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::bluetooth::{bluetooth_beacon_add, refresh_resource};
+
+    lazy_static! {
+        static ref MUTEX: Mutex<()> = Mutex::new(());
+    }
+
+    #[test]
+    fn test_beacon_get() {
+        let _lock = MUTEX.lock().unwrap();
+        refresh_resource();
+
+        let chip_id: ChipIdentifier = 0;
+        bluetooth_beacon_add(0, chip_id, String::from(""), String::from(""));
+
+        let beacon_proto = bluetooth_beacon_get(chip_id);
+
+        assert!(beacon_proto.is_ok(), "{}", beacon_proto.unwrap_err());
+        assert_eq!(ADVERTISING_INTERVAL_MS, beacon_proto.unwrap().settings.interval);
+    }
+
+    #[test]
+    fn test_beacon_patch() {
+        let _lock = MUTEX.lock().unwrap();
+        refresh_resource();
+
+        let chip_id: ChipIdentifier = 0;
+        let interval = 33;
+
+        bluetooth_beacon_add(0, chip_id, String::from(""), String::from(""));
+
+        let patch_result = bluetooth_beacon_patch(
+            chip_id,
+            &BluetoothBeaconProto {
+                settings: MessageField::some(AdvertiseSettingsProto {
+                    interval,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
+
+        assert!(patch_result.is_ok(), "{}", patch_result.unwrap_err());
+
+        let beacon_proto = bluetooth_beacon_get(chip_id);
+
+        assert!(beacon_proto.is_ok(), "{}", beacon_proto.unwrap_err());
+        assert_eq!(interval, beacon_proto.unwrap().settings.interval);
+    }
 }
