@@ -124,7 +124,7 @@ pub fn add_chip(
                     chip_id,
                     "beacon".to_string(),
                     chip_name.to_string(),
-                ),
+                )?,
                 ProtoChipKind::WIFI => wifi_facade::wifi_add(device_id),
                 _ => return Err(format!("Unknown chip kind: {:?}", chip_kind)),
             };
@@ -560,9 +560,7 @@ mod tests {
     use netsim_common::util::netsim_logger::init_for_test;
     use protobuf_json_mapping::print_to_string;
 
-    use crate::{
-        bluetooth::ADVERTISING_INTERVAL_MS, http_server::server_response::ServerResponseWriter,
-    };
+    use crate::http_server::server_response::ServerResponseWriter;
 
     use super::*;
 
@@ -1204,7 +1202,8 @@ mod tests {
         // regenerate_golden_files_helper();
     }
 
-    use crate::bluetooth::refresh_resource as refresh_bluetooth_resource;
+    use bluetooth_facade::tests::MUTEX as BEACON_MUTEX;
+    use bluetooth_facade::ADVERTISING_INTERVAL_MS;
     use frontend_proto::model::chip::Chip::BleBeacon;
     use frontend_proto::model::chip::{bluetooth_beacon::AdvertiseSettings, BluetoothBeacon, Chip};
     use frontend_proto::model::chip_create;
@@ -1217,6 +1216,10 @@ mod tests {
         bluetooth_facade::new_beacon(&DeviceCreate {
             chips: vec![ChipCreate {
                 chip: Some(chip_create::Chip::BleBeacon(chip_create::BluetoothBeaconCreate {
+                    settings: MessageField::some(AdvertiseSettings {
+                        interval: ADVERTISING_INTERVAL_MS,
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -1228,12 +1231,10 @@ mod tests {
 
     #[test]
     fn test_get_beacon_device() {
-        let _lock = MUTEX.lock().unwrap();
+        let _locks = (MUTEX.lock().unwrap(), BEACON_MUTEX.lock().unwrap());
 
         logger_setup();
-
         refresh_resource();
-        refresh_bluetooth_resource();
 
         let ids = bluetooth_beacon_create();
         let devices = clone_devices();
@@ -1255,14 +1256,12 @@ mod tests {
 
     #[test]
     fn test_patch_beacon_device() {
-        let _lock = MUTEX.lock().unwrap();
+        let _locks = (MUTEX.lock().unwrap(), BEACON_MUTEX.lock().unwrap());
 
         logger_setup();
+        refresh_resource();
 
         let interval = 1000;
-
-        refresh_resource();
-        refresh_bluetooth_resource();
 
         let ids = bluetooth_beacon_create();
         let devices = clone_devices();
