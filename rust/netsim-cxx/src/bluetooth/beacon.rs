@@ -44,7 +44,7 @@ static DEFAULT_TX_POWER: i8 = 0;
 // PhyType::LOW_ENERGY defined in $ROOTCANAL/include/phy.h
 static PHY_TYPE_LE: u8 = 0;
 // From Beacon::Beacon constructor referenced in $ROOTCANAL/model/devices/beacon.cc
-pub static ADVERTISING_INTERVAL_MS: u64 = 1280;
+static ADVERTISING_INTERVAL_MS: u64 = 1280;
 
 lazy_static! {
     // A singleton that contains a hash map from chip id to RustBluetoothChip.
@@ -273,17 +273,8 @@ pub mod tests {
     use super::*;
     use crate::bluetooth::{bluetooth_beacon_add, refresh_resource};
 
-    lazy_static! {
-        pub(crate) static ref MUTEX: Mutex<()> = Mutex::new(());
-    }
-
-    #[test]
-    pub fn test_new_beacon() {
-        let _lock = MUTEX.lock().unwrap();
-        refresh_resource();
-
-        let interval = 9999;
-        let ids = new_beacon(&DeviceCreateProto {
+    fn new_test_beacon_with_interval(interval: u64) -> Result<AddChipResult, String> {
+        new_beacon(&DeviceCreateProto {
             name: String::from("test-beacon-device"),
             chips: vec![ChipCreateProto {
                 name: String::from("test-beacon-chip"),
@@ -298,48 +289,36 @@ pub mod tests {
                 ..Default::default()
             }],
             ..Default::default()
-        });
+        })
+    }
 
-        assert!(ids.is_ok());
-        let chip_id = ids.unwrap().chip_id;
-
-        let guard = BEACON_CHIPS.read().unwrap();
-        let beacon = guard
-            .get(&chip_id)
-            .expect("could not get bluetooth beacon with chip id {chip_id}")
-            .lock()
-            .unwrap();
-
-        assert_eq!(
-            interval,
-            <u128 as std::convert::TryInto<u64>>::try_into(beacon.advertising_interval.as_millis())
-                .unwrap()
-        );
+    fn cleanup_beacon(chip_id: ChipIdentifier) {
+        BEACON_CHIPS.write().unwrap().remove(&chip_id);
     }
 
     #[test]
     fn test_beacon_get() {
-        let _lock = MUTEX.lock().unwrap();
-        refresh_resource();
+        let interval = 9999;
 
-        let chip_id: ChipIdentifier = 0;
-        bluetooth_beacon_add(0, chip_id, String::from(""), String::from(""));
+        let ids = new_test_beacon_with_interval(interval);
+        assert!(ids.is_ok());
+        let chip_id = ids.unwrap().chip_id;
 
-        let beacon_proto = bluetooth_beacon_get(chip_id);
+        let beacon = bluetooth_beacon_get(chip_id)
+            .expect("could not get bluetooth beacon with id {chip_id} for testing");
 
-        assert!(beacon_proto.is_ok(), "{}", beacon_proto.unwrap_err());
-        assert_eq!(ADVERTISING_INTERVAL_MS, beacon_proto.unwrap().settings.interval);
+        assert_eq!(interval, beacon.settings.interval);
+        cleanup_beacon(chip_id);
     }
 
     #[test]
     fn test_beacon_patch() {
-        let _lock = MUTEX.lock().unwrap();
-        refresh_resource();
-
         let chip_id: ChipIdentifier = 0;
         let interval = 33;
 
-        bluetooth_beacon_add(0, chip_id, String::from(""), String::from(""));
+        let ids = new_test_beacon_with_interval(0);
+        assert!(ids.is_ok());
+        let chip_id = ids.unwrap().chip_id;
 
         let patch_result = bluetooth_beacon_patch(
             chip_id,
@@ -358,5 +337,6 @@ pub mod tests {
 
         assert!(beacon_proto.is_ok(), "{}", beacon_proto.unwrap_err());
         assert_eq!(interval, beacon_proto.unwrap().settings.interval);
+        cleanup_beacon(chip_id);
     }
 }
