@@ -24,10 +24,9 @@ use frontend_proto::common::ChipKind as ProtoChipKind;
 use frontend_proto::model::Chip as ProtoChip;
 use lazy_static::lazy_static;
 use protobuf::EnumOrUnknown;
-
 use std::sync::RwLock;
 
-pub type ChipIdentifier = i32;
+pub type ChipIdentifier = u32;
 pub type FacadeIdentifier = u32;
 
 const INITIAL_CHIP_ID: ChipIdentifier = 1000;
@@ -83,8 +82,8 @@ impl Chip {
             (Ok(ProtoChipKind::BLUETOOTH), Some(facade_id)) => {
                 chip.set_bt(bluetooth_facade::bluetooth_get(facade_id));
             }
-            (Ok(ProtoChipKind::BLUETOOTH_BEACON), Some(facade_id)) => {
-                chip.set_bt(bluetooth_facade::bluetooth_get(facade_id));
+            (Ok(ProtoChipKind::BLUETOOTH_BEACON), Some(_)) => {
+                chip.set_ble_beacon(bluetooth_facade::bluetooth_beacon_get(self.id)?);
             }
             (Ok(ProtoChipKind::WIFI), Some(facade_id)) => {
                 chip.set_wifi(wifi_facade::wifi_get(facade_id));
@@ -121,10 +120,7 @@ impl Chip {
                     && patch.has_ble_beacon()
                     && patch.ble_beacon().bt.is_some()
                 {
-                    bluetooth_facade::bluetooth_patch(
-                        facade_id,
-                        &patch.ble_beacon().bt.clone().unwrap(),
-                    );
+                    bluetooth_facade::bluetooth_beacon_patch(self.id, patch.ble_beacon())?;
                     Ok(())
                 } else if self.kind == ProtoChipKind::WIFI && patch.has_wifi() {
                     wifi_facade::wifi_patch(facade_id, patch.wifi());

@@ -27,7 +27,7 @@ use frontend_proto::model::Orientation as ProtoOrientation;
 use frontend_proto::model::Position as ProtoPosition;
 use std::collections::BTreeMap;
 
-pub type DeviceIdentifier = i32;
+pub type DeviceIdentifier = u32;
 
 pub struct Device {
     pub id: DeviceIdentifier,
@@ -52,7 +52,7 @@ impl Device {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AddChipResult {
     pub device_id: DeviceIdentifier,
     pub chip_id: ChipIdentifier,
@@ -93,6 +93,8 @@ impl Device {
             if patch_chip_kind == ProtoChipKind::UNSPECIFIED {
                 if patch_chip.has_bt() {
                     patch_chip_kind = ProtoChipKind::BLUETOOTH;
+                } else if patch_chip.has_ble_beacon() {
+                    patch_chip_kind = ProtoChipKind::BLUETOOTH_BEACON;
                 } else if patch_chip.has_wifi() {
                     patch_chip_kind = ProtoChipKind::WIFI;
                 } else if patch_chip.has_uwb() {
