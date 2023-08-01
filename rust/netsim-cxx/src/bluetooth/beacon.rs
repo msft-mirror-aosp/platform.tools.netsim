@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::adv_data;
+use super::advertise_data::{self, AdvertiseData};
 use super::chip::{rust_bluetooth_add, RustBluetoothChipCallbacks};
 use crate::devices::chip::{ChipIdentifier, FacadeIdentifier};
 use crate::devices::device::{AddChipResult, DeviceIdentifier};
@@ -62,9 +62,9 @@ lazy_static! {
 pub struct BeaconChip {
     chip_id: ChipIdentifier,
     address: String,
-    advertising_data: Vec<u8>,
-    advertising_last: Option<Instant>,
-    advertising_interval: Duration,
+    advertise_data: AdvertiseData,
+    advertise_last: Option<Instant>,
+    advertise_interval: Duration,
 }
 
 impl BeaconChip {
@@ -72,9 +72,9 @@ impl BeaconChip {
         BeaconChip {
             chip_id,
             address,
-            advertising_data: Vec::new(),
-            advertising_last: None,
-            advertising_interval: Duration::from_millis(ADVERTISING_INTERVAL_MS),
+            advertise_data: advertise_data::Builder::new().build().unwrap(),
+            advertise_last: None,
+            advertise_interval: Duration::from_millis(ADVERTISING_INTERVAL_MS),
         }
     }
 
@@ -86,7 +86,7 @@ impl BeaconChip {
         Ok(BeaconChip {
             chip_id,
             address: beacon_proto.address.clone(),
-            advertising_data: adv_data::Builder::from_proto(
+            advertise_data: advertise_data::Builder::from_proto(
                 device_name,
                 beacon_proto
                     .settings
@@ -96,8 +96,8 @@ impl BeaconChip {
                 &beacon_proto.adv_data,
             )
             .build()?,
-            advertising_last: None,
-            advertising_interval: Duration::from_millis(beacon_proto.settings.interval),
+            advertise_last: None,
+            advertise_interval: Duration::from_millis(beacon_proto.settings.interval),
         })
     }
 
@@ -130,14 +130,14 @@ impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
             .lock()
             .unwrap();
 
-        if let Some(last) = beacon.advertising_last {
-            if last.elapsed() <= beacon.advertising_interval {
+        if let Some(last) = beacon.advertise_last {
+            if last.elapsed() <= beacon.advertise_interval {
                 return;
             }
         }
 
-        beacon.advertising_last = Some(Instant::now());
-        let packet = generate_advertising_packet(&beacon.address, &beacon.advertising_data);
+        beacon.advertise_last = Some(Instant::now());
+        let packet = generate_advertising_packet(&beacon.address, &beacon.advertise_data.bytes);
         beacon.send_link_layer_packet(&packet, PHY_TYPE_LE, DEFAULT_TX_POWER);
     }
 
@@ -198,7 +198,7 @@ pub fn bluetooth_beacon_patch(
         .unwrap();
 
     // TODO(jmes): Support patching other beacon parameters
-    beacon.advertising_interval = Duration::from_millis(patch.settings.interval);
+    beacon.advertise_interval = Duration::from_millis(patch.settings.interval);
 
     Ok(())
 }
@@ -215,7 +215,7 @@ pub fn bluetooth_beacon_get(chip_id: ChipIdentifier) -> Result<BluetoothBeaconPr
         address: beacon.address.clone(),
         settings: MessageField::some(AdvertiseSettingsProto {
             interval: beacon
-                .advertising_interval
+                .advertise_interval
                 .as_millis()
                 .try_into()
                 .map_err(|err| String::from("{err}"))?,
