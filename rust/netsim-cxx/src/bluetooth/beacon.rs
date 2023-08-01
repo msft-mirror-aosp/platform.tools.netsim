@@ -137,8 +137,8 @@ impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
         }
 
         beacon.advertising_last = Some(Instant::now());
-        // TODO(jmes): Call generate_advertising_packet and send_link_layer_packet after b/290232432 is fixed.
-        warn!("Sending packets from beacons is currently unsupported due to b/290232432.")
+        let packet = generate_advertising_packet(&beacon.address, &beacon.advertising_data);
+        beacon.send_link_layer_packet(&packet, PHY_TYPE_LE, DEFAULT_TX_POWER);
     }
 
     fn receive_link_layer_packet(
