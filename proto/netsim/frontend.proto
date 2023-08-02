@@ -38,7 +38,7 @@ service FrontendService {
   rpc RegisterEvents(google.protobuf.Empty) returns (stream Event);
 
   // Create a builtin device
-  rpc CreateDevice(CreateDeviceRequest) returns (google.protobuf.Empty);
+  rpc CreateDevice(CreateDeviceRequest) returns (CreateDeviceResponse);
 
   // (deprecated with C++ controller) Patch a device
   rpc PatchDevice(PatchDeviceRequest) returns (google.protobuf.Empty);
@@ -90,6 +90,10 @@ message SetLinkLossRequest {
 
 message CreateDeviceRequest {
   netsim.model.DeviceCreate device = 1;
+}
+
+message CreateDeviceResponse {
+  netsim.model.Device device = 1;
 }
 
 message PatchDeviceRequest {
