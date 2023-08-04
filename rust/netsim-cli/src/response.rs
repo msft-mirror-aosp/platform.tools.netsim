@@ -15,6 +15,7 @@
 use std::cmp::max;
 
 use crate::args::{self, Beacon, BeaconPatch, Capture, Command, OnOffState};
+use crate::display::{self, Displayer};
 use frontend_proto::{
     common::ChipKind,
     frontend::{ListCaptureResponse, ListDeviceResponse, VersionResponse},
@@ -109,7 +110,7 @@ impl args::Command {
         let state_width = 5;
         let cnt_width = 9;
         let chip_indent = 2;
-        let radio_width = 9;
+        let radio_width = 16;
         if verbose {
             if response.devices.is_empty() {
                 println!("No attached devices found.");
@@ -166,6 +167,20 @@ impl args::Command {
                                 Self::chip_state_to_string(uwb_chip.state.enum_value_or_default()),
                                 uwb_chip.rx_count,
                                 uwb_chip.tx_count,
+                            );
+                        }
+                        Some(Chip_oneof_chip::BleBeacon(ble_beacon)) => {
+                            let radio = ble_beacon.bt.low_energy.as_ref().unwrap_or_default();
+                            println!(
+                                "{:chip_indent$}{:radio_width$} {}",
+                                "",
+                                format!("ble-beacon ({}):", chip.name),
+                                Displayer::new(radio, true),
+                            );
+                            println!(
+                                "{}",
+                                Displayer::new(ble_beacon, true)
+                                    .indent(chip_indent + display::INDENT_INCREMENT)
                             );
                         }
                         _ => println!("{:chip_indent$}Unknown chip: down  ", ""),
@@ -233,6 +248,17 @@ impl args::Command {
                                     Self::chip_state_to_string(
                                         uwb_chip.state.enum_value_or_default()
                                     )
+                                );
+                            }
+                        }
+                        Some(Chip_oneof_chip::BleBeacon(ble_beacon)) => {
+                            let radio = ble_beacon.bt.low_energy.as_ref().unwrap_or_default();
+                            if radio.state.enum_value_or_default() == State::OFF {
+                                println!(
+                                    "{:chip_indent$}{:radio_width$} {}",
+                                    "",
+                                    format!("ble-beacon ({}):", chip.name),
+                                    Displayer::new(radio, false),
                                 );
                             }
                         }
