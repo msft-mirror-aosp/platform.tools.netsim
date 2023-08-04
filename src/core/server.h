@@ -16,7 +16,11 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
 #include <string>
+
+#include "grpcpp/server.h"
 
 namespace netsim::server {
 
@@ -25,9 +29,25 @@ struct ServerParams {
   bool no_cli_ui;
   bool no_web_ui;
   int hci_port;
+  int instance_num;
   bool dev;
 };
 
+class GrpcServer {
+ public:
+  GrpcServer(std::unique_ptr<grpc::Server> server)
+      : server(std::move(server)) {}
+
+  void Shutdown() const { server->Shutdown(); }
+
+ private:
+  std::unique_ptr<grpc::Server> server;
+};
+
+// Run grpc server.
+std::unique_ptr<GrpcServer> RunGrpcServerCxx(uint32_t netsim_grpc_port,
+                                             bool no_cli_ui,
+                                             uint16_t instance_num);
 // Run grpc and http servers.
 void Run(ServerParams params);
 

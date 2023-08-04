@@ -16,9 +16,7 @@
 
 #include <chrono>
 #include <memory>
-#include <optional>
 #include <string>
-#include <thread>
 
 #include "backend/grpc_server.h"
 #include "frontend/frontend_server.h"
@@ -26,7 +24,6 @@
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
 #include "netsim-cxx/src/lib.rs.h"
-#include "util/filesystem.h"
 #include "util/ini_file.h"
 #include "util/log.h"
 #include "util/os_utils.h"
@@ -42,7 +39,7 @@ namespace {
 constexpr std::chrono::seconds InactivityCheckInterval(5);
 
 std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
-                                            bool no_cli_ui) {
+                                            bool no_cli_ui, int instance_num) {
   grpc::ServerBuilder builder;
   int selected_port;
   builder.AddListeningPort("0.0.0.0:" + std::to_string(netsim_grpc_port),
@@ -63,7 +60,7 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
          std::to_string(selected_port).c_str());
 
   // Writes grpc port to ini file.
-  auto filepath = osutils::GetNetsimIniFilepath();
+  auto filepath = osutils::GetNetsimIniFilepath(instance_num);
   IniFile iniFile(filepath);
   iniFile.Read();
   iniFile.Set("grpc.port", std::to_string(selected_port));
@@ -73,48 +70,21 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
 }
 }  // namespace
 
+std::unique_ptr<GrpcServer> RunGrpcServerCxx(uint32_t netsim_grpc_port,
+                                             bool no_cli_ui,
+                                             uint16_t instance_num) {
+  auto grpc_server = RunGrpcServer(netsim_grpc_port, no_cli_ui, instance_num);
+  if (grpc_server == nullptr) return nullptr;
+  return std::make_unique<GrpcServer>(std::move(grpc_server));
+}
+
 void Run(ServerParams params) {
-  auto rust_service =
-      netsim::CreateService(params.fd_startup_str, params.no_cli_ui,
-                            params.no_web_ui, params.hci_port, params.dev);
+  auto rust_service = netsim::CreateService(
+      params.fd_startup_str, params.no_cli_ui, params.no_web_ui,
+      params.hci_port, params.instance_num, params.dev);
   rust_service->SetUp();
 
-#ifndef NETSIM_ANDROID_EMULATOR
-  netsim::RunFdTransport(params.fd_startup_str);
-#endif
-
-  // Environment variable "NETSIM_GRPC_PORT" is set in google3 forge. If set:
-  // 1. Use the fixed port for grpc server.
-  // 2. Don't start http server.
-  auto netsim_grpc_port = std::stoi(osutils::GetEnv("NETSIM_GRPC_PORT", "0"));
-
-  // Run backend and optionally frontend grpc servers (based on no_cli_ui).
-  auto grpc_server = RunGrpcServer(netsim_grpc_port, params.no_cli_ui);
-  if (grpc_server == nullptr) {
-    BtsLog("Failed to start Grpc server");
-    return;
-  }
-
   rust_service->Run();
-
-  // no_web_ui disables the web server
-  if (netsim_grpc_port == 0 && !params.no_web_ui) {
-    // Run frontend http server.
-    std::thread(RunHttpServer).detach();
-  }
-
-  // Run the socket server.
-  BtsLog("RunSocketTransport:%d", params.hci_port);
-  RunSocketTransport(params.hci_port);
-
-  while (true) {
-    std::this_thread::sleep_for(InactivityCheckInterval);
-    if (netsim::device::IsShutdownTimeCxx()) {
-      grpc_server->Shutdown();
-      BtsLog("Netsim has been shutdown due to inactivity.");
-      break;
-    }
-  }
 }
 
 }  // namespace netsim::server

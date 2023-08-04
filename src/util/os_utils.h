@@ -37,17 +37,22 @@ std::string GetDiscoveryDirectory();
 /**
  * Return the path of netsim ini file.
  */
-std::string GetNetsimIniFilepath();
+std::string GetNetsimIniFilepath(uint16_t instance_num);
 
 /**
  * Return the frontend grpc port.
  */
-std::optional<std::string> GetServerAddress(bool frontend_server = true);
+std::optional<std::string> GetServerAddress(uint16_t instance_num = 0);
 
 /**
  * Redirect stdout and stderr to file.
  */
 void RedirectStdStream(std::string netsim_temp_dir);
+
+/**
+ * Get netsimd instance number.
+ */
+uint16_t GetInstance(uint16_t instance_flag);
 
 }  // namespace osutils
 }  // namespace netsim

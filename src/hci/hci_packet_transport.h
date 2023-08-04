@@ -42,6 +42,8 @@ class HciPacketTransport : public rootcanal::HciTransport {
   static void Add(rootcanal::PhyDevice::Identifier id,
                   const std::shared_ptr<HciPacketTransport> &transport);
 
+  static void Remove(rootcanal::PhyDevice::Identifier id);
+
   /**
    * @brief Constructor for HciPacketTransport class.
    *
@@ -49,18 +51,9 @@ class HciPacketTransport : public rootcanal::HciTransport {
    */
   void Connect(rootcanal::PhyDevice::Identifier device_id);
 
-  void SendEvent(const std::vector<uint8_t> &packet) override;
+  void Send(rootcanal::PacketType packet_type, const std::vector<uint8_t> &packet) override;
 
-  void SendAcl(const std::vector<uint8_t> &packet) override;
-
-  void SendSco(const std::vector<uint8_t> &packet) override;
-
-  void SendIso(const std::vector<uint8_t> &packet) override;
-
-  void RegisterCallbacks(PacketCallback command_callback,
-                         PacketCallback acl_callback,
-                         PacketCallback sco_callback,
-                         PacketCallback iso_callback,
+  void RegisterCallbacks(PacketCallback packet_callback,
                          CloseCallback close_callback) override;
 
   void Tick() override;
@@ -71,15 +64,7 @@ class HciPacketTransport : public rootcanal::HciTransport {
                const std::shared_ptr<std::vector<uint8_t>> &packet);
 
  private:
-  void Response(packet::HCIPacket_PacketType packet_type,
-                const std::vector<uint8_t> &packet);
-  rootcanal::PacketCallback PacketTypeCallback(
-      packet::HCIPacket_PacketType packet_type);
-
-  rootcanal::PacketCallback mAclCallback;
-  rootcanal::PacketCallback mCommandCallback;
-  rootcanal::PacketCallback mScoCallback;
-  rootcanal::PacketCallback mIsoCallback;
+  rootcanal::PacketCallback mPacketCallback;
   rootcanal::CloseCallback mCloseCallback;
   // Device ID is the same as Chip Id externally.
   std::optional<rootcanal::PhyDevice::Identifier> mDeviceId;

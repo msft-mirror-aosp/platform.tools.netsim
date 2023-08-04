@@ -37,6 +37,9 @@ service FrontendService {
   // Register for device movement and emulated radio state events
   rpc RegisterEvents(google.protobuf.Empty) returns (stream Event);
 
+  // Create a builtin device
+  rpc CreateDevice(CreateDeviceRequest) returns (CreateDeviceResponse);
+
   // (deprecated with C++ controller) Patch a device
   rpc PatchDevice(PatchDeviceRequest) returns (google.protobuf.Empty);
 
@@ -85,6 +88,14 @@ message SetLinkLossRequest {
   float link_loss = 4;
 }
 
+message CreateDeviceRequest {
+  netsim.model.DeviceCreate device = 1;
+}
+
+message CreateDeviceResponse {
+  netsim.model.Device device = 1;
+}
+
 message PatchDeviceRequest {
   netsim.model.Device device = 2;  // by id or name
 }
@@ -110,7 +121,7 @@ message NetCatStream {
 }
 
 message PatchCaptureRequest {
-  int32 id = 1;
+  uint32 id = 1;
 
   // Body of PatchCapture that will be channeled into
   // body for HandleCaptureCxx
@@ -126,7 +137,7 @@ message ListCaptureResponse {
 }
 
 message GetCaptureRequest {
-  int32 id = 1;
+  uint32 id = 1;
 }
 
 message GetCaptureResponse {

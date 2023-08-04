@@ -31,6 +31,8 @@ namespace netsim {
 namespace osutils {
 namespace {
 
+constexpr int DEFAULT_INSTANCE = 0;
+
 struct DiscoveryDir {
   const char *root_env;
   const char *subdir;
@@ -72,16 +74,20 @@ std::string GetDiscoveryDirectory() {
   return std::string(env_p) + netsim::filesystem::slash + discovery.subdir;
 }
 
-std::string GetNetsimIniFilepath() {
+std::string GetNetsimIniFilepath(uint16_t instance_num) {
   auto discovery_dir = GetDiscoveryDirectory();
   // Check if directory has a trailing slash.
   if (discovery_dir.back() != netsim::filesystem::slash.back())
     discovery_dir.append(netsim::filesystem::slash);
-  return discovery_dir.append("netsim.ini");
+  auto filename = (instance_num == 0)
+                      ? "netsim.ini"
+                      : "netsim_" + std::to_string(instance_num) + ".ini";
+  discovery_dir.append(filename);
+  return discovery_dir;
 }
 
-std::optional<std::string> GetServerAddress(bool frontend_server) {
-  auto filepath = GetNetsimIniFilepath();
+std::optional<std::string> GetServerAddress(uint16_t instance_num) {
+  auto filepath = GetNetsimIniFilepath(instance_num);
   if (!netsim::filesystem::exists(filepath)) {
     BtsLog("Unable to find netsim ini file: %s", filepath.c_str());
     return std::nullopt;
@@ -112,6 +118,25 @@ void RedirectStdStream(std::string netsim_temp_dir) {
     BtsLog("Redirecting logs to %s", netsim_temp_dir.c_str());
   std::freopen((netsim_temp_dir + "netsim_stdout.log").c_str(), "w", stdout);
   std::freopen((netsim_temp_dir + "netsim_stderr.log").c_str(), "w", stderr);
+}
+
+uint16_t GetInstance(uint16_t instance_flag) {
+  // The following priorities are used to determine the instance number:
+  //
+  // 1. The environment variable `NETSIM_INSTANCE`.
+  // 2. The CLI flag `--instance`.
+  // 3. The default value `DEFAULT_INSTANCE`.
+  uint16_t instance = 0;
+  if (auto netsim_instance = netsim::osutils::GetEnv("NETSIM_INSTANCE", "");
+      netsim_instance != "") {
+    char *ptr;
+    instance = strtol(netsim_instance.c_str(), &ptr, 10);
+  } else if (instance_flag != 0) {
+    instance = instance_flag;
+  } else {
+    instance = DEFAULT_INSTANCE;
+  }
+  return instance;
 }
 }  // namespace osutils
 }  // namespace netsim
