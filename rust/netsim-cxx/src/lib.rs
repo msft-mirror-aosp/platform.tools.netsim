@@ -287,7 +287,7 @@ mod ffi {
 
         #[rust_name = handle_grpc_response]
         #[namespace = "netsim::backend"]
-        fn HandleResponseCxx(kind: u32, facade_id: u32, packet: &CxxVector<u8>, packet_type: u8);
+        fn HandleResponseCxx(kind: u32, facade_id: u32, packet: &Vec<u8>, packet_type: u8);
 
         // Bluetooth facade.
         include!("hci/hci_packet_hub.h");
