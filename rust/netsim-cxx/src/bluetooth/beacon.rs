@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::advertise_data::{self, AdvertiseData};
-use super::advertise_settings::{AdvertiseMode, TxPowerLevel};
+use super::advertise_settings::{AdvertiseMode, AdvertiseSettings, TxPowerLevel};
 use super::chip::{rust_bluetooth_add, RustBluetoothChipCallbacks};
 use crate::devices::chip::{ChipIdentifier, FacadeIdentifier};
 use crate::devices::device::{AddChipResult, DeviceIdentifier};
@@ -57,9 +57,9 @@ lazy_static! {
 pub struct BeaconChip {
     chip_id: ChipIdentifier,
     address: String,
+    advertise_settings: AdvertiseSettings,
     advertise_data: AdvertiseData,
     advertise_last: Option<Instant>,
-    advertise_interval: Duration,
 }
 
 impl BeaconChip {
@@ -67,9 +67,9 @@ impl BeaconChip {
         BeaconChip {
             chip_id,
             address,
+            advertise_settings: AdvertiseSettings::builder().build(),
             advertise_data: advertise_data::Builder::new().build().unwrap(),
             advertise_last: None,
-            advertise_interval: AdvertiseMode::default().try_into().unwrap(),
         }
     }
 
@@ -78,6 +78,7 @@ impl BeaconChip {
         chip_id: ChipIdentifier,
         beacon_proto: &BluetoothBeaconCreateProto,
     ) -> Result<Self, String> {
+        let advertise_settings = AdvertiseSettings::from_proto(&beacon_proto.settings)?.build();
         let advertise_data = advertise_data::Builder::from_proto(
             device_name,
             beacon_proto
@@ -94,15 +95,9 @@ impl BeaconChip {
         Ok(BeaconChip {
             chip_id,
             address: beacon_proto.address.clone(),
+            advertise_settings,
             advertise_data,
             advertise_last: None,
-            advertise_interval: beacon_proto
-                .settings
-                .advertise_mode
-                .as_ref()
-                .map(AdvertiseMode::from)
-                .unwrap_or_default()
-                .into(),
         })
     }
 
@@ -138,7 +133,7 @@ impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
             .unwrap();
 
         if let Some(last) = beacon.advertise_last {
-            if last.elapsed() <= beacon.advertise_interval {
+            if last.elapsed() <= beacon.advertise_settings.mode.get_interval() {
                 return;
             }
         }
@@ -210,8 +205,8 @@ pub fn bluetooth_beacon_patch(
 
     // TODO(jmes): Support patching other beacon parameters
     beacon.address = patch.address.clone();
-    beacon.advertise_interval =
-        patch.settings.advertise_mode.as_ref().map(AdvertiseMode::from).unwrap_or_default().into();
+    beacon.advertise_settings.mode =
+        patch.settings.advertise_mode.as_ref().map(AdvertiseMode::from).unwrap_or_default();
 
     Ok(())
 }
@@ -226,10 +221,7 @@ pub fn bluetooth_beacon_get(chip_id: ChipIdentifier) -> Result<BluetoothBeaconPr
 
     Ok(BluetoothBeaconProto {
         address: beacon.address.clone(),
-        settings: MessageField::some(AdvertiseSettingsProto {
-            advertise_mode: Some(AdvertiseMode::from(beacon.advertise_interval).try_into()?),
-            ..Default::default()
-        }),
+        settings: MessageField::some((&beacon.advertise_settings).try_into()?),
         adv_data: MessageField::none(),
         ..Default::default()
     })
