@@ -15,11 +15,11 @@
 use std::cmp::max;
 
 use crate::args::{self, Beacon, BeaconPatch, Capture, Command, OnOffState};
-use crate::display::{self, Displayer};
+use crate::display::Displayer;
 use frontend_proto::{
     common::ChipKind,
     frontend::{ListCaptureResponse, ListDeviceResponse, VersionResponse},
-    model::{self, chip::Chip as Chip_oneof_chip, State},
+    model::{self, State},
 };
 use netsim_common::util::time_display::TimeDisplay;
 use protobuf::Message;
@@ -53,9 +53,12 @@ impl args::Command {
                 }
             }
             Command::Devices(_) => {
-                Self::print_device_response(
-                    ListDeviceResponse::parse_from_bytes(response).unwrap(),
-                    verbose,
+                println!(
+                    "{}",
+                    Displayer::new(
+                        ListDeviceResponse::parse_from_bytes(response).unwrap(),
+                        verbose
+                    )
                 );
             }
             Command::Reset => {
@@ -100,182 +103,6 @@ impl args::Command {
                 },
                 Beacon::Remove(_) => todo!("Beacon remove response not yet implemented."),
             },
-        }
-    }
-
-    /// Helper function to format and print ListDeviceResponse
-    fn print_device_response(response: ListDeviceResponse, verbose: bool) {
-        let pos_prec = 2;
-        let name_width = 16;
-        let state_width = 5;
-        let cnt_width = 9;
-        let chip_indent = 2;
-        let radio_width = 16;
-        if verbose {
-            if response.devices.is_empty() {
-                println!("No attached devices found.");
-            } else {
-                println!("List of attached devices:");
-            }
-            for device in response.devices {
-                let pos = device.position;
-                println!(
-                    "{:name_width$}  position: {:.pos_prec$}, {:.pos_prec$}, {:.pos_prec$}",
-                    device.name, pos.x, pos.y, pos.z
-                );
-                for chip in &device.chips {
-                    match &chip.chip {
-                        Some(Chip_oneof_chip::Bt(bt)) => {
-                            if bt.low_energy.is_some() {
-                                let ble_chip = &bt.low_energy;
-                                println!(
-                                    "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
-                                    "",
-                                    "ble:",
-                                    Self::chip_state_to_string(ble_chip.state.enum_value_or_default()),
-                                    ble_chip.rx_count,
-                                    ble_chip.tx_count,
-                                );
-                            }
-                            if bt.classic.is_some() {
-                                let classic_chip = &bt.classic;
-                                println!(
-                                    "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
-                                    "",
-                                    "classic:",
-                                    Self::chip_state_to_string(classic_chip.state.enum_value_or_default()),
-                                    classic_chip.rx_count,
-                                    classic_chip.tx_count,
-                                );
-                            }
-                        }
-                        Some(Chip_oneof_chip::Wifi(wifi_chip)) => {
-                            println!(
-                                "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
-                                "",
-                                "wifi:",
-                                Self::chip_state_to_string(wifi_chip.state.enum_value_or_default()),
-                                wifi_chip.rx_count,
-                                wifi_chip.tx_count,
-                            );
-                        }
-                        Some(Chip_oneof_chip::Uwb(uwb_chip)) => {
-                            println!(
-                                "{:chip_indent$}{:radio_width$}{:state_width$}| rx_count: {:cnt_width$?} | tx_count: {:cnt_width$?}",
-                                "",
-                                "uwb:",
-                                Self::chip_state_to_string(uwb_chip.state.enum_value_or_default()),
-                                uwb_chip.rx_count,
-                                uwb_chip.tx_count,
-                            );
-                        }
-                        Some(Chip_oneof_chip::BleBeacon(ble_beacon)) => {
-                            let radio = ble_beacon.bt.low_energy.as_ref().unwrap_or_default();
-                            println!(
-                                "{:chip_indent$}{:radio_width$} {}",
-                                "",
-                                format!("ble-beacon ({}):", chip.name),
-                                Displayer::new(radio, true),
-                            );
-                            println!(
-                                "{}",
-                                Displayer::new(ble_beacon, true)
-                                    .indent(chip_indent + display::INDENT_INCREMENT)
-                            );
-                        }
-                        _ => println!("{:chip_indent$}Unknown chip: down  ", ""),
-                    }
-                }
-            }
-        } else {
-            for device in response.devices {
-                let pos = device.position;
-                print!("{:name_width$}  ", device.name,);
-                if pos.x != 0.0 || pos.y != 0.0 || pos.z != 0.0 {
-                    print!(
-                        "position: {:.pos_prec$}, {:.pos_prec$}, {:.pos_prec$}",
-                        pos.x, pos.y, pos.z
-                    );
-                }
-                for chip in &device.chips {
-                    match &chip.chip {
-                        Some(Chip_oneof_chip::Bt(bt)) => {
-                            if bt.low_energy.is_some() {
-                                let ble_chip = &bt.low_energy;
-                                if ble_chip.state.enum_value_or_default() == State::OFF {
-                                    print!(
-                                        "{:chip_indent$}{:radio_width$}{:state_width$}",
-                                        "",
-                                        "ble:",
-                                        Self::chip_state_to_string(
-                                            ble_chip.state.enum_value_or_default()
-                                        ),
-                                    );
-                                }
-                            }
-                            if bt.classic.is_some() {
-                                let classic_chip = &bt.classic;
-                                if classic_chip.state.enum_value_or_default() == State::OFF {
-                                    print!(
-                                        "{:chip_indent$}{:radio_width$}{:state_width$}",
-                                        "",
-                                        "classic:",
-                                        Self::chip_state_to_string(
-                                            classic_chip.state.enum_value_or_default()
-                                        )
-                                    );
-                                }
-                            }
-                        }
-                        Some(Chip_oneof_chip::Wifi(wifi_chip)) => {
-                            if wifi_chip.state.enum_value_or_default() == State::OFF {
-                                print!(
-                                    "{:chip_indent$}{:radio_width$}{:state_width$}",
-                                    "",
-                                    "wifi:",
-                                    Self::chip_state_to_string(
-                                        wifi_chip.state.enum_value_or_default()
-                                    )
-                                );
-                            }
-                        }
-                        Some(Chip_oneof_chip::Uwb(uwb_chip)) => {
-                            if uwb_chip.state.enum_value_or_default() == State::OFF {
-                                print!(
-                                    "{:chip_indent$}{:radio_width$}{:state_width$}",
-                                    "",
-                                    "uwb:",
-                                    Self::chip_state_to_string(
-                                        uwb_chip.state.enum_value_or_default()
-                                    )
-                                );
-                            }
-                        }
-                        Some(Chip_oneof_chip::BleBeacon(ble_beacon)) => {
-                            let radio = ble_beacon.bt.low_energy.as_ref().unwrap_or_default();
-                            if radio.state.enum_value_or_default() == State::OFF {
-                                println!(
-                                    "{:chip_indent$}{:radio_width$} {}",
-                                    "",
-                                    format!("ble-beacon ({}):", chip.name),
-                                    Displayer::new(radio, false),
-                                );
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                println!();
-            }
-        }
-    }
-
-    /// Helper function to convert frontend_proto::model::State to string for output
-    fn chip_state_to_string(state: State) -> String {
-        match state {
-            State::ON => "up".to_string(),
-            State::OFF => "down".to_string(),
-            _ => "unknown".to_string(),
         }
     }
 
