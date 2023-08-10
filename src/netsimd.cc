@@ -16,99 +16,18 @@
 #include <msvc-getopt.h>
 #else
 #include <getopt.h>
-#endif
-
-#if defined(__linux__)
-
-#ifndef NETSIM_ANDROID_EMULATOR
-#include <client/linux/handler/exception_handler.h>
-#include <unwindstack/AndroidUnwinder.h>
-#endif
-
-#include <execinfo.h>
-#include <fmt/format.h>
-#include <signal.h>
 #include <unistd.h>
-
-#include <cstdio>
-#include <cstdlib>
 #endif
+
+#include <iostream>
 
 #include "core/server.h"
 #include "frontend/frontend_client_stub.h"
 #include "netsim-cxx/src/lib.rs.h"
 #include "util/os_utils.h"
+#include "util/crash_report.h"
 
 // Wireless network simulator for android (and other) emulated devices.
-
-#if defined(__linux__)
-#ifndef NETSIM_ANDROID_EMULATOR
-bool crash_callback(const void *crash_context, size_t crash_context_size,
-                    void * /* context */) {
-  std::optional<pid_t> tid;
-  std::cerr << "netsimd crash_callback invoked\n";
-  if (crash_context_size >=
-      sizeof(google_breakpad::ExceptionHandler::CrashContext)) {
-    auto *ctx =
-        static_cast<const google_breakpad::ExceptionHandler::CrashContext *>(
-            crash_context);
-    tid = ctx->tid;
-    int signal_number = ctx->siginfo.si_signo;
-    std::cerr << fmt::format("Process crashed, signal: {}[{}], tid: {}\n",
-                             strsignal(signal_number), signal_number, ctx->tid)
-                     .c_str();
-  } else {
-    std::cerr << "Process crashed, signal: unknown, tid: unknown\n";
-  }
-  unwindstack::AndroidLocalUnwinder unwinder;
-  unwindstack::AndroidUnwinderData data;
-  if (!unwinder.Unwind(tid, data)) {
-    std::cerr << "Unwind failed\n";
-    return false;
-  }
-  std::cerr << "Backtrace:\n";
-  for (const auto &frame : data.frames) {
-    std::cerr << fmt::format("{}\n", unwinder.FormatFrame(frame)).c_str();
-  }
-  return true;
-}
-#else
-// Signal handler to print backtraces and then terminate the program.
-void SignalHandler(int sig) {
-  size_t buffer_size = 20;  // Number of entries in that array.
-  void *buffer[buffer_size];
-
-  auto size = backtrace(buffer, buffer_size);
-  fprintf(stderr,
-          "netsim error: interrupt by signal %d. Obtained %d stack frames:\n",
-          sig, size);
-  backtrace_symbols_fd(buffer, size, STDERR_FILENO);
-  exit(sig);
-}
-#endif
-#endif
-
-constexpr int DEFAULT_HCI_PORT = 6402;
-
-int get_hci_port(int hci_port_flag, uint16_t instance) {
-  // The following priorities are used to determine the HCI port number:
-  //
-  // 1. The CLI flag `-hci_port`.
-  // 2. The environment variable `NETSIM_HCI_PORT`.
-  // 3. The default value `DEFAULT_HCI_PORT`.
-  int hci_port = 0;
-  if (hci_port_flag != 0) {
-    hci_port = hci_port_flag;
-  } else if (auto netsim_hci_port =
-                 netsim::osutils::GetEnv("NETSIM_HCI_PORT", "0");
-             netsim_hci_port != "0") {
-    char *ptr;
-    hci_port = strtol(netsim_hci_port.c_str(), &ptr, 10);
-  } else {
-    hci_port = DEFAULT_HCI_PORT + instance;
-  }
-  return hci_port;
-}
 
 void ArgError(char *argv[], int c) {
   std::cerr << argv[0] << ": invalid option -- " << (char)c << "\n";
@@ -116,16 +35,8 @@ void ArgError(char *argv[], int c) {
 }
 
 int main(int argc, char *argv[]) {
-#if defined(__linux__)
-#ifndef NETSIM_ANDROID_EMULATOR
-  google_breakpad::MinidumpDescriptor descriptor("/tmp");
-  google_breakpad::ExceptionHandler eh(descriptor, nullptr, nullptr, nullptr,
-                                       true, -1);
-  eh.set_crash_handler(crash_callback);
-#else
-  signal(SIGSEGV, SignalHandler);
-#endif
-#endif
+  netsim::SetUpCrashReport();
+
   bool no_web_ui = false;
   bool no_cli_ui = false;
 
@@ -209,7 +120,7 @@ int main(int argc, char *argv[]) {
 
   netsim::config::SetDev(dev);
   auto instance_num = netsim::osutils::GetInstance(instance_flag);
-  int hci_port = get_hci_port(hci_port_flag, instance_num);
+  int hci_port = netsim::osutils::GetHciPort(hci_port_flag, instance_num);
   // Daemon mode -- start radio managers
   // get netsim daemon, starting if it doesn't exist
   // Create a frontend grpc client to check if a netsimd is already running.

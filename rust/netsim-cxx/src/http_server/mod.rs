@@ -29,7 +29,7 @@ use crate::version::VERSION;
 
 use crate::http_server::thread_pool::ThreadPool;
 
-use http::Request;
+use http::{Request, Uri};
 use log::{info, warn};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -39,6 +39,7 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
@@ -151,15 +152,14 @@ fn handle_version(_request: &Request<Vec<u8>>, _param: &str, writer: ResponseWri
 /// Collect queries and output key and values into Vec
 pub fn collect_query(param: &str) -> Result<HashMap<&str, &str>, &str> {
     let mut result = HashMap::new();
+    if param.is_empty() {
+        return Ok(result);
+    }
     for word in param.split('&') {
-        let equal = word.find('=');
-        match equal {
-            Some(equal) => {
-                if result.insert(&word[..equal], &word[equal + 1..]).is_some() {
-                    return Err("Query has duplicate keys");
-                }
+        if let Some(equal) = word.find('=') {
+            if result.insert(&word[..equal], &word[equal + 1..]).is_some() {
+                return Err("Query has duplicate keys");
             }
-            None => return Err("Invalid query string"),
         }
     }
     // TODO: Check if initial ChipInfo is included
@@ -172,17 +172,17 @@ fn handle_dev(request: &Request<Vec<u8>>, _param: &str, writer: ResponseWritable
 
 fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     let mut router = Router::new();
-    router.add_route("/", Box::new(handle_index));
-    router.add_route("/version", Box::new(handle_version));
-    router.add_route(r"/v1/devices", Box::new(handle_device));
-    router.add_route(r"/v1/devices/{id}", Box::new(handle_device));
-    router.add_route(r"/v1/captures", Box::new(handle_capture));
-    router.add_route(r"/v1/captures/{id}", Box::new(handle_capture));
-    router.add_route(r"/v1/websocket?", Box::new(handle_websocket));
+    router.add_route(Uri::from_static("/"), Box::new(handle_index));
+    router.add_route(Uri::from_static("/version"), Box::new(handle_version));
+    router.add_route(Uri::from_static("/v1/devices"), Box::new(handle_device));
+    router.add_route(Uri::from_static(r"/v1/devices/{id}"), Box::new(handle_device));
+    router.add_route(Uri::from_static("/v1/captures"), Box::new(handle_capture));
+    router.add_route(Uri::from_static(r"/v1/captures/{id}"), Box::new(handle_capture));
+    router.add_route(Uri::from_static(r"/v1/websocket/{radio}"), Box::new(handle_websocket));
 
     // Adding additional routes in dev mode.
     if crate::config::get_dev() {
-        router.add_route("/dev", Box::new(handle_dev));
+        router.add_route(Uri::from_static("/dev"), Box::new(handle_dev));
     }
 
     // A closure for checking if path is a static file we wish to serve, and call handle_static
@@ -202,7 +202,7 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
     // Connecting all path prefixes to handle_static_wrapper
     for prefix in PATH_PREFIXES {
         router.add_route(
-            format!(r"/{prefix}/{{path}}").as_str(),
+            Uri::from_str(format!(r"/{prefix}/{{path}}").as_str()).unwrap(),
             Box::new(handle_static_wrapper.clone()),
         )
     }
@@ -211,11 +211,12 @@ fn handle_connection(mut stream: TcpStream, valid_files: Arc<HashSet<String>>) {
         let mut response_writer = ServerResponseWriter::new(&mut stream);
         router.handle_request(&request, &mut response_writer);
         if let Some(response) = response_writer.get_response() {
+            // Status code of 101 represents switching of protocols from HTTP to Websocket
             if response.status_code == 101 {
-                let query_start = request.uri().to_string().find('?').unwrap();
-                let binding = request.uri().to_string();
-                let queries = collect_query(&binding[query_start + 1..]).unwrap();
-                run_websocket_transport(stream, queries);
+                match collect_query(request.uri().query().unwrap_or("")) {
+                    Ok(queries) => run_websocket_transport(stream, queries),
+                    Err(err) => warn!("{err}"),
+                };
             }
         }
     } else {
@@ -242,8 +243,10 @@ mod tests {
         expected.insert("kind", "bt");
         assert_eq!(collect_query("name=hello&kind=bt"), Ok(expected));
 
-        // Invalid query string or duplicate keys
-        assert_eq!(collect_query("hello"), Err("Invalid query string"));
-        assert_eq!(collect_query("name=hello&name=world"), Err("Query has duplicate keys"))
+        // Check for duplicate keys
+        assert_eq!(collect_query("name=hello&name=world"), Err("Query has duplicate keys"));
+
+        // Empty query string
+        assert_eq!(collect_query(""), Ok(HashMap::new()));
     }
 }
