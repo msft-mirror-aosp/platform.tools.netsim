@@ -165,7 +165,7 @@ pub fn new_test_beacon(idx: u32) {
         address: format!("00:00:00:00:00:{:x}", idx),
         settings: MessageField::some(AdvertiseSettingsProto {
             interval: Some(
-                ble_advertise_settings::AdvertiseMode::from(Duration::from_millis(1280))
+                ble_advertise_settings::AdvertiseMode::new(Duration::from_millis(1280))
                     .try_into()
                     .unwrap(),
             ),
