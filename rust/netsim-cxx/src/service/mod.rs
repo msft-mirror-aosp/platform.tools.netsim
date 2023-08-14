@@ -164,7 +164,7 @@ pub fn new_test_beacon(idx: u32) {
     let beacon_proto = BluetoothBeaconCreateProto {
         address: format!("00:00:00:00:00:{:x}", idx),
         settings: MessageField::some(AdvertiseSettingsProto {
-            advertise_mode: Some(
+            interval: Some(
                 ble_advertise_settings::AdvertiseMode::from(Duration::from_millis(1280))
                     .try_into()
                     .unwrap(),
