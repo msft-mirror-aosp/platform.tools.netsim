@@ -81,7 +81,7 @@ impl BeaconChip {
             device_name,
             beacon_proto
                 .settings
-                .tx_power_level
+                .tx_power
                 .as_ref()
                 .map(TxPowerLevel::try_from)
                 .unwrap_or(Ok(TxPowerLevel::default()))?
@@ -212,7 +212,7 @@ pub fn bluetooth_beacon_patch(
     // TODO(jmes): Support patching other beacon parameters
     beacon.address = patch.address.clone();
     beacon.advertise_settings.mode =
-        patch.settings.advertise_mode.as_ref().map(AdvertiseMode::from).unwrap_or_default();
+        patch.settings.interval.as_ref().map(AdvertiseMode::from).unwrap_or_default();
 
     Ok(())
 }
@@ -258,7 +258,7 @@ pub mod tests {
                 chip: Some(BuiltinProto::BleBeacon(BluetoothBeaconCreateProto {
                     address: String::from("00:00:00:00:00:00"),
                     settings: MessageField::some(AdvertiseSettingsProto {
-                        advertise_mode: Some(AdvertiseMode::from(interval).try_into()?),
+                        interval: Some(AdvertiseMode::from(interval).try_into()?),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -286,7 +286,7 @@ pub mod tests {
         let beacon = beacon.unwrap();
 
         let interval_after_get =
-            beacon.settings.advertise_mode.as_ref().map(AdvertiseMode::from).unwrap().into();
+            beacon.settings.interval.as_ref().map(AdvertiseMode::from).unwrap().into();
 
         assert_eq!(interval, interval_after_get);
         cleanup_beacon(id);
@@ -301,7 +301,7 @@ pub mod tests {
             id,
             &BluetoothBeaconProto {
                 settings: MessageField::some(AdvertiseSettingsProto {
-                    advertise_mode: Some(AdvertiseMode::from(interval).try_into().unwrap()),
+                    interval: Some(AdvertiseMode::from(interval).try_into().unwrap()),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -314,7 +314,7 @@ pub mod tests {
         let interval_after_patch = beacon_proto
             .unwrap()
             .settings
-            .advertise_mode
+            .interval
             .as_ref()
             .map(AdvertiseMode::from)
             .unwrap()

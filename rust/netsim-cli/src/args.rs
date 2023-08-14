@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use frontend_proto::model::chip::bluetooth_beacon::advertise_settings::Advertise_mode;
-use log::error;
-
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use frontend_client_cxx::ffi::{FrontendClient, GrpcMethod};
 use frontend_proto::common::ChipKind;
 use frontend_proto::frontend;
 use frontend_proto::frontend::patch_capture_request::PatchCapture as PatchCaptureProto;
+use frontend_proto::model::chip::bluetooth_beacon::advertise_settings::Interval;
 use frontend_proto::model::chip::bluetooth_beacon::{AdvertiseData, AdvertiseSettings};
 use frontend_proto::model::chip::{
     Bluetooth as Chip_Bluetooth, BluetoothBeacon as Chip_Ble_Beacon, Chip as Chip_Type,
@@ -29,6 +27,7 @@ use frontend_proto::model::{
     self, chip_create, Chip, ChipCreate as ChipCreateProto, Device,
     DeviceCreate as DeviceCreateProto, Position, State,
 };
+use log::error;
 use netsim_common::util::time_display::TimeDisplay;
 use protobuf::{Message, MessageField};
 use std::fmt;
@@ -159,10 +158,10 @@ impl Command {
                                 chip: Some(chip_create::Chip::BleBeacon(
                                     chip_create::BluetoothBeaconCreate {
                                         settings: MessageField::some(AdvertiseSettings {
-                                            advertise_mode: args
+                                            interval: args
                                                 .settings
                                                 .interval
-                                                .map(Advertise_mode::ModeNumeric),
+                                                .map(Interval::Milliseconds),
                                             ..Default::default()
                                         }),
                                         adv_data: MessageField::some(AdvertiseData {
@@ -190,10 +189,10 @@ impl Command {
                                 chip: Some(Chip_Type::BleBeacon(Chip_Ble_Beacon {
                                     bt: MessageField::some(Chip_Bluetooth::new()),
                                     settings: MessageField::some(AdvertiseSettings {
-                                        advertise_mode: args
+                                        interval: args
                                             .settings
                                             .interval
-                                            .map(Advertise_mode::ModeNumeric),
+                                            .map(Interval::Milliseconds),
                                         ..Default::default()
                                     }),
                                     ..Default::default()
