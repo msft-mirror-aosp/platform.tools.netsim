@@ -84,8 +84,9 @@ impl BeaconChip {
                 .tx_power
                 .as_ref()
                 .map(TxPowerLevel::try_from)
-                .unwrap_or(Ok(TxPowerLevel::default()))?
-                .into(),
+                .transpose()?
+                .unwrap_or_default()
+                .tx_power,
             &beacon_proto.adv_data,
         )
         .build()?;
@@ -131,18 +132,14 @@ impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
             .unwrap();
 
         if let Some(last) = beacon.advertise_last {
-            if last.elapsed() <= beacon.advertise_settings.mode.get_interval() {
+            if last.elapsed() <= beacon.advertise_settings.mode.interval {
                 return;
             }
         }
 
         beacon.advertise_last = Some(Instant::now());
         let packet = generate_advertising_packet(&beacon.address, &beacon.advertise_data.bytes);
-        beacon.send_link_layer_packet(
-            &packet,
-            PHY_TYPE_LE,
-            TxPowerLevel::default().try_into().unwrap(),
-        );
+        beacon.send_link_layer_packet(&packet, PHY_TYPE_LE, TxPowerLevel::default().tx_power);
     }
 
     fn receive_link_layer_packet(
@@ -258,7 +255,7 @@ pub mod tests {
                 chip: Some(BuiltinProto::BleBeacon(BluetoothBeaconCreateProto {
                     address: String::from("00:00:00:00:00:00"),
                     settings: MessageField::some(AdvertiseSettingsProto {
-                        interval: Some(AdvertiseMode::from(interval).try_into()?),
+                        interval: Some(AdvertiseMode::new(interval).try_into()?),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -286,7 +283,7 @@ pub mod tests {
         let beacon = beacon.unwrap();
 
         let interval_after_get =
-            beacon.settings.interval.as_ref().map(AdvertiseMode::from).unwrap().into();
+            beacon.settings.interval.as_ref().map(AdvertiseMode::from).unwrap().interval;
 
         assert_eq!(interval, interval_after_get);
         cleanup_beacon(id);
@@ -301,7 +298,7 @@ pub mod tests {
             id,
             &BluetoothBeaconProto {
                 settings: MessageField::some(AdvertiseSettingsProto {
-                    interval: Some(AdvertiseMode::from(interval).try_into().unwrap()),
+                    interval: Some(AdvertiseMode::new(interval).try_into().unwrap()),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -318,7 +315,7 @@ pub mod tests {
             .as_ref()
             .map(AdvertiseMode::from)
             .unwrap()
-            .into();
+            .interval;
 
         assert_eq!(interval, interval_after_patch);
         cleanup_beacon(id);
