@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use frontend_proto::model::chip::{
-    bluetooth_beacon::advertise_settings::Advertise_mode,
-    bluetooth_beacon::advertise_settings::Tx_power_level,
+    bluetooth_beacon::advertise_settings::Interval as IntervalProto,
+    bluetooth_beacon::advertise_settings::Tx_power as TxPowerProto,
     bluetooth_beacon::AdvertiseSettings as AdvertiseSettingsProto,
 };
 use std::time::Duration;
@@ -46,11 +46,11 @@ impl AdvertiseSettings {
     pub fn from_proto(proto: &AdvertiseSettingsProto) -> Result<Builder, String> {
         let mut builder = Builder::default();
 
-        if let Some(mode) = proto.advertise_mode.as_ref() {
+        if let Some(mode) = proto.interval.as_ref() {
             builder.mode(mode.into());
         }
 
-        if let Some(tx_power) = proto.tx_power_level.as_ref() {
+        if let Some(tx_power) = proto.tx_power.as_ref() {
             builder.tx_power_level(tx_power.try_into()?);
         }
 
@@ -71,8 +71,8 @@ impl TryFrom<&AdvertiseSettings> for AdvertiseSettingsProto {
 
     fn try_from(value: &AdvertiseSettings) -> Result<Self, Self::Error> {
         Ok(AdvertiseSettingsProto {
-            advertise_mode: Some(value.mode.try_into()?),
-            tx_power_level: Some(value.tx_power_level.into()),
+            interval: Some(value.mode.try_into()?),
+            tx_power: Some(value.tx_power_level.into()),
             scannable: value.scannable,
             timeout: value.timeout.unwrap_or_default().as_millis().try_into().map_err(|_| {
                 String::from("could not convert timeout to millis: must fit in a u64")
@@ -147,23 +147,21 @@ impl Default for AdvertiseMode {
     }
 }
 
-impl From<&Advertise_mode> for AdvertiseMode {
-    fn from(value: &Advertise_mode) -> Self {
+impl From<&IntervalProto> for AdvertiseMode {
+    fn from(value: &IntervalProto) -> Self {
         match value {
-            Advertise_mode::ModeNumeric(interval) => {
-                Self { interval: Duration::from_millis(*interval) }
-            }
+            IntervalProto::Milliseconds(ms) => Self { interval: Duration::from_millis(*ms) },
             // TODO(jmes): Support named advertising modes b/294260722
             _ => todo!("named advertising modes are not yet implemented"),
         }
     }
 }
 
-impl TryFrom<AdvertiseMode> for Advertise_mode {
+impl TryFrom<AdvertiseMode> for IntervalProto {
     type Error = String;
 
     fn try_from(value: AdvertiseMode) -> Result<Self, Self::Error> {
-        Ok(Advertise_mode::ModeNumeric(value.interval.as_millis().try_into().map_err(|_| {
+        Ok(IntervalProto::Milliseconds(value.interval.as_millis().try_into().map_err(|_| {
             String::from(
                 "failed to convert duration to AdvertiseMode: number of milliseconds was larger than a u64",
             )
@@ -197,13 +195,13 @@ impl Default for TxPowerLevel {
     }
 }
 
-impl TryFrom<&Tx_power_level> for TxPowerLevel {
+impl TryFrom<&TxPowerProto> for TxPowerLevel {
     type Error = String;
 
-    fn try_from(value: &Tx_power_level) -> Result<Self, Self::Error> {
+    fn try_from(value: &TxPowerProto) -> Result<Self, Self::Error> {
         Ok(match value {
-            Tx_power_level::LevelNumeric(tx_power) => Self {
-                tx_power: (*tx_power)
+            TxPowerProto::Dbm(dbm) => Self {
+                tx_power: (*dbm)
                     .try_into()
                     .map_err(|_| "tx power level was too large: it must fit in an i8")?,
             },
@@ -213,9 +211,9 @@ impl TryFrom<&Tx_power_level> for TxPowerLevel {
     }
 }
 
-impl From<TxPowerLevel> for Tx_power_level {
+impl From<TxPowerLevel> for TxPowerProto {
     fn from(value: TxPowerLevel) -> Self {
-        Tx_power_level::LevelNumeric(value.tx_power.into())
+        TxPowerProto::Dbm(value.tx_power.into())
     }
 }
 
@@ -256,13 +254,13 @@ mod tests {
 
     #[test]
     fn test_from_proto_succeeds() {
-        let mode = Advertise_mode::ModeNumeric(150);
-        let tx_power_level = Tx_power_level::LevelNumeric(3);
+        let interval = IntervalProto::Milliseconds(150);
+        let tx_power = TxPowerProto::Dbm(3);
         let timeout_ms = 5555;
 
         let proto = AdvertiseSettingsProto {
-            advertise_mode: Some(mode.clone()),
-            tx_power_level: Some(tx_power_level.clone()),
+            interval: Some(interval.clone()),
+            tx_power: Some(tx_power.clone()),
             scannable: true,
             timeout: timeout_ms,
             ..Default::default()
@@ -271,12 +269,12 @@ mod tests {
         let settings = AdvertiseSettings::from_proto(&proto);
         assert!(settings.is_ok());
 
-        let tx_power_level: Result<TxPowerLevel, _> = (&tx_power_level).try_into();
-        assert!(tx_power_level.is_ok());
-        let tx_power_level = tx_power_level.unwrap();
+        let tx_power: Result<TxPowerLevel, _> = (&tx_power).try_into();
+        assert!(tx_power.is_ok());
+        let tx_power_level = tx_power.unwrap();
 
         let exp_settings = AdvertiseSettings::builder()
-            .mode((&mode).into())
+            .mode((&interval).into())
             .tx_power_level(tx_power_level)
             .scannable()
             .timeout(Duration::from_millis(timeout_ms))
@@ -288,7 +286,7 @@ mod tests {
     #[test]
     fn test_from_proto_fails() {
         let proto = AdvertiseSettingsProto {
-            tx_power_level: Some(Tx_power_level::LevelNumeric((std::i8::MAX as i32) + 1)),
+            tx_power: Some(TxPowerProto::Dbm((std::i8::MAX as i32) + 1)),
             ..Default::default()
         };
 
@@ -298,8 +296,8 @@ mod tests {
     #[test]
     fn test_into_proto() {
         let proto = AdvertiseSettingsProto {
-            advertise_mode: Some(Advertise_mode::ModeNumeric(123)),
-            tx_power_level: Some(Tx_power_level::LevelNumeric(-3)),
+            interval: Some(IntervalProto::Milliseconds(123)),
+            tx_power: Some(TxPowerProto::Dbm(-3)),
             scannable: true,
             timeout: 1234,
             ..Default::default()
