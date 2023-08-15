@@ -400,7 +400,17 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
         let proto_device = patch_device_request.device;
         match id_option {
             Some(id) => match devices.entries.get_mut(&id) {
-                Some(device) => device.patch(&proto_device),
+                Some(device) => {
+                    let result = device.patch(&proto_device);
+                    if result.is_ok() {
+                        // Publish Device Patched event
+                        resource::clone_events()
+                            .lock()
+                            .unwrap()
+                            .publish(Event::DevicePatched { id, name: device.name.clone() });
+                    }
+                    result
+                }
                 None => Err(format!("No such device with id {id}")),
             },
             None => {
@@ -422,7 +432,16 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
                     ));
                 }
                 match target {
-                    Some(device) => device.patch(&proto_device),
+                    Some(device) => {
+                        let result = device.patch(&proto_device);
+                        if result.is_ok() {
+                            // Publish Device Patched event
+                            resource::clone_events().lock().unwrap().publish(
+                                Event::DevicePatched { id: device.id, name: device.name.clone() },
+                            );
+                        }
+                        result
+                    }
                     None => Err(format!("No such device with name {}", proto_device.name)),
                 }
             }
