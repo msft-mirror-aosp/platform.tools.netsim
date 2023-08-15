@@ -16,6 +16,7 @@
 
 #![allow(dead_code)]
 
+mod args;
 mod bluetooth;
 pub mod captures;
 mod config;
@@ -24,6 +25,7 @@ mod events;
 mod http_server;
 mod ranging;
 mod resource;
+mod rust_main;
 mod service;
 mod transport;
 mod uwb;
@@ -432,12 +434,24 @@ mod ffi {
         #[namespace = "netsim::osutils"]
         pub fn GetHciPort(hci_port_flag: u32, instance_flag: u16) -> u32;
 
+        #[rust_name = redirect_std_stream]
+        #[namespace = "netsim::osutils"]
+        pub fn RedirectStdStream(netsim_temp_dir: &CxxString);
+
         // Crash report.
         include!("util/crash_report.h");
 
         #[rust_name = set_up_crash_report]
         #[namespace = "netsim"]
         pub fn SetUpCrashReport();
+
+        // Frontend client.
+        include!("frontend/frontend_client_stub.h");
+
+        #[rust_name = is_netsimd_alive]
+        #[namespace = "netsim::frontend"]
+        pub fn IsNetsimdAlive(instance_num: u16) -> bool;
+
     }
 }
 

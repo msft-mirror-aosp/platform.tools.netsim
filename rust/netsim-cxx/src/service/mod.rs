@@ -16,7 +16,7 @@ use crate::bluetooth as bluetooth_facade;
 use crate::bluetooth::advertise_settings as ble_advertise_settings;
 use crate::captures;
 use crate::captures::handlers::clear_pcap_files;
-use crate::config::get_dev;
+use crate::config::{get_dev, set_dev};
 use crate::devices::devices_handler::is_shutdown_time;
 use crate::ffi::run_grpc_server_cxx;
 use crate::http_server::server::run_http_server;
@@ -41,7 +41,18 @@ pub struct ServiceParams {
     dev: bool,
 }
 
-// TODO: Replace Run() in server.cc.
+impl ServiceParams {
+    pub fn new(
+        fd_startup_str: String,
+        no_cli_ui: bool,
+        no_web_ui: bool,
+        hci_port: u16,
+        instance_num: u16,
+        dev: bool,
+    ) -> Self {
+        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev }
+    }
+}
 
 pub struct Service {
     // netsimd states, like device resource.
@@ -63,6 +74,7 @@ impl Service {
         if clear_pcap_files() {
             info!("netsim generated pcap files in temp directory has been removed.");
         }
+        set_dev(self.service_params.dev);
 
         // Start all the subscribers for events
         let events_rx = resource::clone_events().lock().unwrap().subscribe();
