@@ -6,8 +6,7 @@ Usage:
 Options:
 * `-v, --verbose`: Set verbose mode
 * `-p, --port <PORT>`: Set custom grpc port
-* `    --vsock <VSOCK>`: Set vsock cid:port pair
-* `-h, --help`: Print help information
+* `-h, --help`:    Print help information
 
 ## Commands:
 * ### `version`:    Print Netsim version information
