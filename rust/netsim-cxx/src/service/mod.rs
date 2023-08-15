@@ -19,7 +19,7 @@ use crate::captures::handlers::clear_pcap_files;
 use crate::config::get_dev;
 use crate::devices::devices_handler::is_shutdown_time;
 use crate::ffi::run_grpc_server_cxx;
-use crate::http_server::run_http_server;
+use crate::http_server::server::run_http_server;
 use crate::resource;
 use crate::transport::socket::run_socket_transport;
 use crate::wifi as wifi_facade;
