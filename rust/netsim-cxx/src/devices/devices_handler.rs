@@ -38,15 +38,20 @@ use crate::wifi as wifi_facade;
 use crate::CxxServerResponseWriterWrapper;
 use cxx::CxxString;
 use frontend_proto::common::ChipKind as ProtoChipKind;
+use frontend_proto::frontend::CreateDeviceRequest;
+use frontend_proto::frontend::CreateDeviceResponse;
 use frontend_proto::frontend::ListDeviceResponse;
 use frontend_proto::frontend::PatchDeviceRequest;
+use frontend_proto::model::chip_create::Chip as ProtoBuiltin;
 use frontend_proto::model::ChipCreate;
 use frontend_proto::model::Position as ProtoPosition;
 use frontend_proto::model::Scene as ProtoScene;
 use http::Request;
 use http::Version;
 use log::{info, warn};
+use protobuf::MessageField;
 use protobuf_json_mapping::merge_from_str;
+use protobuf_json_mapping::print_to_string;
 use protobuf_json_mapping::print_to_string_with_options;
 use protobuf_json_mapping::PrintOptions;
 use std::collections::btree_map::Entry;
@@ -105,7 +110,11 @@ pub fn add_chip(
         let devices_arc = clone_devices();
         let mut devices = devices_arc.write().unwrap();
         devices.idle_since = None;
-        let device_id = get_or_create_device(&mut devices, device_guid, device_name);
+        let (device_id, _) =
+            get_or_create_device(&mut devices, Some(device_guid), Some(device_name));
+
+        let chip_name = (chip_create_proto.name != String::default())
+            .then_some(chip_create_proto.name.as_str());
         // This is infrequent, so we can afford to do another lookup for the device.
         devices
             .entries
@@ -113,7 +122,7 @@ pub fn add_chip(
             .ok_or(format!("Device not found for device_id: {device_id}"))?
             .add_chip(
                 chip_kind,
-                &chip_create_proto.name,
+                chip_name,
                 &chip_create_proto.manufacturer,
                 &chip_create_proto.product_name,
             )
@@ -127,9 +136,9 @@ pub fn add_chip(
                 ProtoChipKind::BLUETOOTH => bluetooth_facade::bluetooth_add(device_id),
                 ProtoChipKind::BLUETOOTH_BEACON => bluetooth_facade::bluetooth_beacon_add(
                     device_id,
+                    String::from(device_name),
                     chip_id,
-                    "beacon".to_string(),
-                    chip_create_proto.name.clone(),
+                    chip_create_proto,
                 )?,
                 ProtoChipKind::WIFI => wifi_facade::wifi_add(device_id),
                 _ => return Err(format!("Unknown chip kind: {:?}", chip_kind)),
@@ -238,17 +247,29 @@ pub fn add_chip_cxx(
 }
 
 /// Get or create a device.
-fn get_or_create_device(devices: &mut Devices, guid: &str, name: &str) -> DeviceIdentifier {
-    // Check if a device with the given guid already exists
-    if let Some(existing_device) = devices.entries.values().find(|d| d.guid == guid) {
-        // A device with the same guid already exists, return it
-        existing_device.id
-    } else {
-        // No device with the same guid exists, insert the new device
-        let new_id = devices.id_factory.next_id();
-        devices.entries.insert(new_id, Device::new(new_id, guid.to_string(), name.to_string()));
-        new_id
+/// Returns a (device_id, device_name) pair.
+fn get_or_create_device(
+    devices: &mut Devices,
+    guid: Option<&str>,
+    name: Option<&str>,
+) -> (DeviceIdentifier, String) {
+    // Check if a device with the same guid already exists and if so, return it
+    if let Some(guid) = guid {
+        if let Some(existing_device) = devices.entries.values().find(|d| d.guid == *guid) {
+            return (existing_device.id, existing_device.name.clone());
+        }
     }
+
+    // A new device needs to be created and inserted
+    let new_id = devices.id_factory.next_id();
+    let default = format!("device-{}", new_id);
+    let name = name.unwrap_or(&default);
+    devices.entries.insert(
+        new_id,
+        Device::new(new_id, String::from(guid.unwrap_or(&default)), String::from(name)),
+    );
+
+    (new_id, String::from(name))
 }
 
 /// Remove a device from the simulation.
@@ -320,6 +341,55 @@ pub fn remove_chip_cxx(device_id: u32, chip_id: u32) {
     let _ = remove_chip(device_id, chip_id);
 }
 
+/// Create a device from a CreateDeviceRequest json.
+/// Uses a default name if none is provided.
+/// Returns an error if the device already exists.
+pub fn create_device(create_json: &str) -> Result<DeviceIdentifier, String> {
+    let mut create_device_request = CreateDeviceRequest::new();
+    if merge_from_str(&mut create_device_request, create_json).is_err() {
+        return Err(format!(
+            "failed to create device: incorrectly formatted create json: {}",
+            create_json
+        ));
+    }
+
+    let new_device = create_device_request.device;
+    let devices_arc = clone_devices();
+    let mut devices = devices_arc.write().unwrap();
+    // Check if specified device name is already mapped.
+    if new_device.name != String::default()
+        && devices.entries.values().any(|d| d.guid == new_device.name)
+    {
+        return Err(String::from("failed to create device: device already exists"));
+    }
+
+    if new_device.chips.is_empty() {
+        return Err(String::from("failed to create device: device must contain at least 1 chip"));
+    }
+    new_device.chips.iter().try_for_each(|chip| match chip.chip {
+        Some(ProtoBuiltin::BleBeacon(_)) => Ok(()),
+        Some(_) => Err(format!("failed to create device: chip {} was not a built-in", chip.name)),
+        None => Err(format!("failed to create device: chip {} was missing a radio", chip.name)),
+    })?;
+
+    let device_name = (new_device.name != String::default()).then_some(new_device.name.as_str());
+    let (device_id, device_name) = get_or_create_device(&mut devices, device_name, device_name);
+
+    // Release devices lock so that add_chip can take it.
+    drop(devices);
+    new_device
+        .chips
+        .iter()
+        .try_for_each(|chip| add_chip(&device_name, &device_name, chip).map(|_| ()))?;
+
+    resource::clone_events()
+        .lock()
+        .unwrap()
+        .publish(Event::DeviceAdded { id: device_id, name: device_name });
+
+    Ok(device_id)
+}
+
 // lock the devices, find the id and call the patch function
 #[allow(dead_code)]
 fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result<(), String> {
@@ -330,7 +400,17 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
         let proto_device = patch_device_request.device;
         match id_option {
             Some(id) => match devices.entries.get_mut(&id) {
-                Some(device) => device.patch(&proto_device),
+                Some(device) => {
+                    let result = device.patch(&proto_device);
+                    if result.is_ok() {
+                        // Publish Device Patched event
+                        resource::clone_events()
+                            .lock()
+                            .unwrap()
+                            .publish(Event::DevicePatched { id, name: device.name.clone() });
+                    }
+                    result
+                }
                 None => Err(format!("No such device with id {id}")),
             },
             None => {
@@ -352,7 +432,16 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
                     ));
                 }
                 match target {
-                    Some(device) => device.patch(&proto_device),
+                    Some(device) => {
+                        let result = device.patch(&proto_device);
+                        if result.is_ok() {
+                            // Publish Device Patched event
+                            resource::clone_events().lock().unwrap().publish(
+                                Event::DevicePatched { id: device.id, name: device.name.clone() },
+                            );
+                        }
+                        result
+                    }
                     None => Err(format!("No such device with name {}", proto_device.name)),
                 }
             }
@@ -438,6 +527,25 @@ pub fn is_shutdown_time() -> bool {
     }
 }
 
+fn handle_device_create(writer: ResponseWritable, create_json: &str) {
+    let mut response = CreateDeviceResponse::new();
+
+    let mut collate_results = || {
+        let id = create_device(create_json)?;
+
+        let devices_arc = clone_devices();
+        let devices = devices_arc.read().unwrap();
+        let device_proto = devices.entries.get(&id).ok_or("failed to create device")?.get()?;
+        response.device = MessageField::some(device_proto);
+        print_to_string(&response).map_err(|_| String::from("failed to convert device to json"))
+    };
+
+    match collate_results() {
+        Ok(response) => writer.put_ok("text/json", &response, vec![]),
+        Err(err) => writer.put_error(404, err.as_str()),
+    }
+}
+
 /// Performs PatchDevice to patch a single device
 fn handle_device_patch(writer: ResponseWritable, id: Option<DeviceIdentifier>, patch_json: &str) {
     match patch_device(id, patch_json) {
@@ -488,6 +596,11 @@ pub fn handle_device(request: &Request<Vec<u8>>, param: &str, writer: ResponseWr
                 let body = request.body();
                 let patch_json = String::from_utf8(body.to_vec()).unwrap();
                 handle_device_patch(writer, None, patch_json.as_str());
+            }
+            "POST" => {
+                let body = &request.body();
+                let create_json = String::from_utf8(body.to_vec()).unwrap();
+                handle_device_create(writer, create_json.as_str());
             }
             _ => writer.put_error(404, "Not found."),
         }
@@ -559,7 +672,10 @@ pub fn get_facade_id(chip_id: u32) -> Result<u32, String> {
 mod tests {
     use std::{sync::Once, thread, time::Duration};
 
-    use frontend_proto::model::{Device as ProtoDevice, Orientation as ProtoOrientation, State};
+    use frontend_proto::model::{
+        Device as ProtoDevice, DeviceCreate as ProtoDeviceCreate, Orientation as ProtoOrientation,
+        State,
+    };
     use netsim_common::util::netsim_logger::init_for_test;
     use protobuf_json_mapping::print_to_string;
 
@@ -602,7 +718,12 @@ mod tests {
         fn get_or_create_device(&self) -> DeviceIdentifier {
             let devices_arc = clone_devices();
             let mut devices = devices_arc.write().unwrap();
-            super::get_or_create_device(&mut devices, &self.device_guid, &self.device_name)
+            super::get_or_create_device(
+                &mut devices,
+                Some(&self.device_guid),
+                Some(&self.device_name),
+            )
+            .0
         }
     }
 
@@ -986,66 +1107,179 @@ mod tests {
             .unwrap()
     }
 
-    use frontend_proto::model::chip::{BluetoothBeacon, Chip};
-    use frontend_proto::model::chip_create;
+    use frontend_proto::model::chip::{
+        bluetooth_beacon::AdvertiseData, bluetooth_beacon::AdvertiseSettings, BluetoothBeacon, Chip,
+    };
+    use frontend_proto::model::chip_create::{BluetoothBeaconCreate, Chip as BuiltChipProto};
     use frontend_proto::model::Chip as ChipProto;
+    use frontend_proto::model::ChipCreate;
     use frontend_proto::model::Device as DeviceProto;
-    use frontend_proto::model::{ChipCreate, DeviceCreate};
     use protobuf::{EnumOrUnknown, MessageField};
 
-    fn bluetooth_beacon_create() -> AddChipResult {
-        bluetooth_facade::new_beacon(&DeviceCreate {
-            chips: vec![ChipCreate {
-                chip: Some(chip_create::Chip::BleBeacon(chip_create::BluetoothBeaconCreate {
-                    ..Default::default()
-                })),
-                ..Default::default()
-            }],
+    fn get_test_create_device_request(device_name: Option<String>) -> CreateDeviceRequest {
+        let beacon_proto = BluetoothBeaconCreate {
+            settings: MessageField::some(AdvertiseSettings { ..Default::default() }),
+            adv_data: MessageField::some(AdvertiseData { ..Default::default() }),
             ..Default::default()
-        })
-        .expect("Error creating beacon device for testing: {err}")
+        };
+
+        let chip_proto = ChipCreate {
+            name: String::from("test-beacon-chip"),
+            kind: ProtoChipKind::BLUETOOTH_BEACON.into(),
+            chip: Some(BuiltChipProto::BleBeacon(beacon_proto)),
+            ..Default::default()
+        };
+
+        let device_proto = ProtoDeviceCreate {
+            name: device_name.unwrap_or_default(),
+            chips: vec![chip_proto],
+            ..Default::default()
+        };
+
+        CreateDeviceRequest { device: MessageField::some(device_proto), ..Default::default() }
     }
 
-    #[ignore = "TODO: include thread_id in names and ids"]
+    fn get_device_proto(id: DeviceIdentifier) -> DeviceProto {
+        let devices = clone_devices();
+        let devices_guard = devices.read().unwrap();
+        let device =
+            devices_guard.entries.get(&id).expect("could not find test bluetooth beacon device");
+
+        let device_proto = device.get();
+        assert!(device_proto.is_ok(), "{}", device_proto.unwrap_err());
+
+        device_proto.unwrap()
+    }
+
+    #[test]
+    fn test_create_device_succeeds() {
+        logger_setup();
+
+        let request = get_test_create_device_request(Some(format!(
+            "bob-the-beacon-{:?}",
+            thread::current().id()
+        )));
+
+        let id = create_device(&print_to_string(&request).unwrap());
+        assert!(id.is_ok(), "{}", id.unwrap_err());
+        let id = id.unwrap();
+
+        let device_proto = get_device_proto(id);
+        assert_eq!(request.device.name, device_proto.name);
+        assert_eq!(1, device_proto.chips.len());
+        assert_eq!(request.device.chips[0].name, device_proto.chips[0].name);
+    }
+
+    #[test]
+    fn test_create_chipless_device_fails() {
+        logger_setup();
+
+        let request = CreateDeviceRequest {
+            device: MessageField::some(ProtoDeviceCreate { ..Default::default() }),
+            ..Default::default()
+        };
+
+        let id = create_device(&print_to_string(&request).unwrap());
+        assert!(id.is_err(), "{}", id.unwrap());
+    }
+
+    #[test]
+    fn test_create_radioless_device_fails() {
+        logger_setup();
+
+        let request = CreateDeviceRequest {
+            device: MessageField::some(ProtoDeviceCreate {
+                chips: vec![ChipCreate::default()],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let id = create_device(&print_to_string(&request).unwrap());
+        assert!(id.is_err(), "{}", id.unwrap());
+    }
+
     #[test]
     fn test_get_beacon_device() {
         logger_setup();
 
-        let ids = bluetooth_beacon_create();
-        let devices = clone_devices();
-        let devices_guard = devices.read().unwrap();
-        let device = devices_guard
-            .entries
-            .get(&ids.device_id)
-            .expect("Could not find test bluetooth beacon device");
+        let request = get_test_create_device_request(Some(format!(
+            "bob-the-beacon-{:?}",
+            thread::current().id()
+        )));
 
-        let device_proto = device.get();
-        assert!(device_proto.is_ok(), "{}", device_proto.unwrap_err());
-        assert_eq!(1, device_proto.as_ref().unwrap().chips.len());
-        assert!(device_proto.as_ref().unwrap().chips[0].chip.is_some());
-        assert!(matches!(
-            device_proto.as_ref().unwrap().chips[0].chip.as_ref().unwrap(),
-            Chip::BleBeacon(_)
-        ));
+        let id = create_device(&print_to_string(&request).unwrap());
+        assert!(id.is_ok(), "{}", id.unwrap_err());
+        let id = id.unwrap();
+
+        let device_proto = get_device_proto(id);
+        assert_eq!(1, device_proto.chips.len());
+        assert!(device_proto.chips[0].chip.is_some());
+        assert!(matches!(device_proto.chips[0].chip, Some(Chip::BleBeacon(_))));
     }
 
-    #[ignore = "TODO: include thread_id in names and ids"]
+    #[test]
+    fn test_create_device_default_name() {
+        logger_setup();
+
+        let request = get_test_create_device_request(None);
+
+        let id = create_device(&print_to_string(&request).unwrap());
+        assert!(id.is_ok(), "{}", id.unwrap_err());
+        let id = id.unwrap();
+
+        let device_proto = get_device_proto(id);
+        assert_eq!(format!("device-{id}"), device_proto.name);
+    }
+
+    #[test]
+    fn test_create_existing_device_fails() {
+        logger_setup();
+
+        let request = get_test_create_device_request(Some(format!(
+            "existing-device-{:?}",
+            thread::current().id()
+        )));
+
+        let request_json = print_to_string(&request).unwrap();
+
+        let id = create_device(&request_json);
+        assert!(id.is_ok(), "{}", id.unwrap_err());
+
+        // Attempt to create the device again. This should fail because the devices have the same name.
+        let id = create_device(&request_json);
+        assert!(id.is_err());
+    }
+
     #[test]
     fn test_patch_beacon_device() {
         logger_setup();
 
-        let ids = bluetooth_beacon_create();
+        let request = get_test_create_device_request(Some(format!(
+            "bob-the-beacon-{:?}",
+            thread::current().id()
+        )));
+
+        let id = create_device(&print_to_string(&request).unwrap());
+        assert!(id.is_ok(), "{}", id.unwrap_err());
+        let id = id.unwrap();
+
         let devices = clone_devices();
         let mut devices_guard = devices.write().unwrap();
         let device = devices_guard
             .entries
-            .get_mut(&ids.device_id)
-            .expect("Could not find test bluetooth beacon device");
+            .get_mut(&id)
+            .expect("could not find test bluetooth beacon device");
 
-        if let Err(err) = device.patch(&DeviceProto {
-            id: ids.device_id,
+        let device_proto = device.get();
+        assert!(device_proto.is_ok(), "{}", device_proto.unwrap_err());
+        let device_proto = device_proto.unwrap();
+
+        let patch_result = device.patch(&DeviceProto {
+            name: device_proto.name.clone(),
+            id,
             chips: vec![ChipProto {
-                id: ids.chip_id,
+                name: request.device.chips[0].name.clone(),
                 kind: EnumOrUnknown::new(ProtoChipKind::BLUETOOTH_BEACON),
                 chip: Some(Chip::BleBeacon(BluetoothBeacon {
                     bt: MessageField::some(Default::default()),
@@ -1054,17 +1288,13 @@ mod tests {
                 ..Default::default()
             }],
             ..Default::default()
-        }) {
-            panic!("{err}");
-        }
+        });
+        assert!(patch_result.is_ok(), "{}", patch_result.unwrap_err());
 
         let patched_device = device.get();
         assert!(patched_device.is_ok(), "{}", patched_device.unwrap_err());
-        assert_eq!(1, patched_device.as_ref().unwrap().chips.len());
-        assert!(patched_device.as_ref().unwrap().chips[0].chip.is_some());
-        assert!(matches!(
-            patched_device.as_ref().unwrap().chips[0].chip.as_ref().unwrap(),
-            Chip::BleBeacon(_)
-        ));
+        let patched_device = patched_device.unwrap();
+        assert_eq!(1, patched_device.chips.len());
+        assert!(matches!(patched_device.chips[0].chip, Some(Chip::BleBeacon(_))));
     }
 }

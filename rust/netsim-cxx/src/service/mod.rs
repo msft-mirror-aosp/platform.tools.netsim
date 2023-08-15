@@ -16,10 +16,10 @@ use crate::bluetooth as bluetooth_facade;
 use crate::bluetooth::advertise_settings as ble_advertise_settings;
 use crate::captures;
 use crate::captures::handlers::clear_pcap_files;
-use crate::config::get_dev;
+use crate::config::{get_dev, set_dev};
 use crate::devices::devices_handler::is_shutdown_time;
 use crate::ffi::run_grpc_server_cxx;
-use crate::http_server::run_http_server;
+use crate::http_server::server::run_http_server;
 use crate::resource;
 use crate::transport::socket::run_socket_transport;
 use crate::wifi as wifi_facade;
@@ -41,7 +41,18 @@ pub struct ServiceParams {
     dev: bool,
 }
 
-// TODO: Replace Run() in server.cc.
+impl ServiceParams {
+    pub fn new(
+        fd_startup_str: String,
+        no_cli_ui: bool,
+        no_web_ui: bool,
+        hci_port: u16,
+        instance_num: u16,
+        dev: bool,
+    ) -> Self {
+        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev }
+    }
+}
 
 pub struct Service {
     // netsimd states, like device resource.
@@ -63,6 +74,7 @@ impl Service {
         if clear_pcap_files() {
             info!("netsim generated pcap files in temp directory has been removed.");
         }
+        set_dev(self.service_params.dev);
 
         // Start all the subscribers for events
         let events_rx = resource::clone_events().lock().unwrap().subscribe();
@@ -147,42 +159,56 @@ pub unsafe fn create_service(
 }
 
 pub fn new_test_beacon(idx: u32) {
-    use crate::bluetooth::new_beacon;
+    use crate::devices::devices_handler::create_device;
+    use frontend_proto::common::ChipKind;
+    use frontend_proto::frontend::CreateDeviceRequest;
     use frontend_proto::model::chip::bluetooth_beacon::{
         AdvertiseData as AdvertiseDataProto, AdvertiseSettings as AdvertiseSettingsProto,
     };
     use frontend_proto::model::chip_create::{
         BluetoothBeaconCreate as BluetoothBeaconCreateProto, Chip as ChipProto,
     };
-    use frontend_proto::model::{ChipCreate as ChipCreateProto, DeviceCreate as DeviceCreateProto};
+    use frontend_proto::model::ChipCreate as ChipCreateProto;
+    use frontend_proto::model::DeviceCreate as DeviceCreateProto;
     use protobuf::MessageField;
+    use protobuf_json_mapping::print_to_string;
 
-    if let Err(err) = new_beacon(&DeviceCreateProto {
-        name: format!("test-beacon-device-{idx}"),
-        chips: vec![ChipCreateProto {
-            name: format!("test-beacon-chip-{idx}"),
-            chip: Some(ChipProto::BleBeacon(BluetoothBeaconCreateProto {
-                address: format!("00:00:00:00:00:{:x}", idx),
-                settings: MessageField::some(AdvertiseSettingsProto {
-                    advertise_mode: Some(
-                        ble_advertise_settings::AdvertiseMode::from(Duration::from_millis(1280))
-                            .try_into()
-                            .unwrap(),
-                    ),
-                    ..Default::default()
-                }),
-                adv_data: MessageField::some(AdvertiseDataProto {
-                    include_device_name: true,
-                    include_tx_power_level: true,
-                    manufacturer_data: vec![1u8, 2, 3, 4],
-                    ..Default::default()
-                }),
-                ..Default::default()
-            })),
+    let beacon_proto = BluetoothBeaconCreateProto {
+        address: format!("00:00:00:00:00:{:x}", idx),
+        settings: MessageField::some(AdvertiseSettingsProto {
+            interval: Some(
+                ble_advertise_settings::AdvertiseMode::new(Duration::from_millis(1280))
+                    .try_into()
+                    .unwrap(),
+            ),
             ..Default::default()
-        }],
+        }),
+        adv_data: MessageField::some(AdvertiseDataProto {
+            include_device_name: true,
+            include_tx_power_level: true,
+            manufacturer_data: vec![1u8, 2, 3, 4],
+            ..Default::default()
+        }),
         ..Default::default()
-    }) {
+    };
+
+    let chip_proto = ChipCreateProto {
+        name: format!("test-beacon-chip-{idx}"),
+        kind: ChipKind::BLUETOOTH_BEACON.into(),
+        chip: Some(ChipProto::BleBeacon(beacon_proto)),
+        ..Default::default()
+    };
+
+    let device_proto = DeviceCreateProto {
+        name: format!("test-beacon-device-{idx}"),
+        chips: vec![chip_proto],
+        ..Default::default()
+    };
+
+    let request =
+        CreateDeviceRequest { device: MessageField::some(device_proto), ..Default::default() };
+
+    if let Err(err) = create_device(&print_to_string(&request).unwrap()) {
         warn!("Failed to create beacon device {idx}: {err}");
     }
 }
