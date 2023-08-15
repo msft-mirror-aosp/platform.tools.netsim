@@ -97,6 +97,7 @@ mod ffi {
             hci_port: u16,
             instance_num: u16,
             dev: bool,
+            vsock: String,
         ) -> Box<Service>;
         #[cxx_name = "SetUp"]
         fn set_up(self: &Service);
@@ -421,6 +422,7 @@ mod ffi {
             netsim_grpc_port: u32,
             no_cli_ui: bool,
             instance_num: u16,
+            vsock: &CxxString,
         ) -> UniquePtr<GrpcServer>;
 
         // OS utilities.
