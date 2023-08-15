@@ -58,6 +58,7 @@ use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::pin::Pin;
 use std::sync::RwLockWriteGuard;
+use std::time::Duration;
 use std::time::Instant;
 
 const INITIAL_DEVICE_ID: DeviceIdentifier = 1;
@@ -424,7 +425,17 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
                 for device in devices.entries.values_mut() {
                     if device.name.contains(&proto_device.name) {
                         if device.name == proto_device.name {
-                            return device.patch(&proto_device);
+                            let result = device.patch(&proto_device);
+                            if result.is_ok() {
+                                // Publish Device Patched event
+                                resource::clone_events().lock().unwrap().publish(
+                                    Event::DevicePatched {
+                                        id: device.id,
+                                        name: device.name.clone(),
+                                    },
+                                );
+                            }
+                            return result;
                         }
                         multiple_matches = target.is_some();
                         target = Some(device);
@@ -500,22 +511,16 @@ pub fn get_devices() -> Result<ProtoScene, String> {
     Ok(scene)
 }
 
-#[allow(dead_code)]
-fn reset(id: DeviceIdentifier) -> Result<(), String> {
-    let devices_arc = clone_devices();
-    let mut devices = devices_arc.write().unwrap();
-    match devices.entries.get_mut(&id) {
-        Some(device) => device.reset(),
-        None => Err(format!("No such device with id {id}")),
-    }
-}
-
-#[allow(dead_code)]
 fn reset_all() -> Result<(), String> {
     let devices_arc = clone_devices();
     let mut devices = devices_arc.write().unwrap();
     for device in devices.entries.values_mut() {
         device.reset()?;
+        // Publish Device Patched event
+        resource::clone_events()
+            .lock()
+            .unwrap()
+            .publish(Event::DevicePatched { id: device.id, name: device.name.clone() });
     }
     Ok(())
 }
@@ -585,6 +590,19 @@ fn handle_device_reset(writer: ResponseWritable) {
     }
 }
 
+/// Performs SubscribeDevice
+fn handle_device_subscribe(writer: ResponseWritable) {
+    let event_rx = resource::clone_events().lock().unwrap().subscribe();
+    // Timeout after 15 seconds with no event received
+    match event_rx.recv_timeout(Duration::from_secs(15)) {
+        Ok(Event::ChipAdded { .. })
+        | Ok(Event::ChipRemoved { .. })
+        | Ok(Event::DevicePatched { .. }) => handle_device_list(writer),
+        Err(err) => writer.put_error(404, format!("{err:?}").as_str()),
+        _ => writer.put_error(404, "disconnecting due to unrelated event"),
+    }
+}
+
 /// The Rust device handler used directly by Http frontend or handle_device_cxx for LIST, GET, and PATCH
 pub fn handle_device(request: &Request<Vec<u8>>, param: &str, writer: ResponseWritable) {
     // Route handling
@@ -596,6 +614,9 @@ pub fn handle_device(request: &Request<Vec<u8>>, param: &str, writer: ResponseWr
             }
             "PUT" => {
                 handle_device_reset(writer);
+            }
+            "SUBSCRIBE" => {
+                handle_device_subscribe(writer);
             }
             "PATCH" => {
                 let body = request.body();
@@ -778,6 +799,15 @@ mod tests {
             chip_name: "bt_chip_name".to_string(),
             chip_manufacturer: "netsim".to_string(),
             chip_product_name: "netsim_bt".to_string(),
+        }
+    }
+
+    fn reset(id: DeviceIdentifier) -> Result<(), String> {
+        let devices_arc = clone_devices();
+        let mut devices = devices_arc.write().unwrap();
+        match devices.entries.get_mut(&id) {
+            Some(device) => device.reset(),
+            None => Err(format!("No such device with id {id}")),
         }
     }
 
