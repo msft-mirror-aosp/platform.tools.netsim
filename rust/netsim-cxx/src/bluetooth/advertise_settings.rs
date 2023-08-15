@@ -12,17 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use frontend_proto::model::chip::{
-    bluetooth_beacon::advertise_settings::Interval as IntervalProto,
-    bluetooth_beacon::advertise_settings::Tx_power as TxPowerProto,
-    bluetooth_beacon::AdvertiseSettings as AdvertiseSettingsProto,
+use frontend_proto::model::chip::bluetooth_beacon::{
+    advertise_settings::{
+        AdvertiseMode as Mode, AdvertiseTxPower as Level, Interval as IntervalProto,
+        Tx_power as TxPowerProto,
+    },
+    AdvertiseSettings as AdvertiseSettingsProto,
 };
+
 use std::time::Duration;
 
-// Default parameter value for SendLinkLayerPacket in packages/modules/Bluetooth/tools/model/devices/device.h
-static DEFAULT_TX_POWER_LEVEL: i8 = 0;
 // From Beacon::Beacon constructor referenced in packages/modules/Bluetooth/tools/model/devices/beacon.cc
-static DEFAULT_ADVERTISE_INTERVAL: Duration = Duration::from_millis(1280);
+const MODE_DEFAULT_MS: u64 = 1280;
+// From packages/modules/Bluetooth/framework/java/android/bluetooth/le/BluetoothLeAdvertiser.java#151
+const MODE_LOW_POWER_MS: u64 = 160;
+const MODE_BALANCED_MS: u64 = 400;
+const MODE_LOW_LATENCY_MS: u64 = 1600;
+
+// Default parameter value for SendLinkLayerPacket in packages/modules/Bluetooth/tools/model/devices/device.h
+const TX_POWER_DEFAULT_DBM: i8 = 0;
+// From packages/modules/Bluetooth/framework/java/android/bluetooth/le/BluetoothLeAdvertiser.java#159
+const TX_POWER_ULTRA_LOW_DBM: i8 = -21;
+const TX_POWER_LOW_DBM: i8 = -15;
+const TX_POWER_MEDIUM_DBM: i8 = -7;
+const TX_POWER_HIGH_DBM: i8 = 1;
 
 /// Configurable settings for ble beacon advertisements.
 #[derive(Debug, PartialEq)]
@@ -127,32 +140,38 @@ impl Builder {
     }
 }
 
-/// A ble beacon advertise mode. Can be casted to/from a(n):
-/// * `std::time::Duration` representing the time interval between advertisements
-/// * `model::chip::bluetooth_beacon::advertise_settings::Advertise_mode`
+/// A BLE beacon advertise mode. Can be casted to/from a protobuf message.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AdvertiseMode {
-    interval: Duration,
+    /// The time interval between advertisements.
+    pub interval: Duration,
 }
 
 impl AdvertiseMode {
-    pub fn get_interval(&self) -> Duration {
-        self.interval
+    /// Create an `AdvertiseMode` from an `std::time::Duration` representing the time interval between advertisements.
+    pub fn new(interval: Duration) -> Self {
+        AdvertiseMode { interval }
     }
 }
 
 impl Default for AdvertiseMode {
     fn default() -> Self {
-        Self { interval: DEFAULT_ADVERTISE_INTERVAL }
+        Self { interval: Duration::from_millis(MODE_DEFAULT_MS) }
     }
 }
 
 impl From<&IntervalProto> for AdvertiseMode {
     fn from(value: &IntervalProto) -> Self {
-        match value {
-            IntervalProto::Milliseconds(ms) => Self { interval: Duration::from_millis(*ms) },
-            // TODO(jmes): Support named advertising modes b/294260722
-            _ => todo!("named advertising modes are not yet implemented"),
+        Self {
+            interval: Duration::from_millis(match value {
+                IntervalProto::Milliseconds(ms) => *ms,
+                IntervalProto::AdvertiseMode(mode) => match mode.enum_value_or_default() {
+                    Mode::LOW_POWER => MODE_LOW_POWER_MS,
+                    Mode::BALANCED => MODE_BALANCED_MS,
+                    Mode::LOW_LATENCY => MODE_LOW_LATENCY_MS,
+                },
+                _ => MODE_DEFAULT_MS,
+            }),
         }
     }
 }
@@ -161,37 +180,36 @@ impl TryFrom<AdvertiseMode> for IntervalProto {
     type Error = String;
 
     fn try_from(value: AdvertiseMode) -> Result<Self, Self::Error> {
-        Ok(IntervalProto::Milliseconds(value.interval.as_millis().try_into().map_err(|_| {
-            String::from(
-                "failed to convert duration to AdvertiseMode: number of milliseconds was larger than a u64",
-            )
-        })?))
+        Ok(
+            match value.interval.as_millis().try_into().map_err(|_| {
+                String::from("failed to convert interval: duration as millis must fit in a u64")
+            })? {
+                MODE_LOW_POWER_MS => IntervalProto::AdvertiseMode(Mode::LOW_POWER.into()),
+                MODE_BALANCED_MS => IntervalProto::AdvertiseMode(Mode::BALANCED.into()),
+                MODE_LOW_LATENCY_MS => IntervalProto::AdvertiseMode(Mode::LOW_LATENCY.into()),
+                ms => IntervalProto::Milliseconds(ms),
+            },
+        )
     }
 }
 
-impl From<AdvertiseMode> for Duration {
-    fn from(value: AdvertiseMode) -> Self {
-        value.interval
-    }
-}
-
-impl From<Duration> for AdvertiseMode {
-    fn from(value: Duration) -> Self {
-        Self { interval: value }
-    }
-}
-
-/// A ble beacon transmit power level. Can be casted to/from a(n):
-/// * `i8` measuring power in dBm
-/// * `model::chip::bluetooth_beacon::advertise_settings::Tx_power_level`
+/// A BLE beacon transmit power level. Can be casted to/from a protobuf message.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TxPowerLevel {
-    tx_power: i8,
+    /// The transmit power in dBm.
+    pub tx_power: i8,
+}
+
+impl TxPowerLevel {
+    /// Create a `TxPowerLevel` from an `i8` measuring power in dBm.
+    fn new(tx_power: i8) -> Self {
+        TxPowerLevel { tx_power }
+    }
 }
 
 impl Default for TxPowerLevel {
     fn default() -> Self {
-        TxPowerLevel { tx_power: DEFAULT_TX_POWER_LEVEL }
+        TxPowerLevel { tx_power: TX_POWER_DEFAULT_DBM }
     }
 }
 
@@ -199,33 +217,32 @@ impl TryFrom<&TxPowerProto> for TxPowerLevel {
     type Error = String;
 
     fn try_from(value: &TxPowerProto) -> Result<Self, Self::Error> {
-        Ok(match value {
-            TxPowerProto::Dbm(dbm) => Self {
-                tx_power: (*dbm)
+        Ok(Self {
+            tx_power: (match value {
+                TxPowerProto::Dbm(dbm) => (*dbm)
                     .try_into()
-                    .map_err(|_| "tx power level was too large: it must fit in an i8")?,
-            },
-            // TODO(jmes): Support named tx power levels b/294260722
-            _ => todo!("named tx power levels are not yet implemented"),
+                    .map_err(|_| "failed to convert tx power level: it must fit in an i8")?,
+                TxPowerProto::TxPowerLevel(level) => match level.enum_value_or_default() {
+                    Level::ULTRA_LOW => TX_POWER_ULTRA_LOW_DBM,
+                    Level::LOW => TX_POWER_LOW_DBM,
+                    Level::MEDIUM => TX_POWER_MEDIUM_DBM,
+                    Level::HIGH => TX_POWER_HIGH_DBM,
+                },
+                _ => TX_POWER_DEFAULT_DBM,
+            }),
         })
     }
 }
 
 impl From<TxPowerLevel> for TxPowerProto {
     fn from(value: TxPowerLevel) -> Self {
-        TxPowerProto::Dbm(value.tx_power.into())
-    }
-}
-
-impl From<TxPowerLevel> for i8 {
-    fn from(value: TxPowerLevel) -> Self {
-        value.tx_power
-    }
-}
-
-impl From<i8> for TxPowerLevel {
-    fn from(value: i8) -> Self {
-        Self { tx_power: value }
+        match value.tx_power {
+            TX_POWER_ULTRA_LOW_DBM => TxPowerProto::TxPowerLevel(Level::ULTRA_LOW.into()),
+            TX_POWER_LOW_DBM => TxPowerProto::TxPowerLevel(Level::LOW.into()),
+            TX_POWER_MEDIUM_DBM => TxPowerProto::TxPowerLevel(Level::MEDIUM.into()),
+            TX_POWER_HIGH_DBM => TxPowerProto::TxPowerLevel(Level::HIGH.into()),
+            dbm => TxPowerProto::Dbm(dbm.into()),
+        }
     }
 }
 
@@ -235,8 +252,8 @@ mod tests {
 
     #[test]
     fn test_build() {
-        let mode: AdvertiseMode = Duration::from_millis(200).into();
-        let tx_power_level: TxPowerLevel = (-1).into();
+        let mode = AdvertiseMode::new(Duration::from_millis(200));
+        let tx_power_level = TxPowerLevel::new(-1);
         let timeout = Duration::from_millis(8000);
 
         let settings = AdvertiseSettings::builder()
@@ -312,8 +329,33 @@ mod tests {
     }
 
     #[test]
+    fn test_from_proto_default() {
+        let proto = AdvertiseSettingsProto {
+            tx_power: Default::default(),
+            interval: Default::default(),
+            ..Default::default()
+        };
+
+        let settings = AdvertiseSettings::from_proto(&proto);
+        assert!(settings.is_ok());
+        let settings = settings.unwrap();
+
+        let tx_power: i8 = proto
+            .tx_power
+            .as_ref()
+            .map(|proto| TxPowerLevel::try_from(proto).unwrap())
+            .unwrap_or_default()
+            .tx_power;
+        let interval: Duration =
+            proto.interval.as_ref().map(AdvertiseMode::from).unwrap_or_default().interval;
+
+        assert_eq!(TX_POWER_DEFAULT_DBM, tx_power);
+        assert_eq!(Duration::from_millis(MODE_DEFAULT_MS), interval);
+    }
+
+    #[test]
     fn test_from_proto_timeout_unset() {
-        let proto = AdvertiseSettingsProto { ..Default::default() };
+        let proto = AdvertiseSettingsProto::default();
 
         let settings = AdvertiseSettings::from_proto(&proto);
         assert!(settings.is_ok());
