@@ -31,7 +31,6 @@ struct ServerParams {
   int hci_port;
   int instance_num;
   bool dev;
-  std::string vsock;
 };
 
 class GrpcServer {
@@ -48,8 +47,7 @@ class GrpcServer {
 // Run grpc server.
 std::unique_ptr<GrpcServer> RunGrpcServerCxx(uint32_t netsim_grpc_port,
                                              bool no_cli_ui,
-                                             uint16_t instance_num,
-                                             std::string const &vsock);
+                                             uint16_t instance_num);
 // Run grpc and http servers.
 void Run(ServerParams params);
 
