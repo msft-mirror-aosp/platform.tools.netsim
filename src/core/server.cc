@@ -32,20 +32,14 @@
 #else
 #include <unistd.h>
 #endif
-#ifndef NETSIM_ANDROID_EMULATOR
-#include <sys/socket.h>
 
-// Needs to be below sys/socket.h
-#include <linux/vm_sockets.h>
-#endif
 namespace netsim::server {
 
 namespace {
 constexpr std::chrono::seconds InactivityCheckInterval(5);
 
 std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
-                                            bool no_cli_ui, int instance_num,
-                                            std::string vsock) {
+                                            bool no_cli_ui, int instance_num) {
   grpc::ServerBuilder builder;
   int selected_port;
   builder.AddListeningPort("0.0.0.0:" + std::to_string(netsim_grpc_port),
@@ -54,16 +48,6 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
     static auto frontend_service = GetFrontendService();
     builder.RegisterService(frontend_service.release());
   }
-
-#ifndef NETSIM_ANDROID_EMULATOR
-  if (!vsock.empty()) {
-    std::string vsock_uri =
-        "vsock:" + std::to_string(VMADDR_CID_ANY) + ":" + vsock;
-    BtsLog("vsock_uri: %s", vsock_uri.c_str());
-    builder.AddListeningPort(vsock_uri, grpc::InsecureServerCredentials());
-  }
-#endif
-
   static auto backend_service = GetBackendService();
   builder.RegisterService(backend_service.release());
   builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
@@ -88,10 +72,8 @@ std::unique_ptr<grpc::Server> RunGrpcServer(int netsim_grpc_port,
 
 std::unique_ptr<GrpcServer> RunGrpcServerCxx(uint32_t netsim_grpc_port,
                                              bool no_cli_ui,
-                                             uint16_t instance_num,
-                                             std::string const &vsock) {
-  auto grpc_server =
-      RunGrpcServer(netsim_grpc_port, no_cli_ui, instance_num, vsock);
+                                             uint16_t instance_num) {
+  auto grpc_server = RunGrpcServer(netsim_grpc_port, no_cli_ui, instance_num);
   if (grpc_server == nullptr) return nullptr;
   return std::make_unique<GrpcServer>(std::move(grpc_server));
 }
@@ -99,7 +81,7 @@ std::unique_ptr<GrpcServer> RunGrpcServerCxx(uint32_t netsim_grpc_port,
 void Run(ServerParams params) {
   auto rust_service = netsim::CreateService(
       params.fd_startup_str, params.no_cli_ui, params.no_web_ui,
-      params.hci_port, params.instance_num, params.dev, params.vsock);
+      params.hci_port, params.instance_num, params.dev);
   rust_service->SetUp();
 
   rust_service->Run();
