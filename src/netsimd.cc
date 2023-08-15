@@ -24,8 +24,8 @@
 #include "core/server.h"
 #include "frontend/frontend_client_stub.h"
 #include "netsim-cxx/src/lib.rs.h"
-#include "util/os_utils.h"
 #include "util/crash_report.h"
+#include "util/os_utils.h"
 
 // Wireless network simulator for android (and other) emulated devices.
 
