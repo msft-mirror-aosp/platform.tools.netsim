@@ -43,4 +43,8 @@ pub struct NetsimdArgs {
     /// Enable development mode. This will include additional features
     #[arg(short, long)]
     pub dev: bool,
+
+    /// Set the vsock port number to be listened by the frontend grpc server
+    #[arg(short, long)]
+    pub vsock: Option<u16>,
 }
