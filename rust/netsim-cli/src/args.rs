@@ -47,9 +47,6 @@ pub struct NetsimArgs {
     /// Set netsimd instance number to connect
     #[arg(short, long)]
     pub instance: Option<u16>,
-    /// Set vsock cid:port pair
-    #[arg(long)]
-    pub vsock: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
