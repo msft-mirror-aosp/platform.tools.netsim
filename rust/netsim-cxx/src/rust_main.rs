@@ -44,6 +44,7 @@ pub extern "C" fn rust_main() {
         .try_into()
         .unwrap();
     let dev = netsimd_args.dev;
+    let vsock = netsimd_args.vsock.unwrap_or_default();
 
     #[cfg(feature = "cuttlefish")]
     if fd_startup_str.is_empty() {
@@ -55,8 +56,15 @@ pub extern "C" fn rust_main() {
         warn!("Failed to start netsim daemon because a netsim daemon is already running");
         return;
     }
-    let service_params =
-        ServiceParams::new(fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev);
+    let service_params = ServiceParams::new(
+        fd_startup_str,
+        no_cli_ui,
+        no_web_ui,
+        hci_port,
+        instance_num,
+        dev,
+        vsock,
+    );
 
     let service = unsafe { Service::new(service_params) };
     service.set_up();
