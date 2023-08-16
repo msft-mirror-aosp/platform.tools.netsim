@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use cxx::let_cxx_string;
-use frontend_proto::model::chip::Bluetooth;
+use netsim_proto::model::chip::Bluetooth;
 use protobuf::Message;
 
 pub fn handle_bluetooth_request(facade_id: u32, packet_type: u8, packet: &Vec<u8>) {

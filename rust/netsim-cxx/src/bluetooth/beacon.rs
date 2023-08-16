@@ -22,18 +22,18 @@ use crate::devices::device::{AddChipResult, DeviceIdentifier};
 use crate::devices::{devices_handler::add_chip, id_factory::IdFactory};
 use crate::ffi::{generate_advertising_packet, generate_scan_response_packet, RustBluetoothChip};
 use cxx::{let_cxx_string, UniquePtr};
-use frontend_proto::common::ChipKind;
-use frontend_proto::model::chip::{
+use lazy_static::lazy_static;
+use log::{error, info, warn};
+use netsim_proto::common::ChipKind;
+use netsim_proto::model::chip::{
     bluetooth_beacon::AdvertiseData as AdvertiseDataProto,
     bluetooth_beacon::AdvertiseSettings as AdvertiseSettingsProto,
     BluetoothBeacon as BluetoothBeaconProto,
 };
-use frontend_proto::model::chip_create::{
+use netsim_proto::model::chip_create::{
     BluetoothBeaconCreate as BluetoothBeaconCreateProto, Chip as BuiltinProto,
 };
-use frontend_proto::model::{ChipCreate as ChipCreateProto, DeviceCreate as DeviceCreateProto};
-use lazy_static::lazy_static;
-use log::{error, info, warn};
+use netsim_proto::model::{ChipCreate as ChipCreateProto, DeviceCreate as DeviceCreateProto};
 use protobuf::MessageField;
 use std::alloc::System;
 use std::sync::{Mutex, RwLock};
@@ -236,7 +236,7 @@ pub fn bluetooth_beacon_get(chip_id: ChipIdentifier) -> Result<BluetoothBeaconPr
 pub mod tests {
     use std::thread;
 
-    use frontend_proto::model::chip::bluetooth_beacon::AdvertiseData as AdvertiseDataProto;
+    use netsim_proto::model::chip::bluetooth_beacon::AdvertiseData as AdvertiseDataProto;
 
     use super::*;
     use crate::bluetooth::{bluetooth_beacon_add, refresh_resource};
