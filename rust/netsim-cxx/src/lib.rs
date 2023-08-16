@@ -157,6 +157,7 @@ mod ffi {
             device_guid: &str,
             device_name: &str,
             chip_kind: &CxxString,
+            chip_address: &str,
             chip_name: &str,
             chip_manufacturer: &str,
             chip_product_name: &str,
@@ -339,7 +340,7 @@ mod ffi {
 
         #[rust_name = bluetooth_add]
         #[namespace = "netsim::hci::facade"]
-        pub fn Add(_chip_id: u32) -> u32;
+        pub fn Add(_chip_id: u32, address: &CxxString) -> u32;
 
         /*
         From https://cxx.rs/binding/box.html#restrictions,
