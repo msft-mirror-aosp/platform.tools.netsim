@@ -23,7 +23,6 @@ use crate::http_server::server::run_http_server;
 use crate::resource;
 use crate::transport::socket::run_socket_transport;
 use crate::wifi as wifi_facade;
-use cxx::let_cxx_string;
 use log::{error, info, warn};
 use netsim_common::util::netsim_logger;
 use std::env;
@@ -40,7 +39,6 @@ pub struct ServiceParams {
     hci_port: u16,
     instance_num: u16,
     dev: bool,
-    vsock: String,
 }
 
 impl ServiceParams {
@@ -104,12 +102,10 @@ impl Service {
         // 2. Don't start http server.
         let netsim_grpc_port =
             env::var("NETSIM_GRPC_PORT").map(|val| val.parse::<u32>().unwrap_or(0)).unwrap_or(0);
-        let_cxx_string!(vsock = &self.service_params.vsock);
         let grpc_server = run_grpc_server_cxx(
             netsim_grpc_port,
             self.service_params.no_cli_ui,
             self.service_params.instance_num,
-            &vsock,
         );
         if grpc_server.is_null() {
             error!("Failed to run netsimd because unable to start grpc server");
@@ -154,10 +150,9 @@ pub unsafe fn create_service(
     hci_port: u16,
     instance_num: u16,
     dev: bool,
-    vsock: String,
 ) -> Box<Service> {
     let service_params =
-        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev, vsock };
+        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev };
     // SAFETY: The caller guarandeed that the file descriptors in `fd_startup_str` would remain
     // valid and open for as long as the `Service` exists.
     Box::new(unsafe { Service::new(service_params) })
