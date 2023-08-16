@@ -20,9 +20,13 @@ use crate::ffi;
 use crate::service::{Service, ServiceParams};
 
 /// Wireless network simulator for android (and other) emulated devices.
-
+///
+/// # Safety
+///
+/// The file descriptors passed in `NetsimdArgs::fd_startup_str` must remain valid and open for as
+/// long as the program runs.
 #[no_mangle]
-pub extern "C" fn rust_main() {
+pub unsafe extern "C" fn rust_main() {
     ffi::set_up_crash_report();
 
     // TODO: Initialize netsim logger in the beginning of main.
@@ -66,6 +70,8 @@ pub extern "C" fn rust_main() {
         vsock,
     );
 
+    // SAFETY: The caller guaranteed that the file descriptors in `fd_startup_str` would remain
+    // valid and open for as long as the program runs.
     let service = unsafe { Service::new(service_params) };
     service.set_up();
     service.run();

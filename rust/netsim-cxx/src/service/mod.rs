@@ -157,7 +157,7 @@ pub unsafe fn create_service(
 ) -> Box<Service> {
     let service_params =
         ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev, vsock };
-    // SAFETY: The caller guarandeed that the file descriptors in `fd_startup_str` would remain
+    // SAFETY: The caller guaranteed that the file descriptors in `fd_startup_str` would remain
     // valid and open for as long as the `Service` exists.
     Box::new(unsafe { Service::new(service_params) })
 }
