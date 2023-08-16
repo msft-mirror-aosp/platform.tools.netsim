@@ -417,6 +417,10 @@ mod ffi {
         #[namespace = "netsim::server"]
         fn Shutdown(self: &GrpcServer);
 
+        #[rust_name = get_grpc_port]
+        #[namespace = "netsim::server"]
+        fn GetGrpcPort(self: &GrpcServer) -> u32;
+
         #[rust_name = run_grpc_server_cxx]
         #[namespace = "netsim::server"]
         pub fn RunGrpcServerCxx(
@@ -428,6 +432,10 @@ mod ffi {
 
         // OS utilities.
         include!("util/os_utils.h");
+
+        #[rust_name = get_netsim_ini_file_path_cxx]
+        #[namespace = "netsim::osutils"]
+        pub fn GetNetsimIniFilepathCxx(instance_num: u16) -> UniquePtr<CxxString>;
 
         #[rust_name = get_instance]
         #[namespace = "netsim::osutils"]
