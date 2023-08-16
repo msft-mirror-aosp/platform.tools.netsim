@@ -39,6 +39,7 @@ pub struct ServiceParams {
     hci_port: u16,
     instance_num: u16,
     dev: bool,
+    vsock: u16,
 }
 
 impl ServiceParams {
@@ -49,8 +50,9 @@ impl ServiceParams {
         hci_port: u16,
         instance_num: u16,
         dev: bool,
+        vsock: u16,
     ) -> Self {
-        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev }
+        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev, vsock }
     }
 }
 
@@ -106,6 +108,7 @@ impl Service {
             netsim_grpc_port,
             self.service_params.no_cli_ui,
             self.service_params.instance_num,
+            self.service_params.vsock,
         );
         if grpc_server.is_null() {
             error!("Failed to run netsimd because unable to start grpc server");
@@ -150,9 +153,10 @@ pub unsafe fn create_service(
     hci_port: u16,
     instance_num: u16,
     dev: bool,
+    vsock: u16,
 ) -> Box<Service> {
     let service_params =
-        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev };
+        ServiceParams { fd_startup_str, no_cli_ui, no_web_ui, hci_port, instance_num, dev, vsock };
     // SAFETY: The caller guarandeed that the file descriptors in `fd_startup_str` would remain
     // valid and open for as long as the `Service` exists.
     Box::new(unsafe { Service::new(service_params) })
