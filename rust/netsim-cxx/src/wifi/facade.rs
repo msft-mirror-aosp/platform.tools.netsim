@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use frontend_proto::model::chip::Radio;
+use netsim_proto::model::chip::Radio;
 use protobuf::Message;
 
 pub fn handle_wifi_request(facade_id: u32, packet: &Vec<u8>) {

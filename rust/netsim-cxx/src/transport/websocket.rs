@@ -15,10 +15,10 @@
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, io::Cursor, net::TcpStream};
 
-use frontend_proto::common::ChipKind;
-use frontend_proto::model::ChipCreate;
 use http::Request;
 use log::{error, info, warn};
+use netsim_proto::common::ChipKind;
+use netsim_proto::model::ChipCreate;
 use tungstenite::{protocol::Role, Message, WebSocket};
 
 use crate::http_server::server_response::ResponseWritable;

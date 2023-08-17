@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use frontend_proto::frontend::ListDeviceResponse;
-use frontend_proto::model::{
+use netsim_proto::frontend::ListDeviceResponse;
+use netsim_proto::model::{
     self,
     chip::bluetooth_beacon::advertise_settings,
     chip::bluetooth_beacon::{AdvertiseData, AdvertiseSettings},

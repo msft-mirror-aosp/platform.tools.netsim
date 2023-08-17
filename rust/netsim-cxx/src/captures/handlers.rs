@@ -27,11 +27,11 @@
 // TODO(b/274506882): Implement gRPC status proto on error responses. Also write better
 // and more descriptive error messages with proper error codes.
 
-use frontend_proto::common::ChipKind;
-use frontend_proto::frontend::ListCaptureResponse;
 use http::{Request, Version};
 use log::warn;
 use netsim_common::util::time_display::TimeDisplay;
+use netsim_proto::common::ChipKind;
+use netsim_proto::frontend::ListCaptureResponse;
 use protobuf_json_mapping::{print_to_string_with_options, PrintOptions};
 use std::fs::File;
 use std::io::{Read, Result};

@@ -19,7 +19,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use frontend_proto::common::ChipKind;
+use netsim_proto::common::ChipKind;
 
 use crate::bluetooth::handle_bluetooth_request;
 use crate::captures::handlers as captures_handlers;

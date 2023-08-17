@@ -16,9 +16,9 @@ use super::dispatcher::{handle_request, register_transport, unregister_transport
 use super::h4::PacketError;
 use crate::devices::devices_handler::{add_chip, remove_chip};
 use crate::transport::h4;
-use frontend_proto::common::ChipKind;
-use frontend_proto::model::ChipCreate;
 use log::{error, info, warn};
+use netsim_proto::common::ChipKind;
+use netsim_proto::model::ChipCreate;
 use std::io::{ErrorKind, Write};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
 use std::thread;
