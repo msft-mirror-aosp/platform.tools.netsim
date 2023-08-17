@@ -197,6 +197,13 @@ mod tests {
     }
 
     #[test]
+    fn test_read_no_file() {
+        let filepath = get_temp_ini_filepath("test_read_no_file");
+        let mut inifile = IniFile::new(filepath.clone());
+        assert!(inifile.read().is_err());
+    }
+
+    #[test]
     fn test_read_multiple_lines() {
         let filepath = get_temp_ini_filepath("test_read_multiple_lines");
 
@@ -302,5 +309,24 @@ mod tests {
         assert_eq!(inifile.get("unknown-key"), None);
 
         std::fs::remove_file(filepath).unwrap();
+    }
+
+    #[test]
+    fn test_overwrite() {
+        let filepath = get_temp_ini_filepath("test_overwrite");
+        {
+            let mut tmpfile = File::create(&filepath).unwrap();
+            write!(tmpfile, "port=123\nport2=456\n").unwrap();
+        }
+
+        let mut inifile = IniFile::new(filepath.clone());
+        inifile.insert("port3", "789");
+
+        inifile.write().unwrap();
+        let mut file = File::open(&filepath).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+
+        assert_eq!(contents, "port3=789\n");
     }
 }
