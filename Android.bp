@@ -166,7 +166,7 @@ cc_library_host_static {
         "libc++fs",
         "libjsoncpp",
         "libprotobuf-cpp-full",
-        "libscriptedbeaconpayload-protos-lite", // TODO: Remove this after using pdl library.
+        "libscriptedbeaconpayload-protos-lite",
         "lib-netsimd-proto",
     ],
     whole_static_libs: [
@@ -202,6 +202,45 @@ cc_binary_host {
     name: "netsimd",
     defaults: ["netsim_defaults"],
     srcs: [
+        "src/netsimd.cc",
+    ],
+    generated_headers: [
+        "cxx-bridge-header",
+        "netsim_cxx_h",
+    ],
+    shared_libs: [
+        "libbase",
+        "libgrpc++",
+        "libcap",
+        "libcrypto",
+        "libssl",
+        "libunwindstack",
+    ],
+    static_libs: [
+        "breakpad_client",
+        "libc++fs",
+        "libjsoncpp",
+        "libprotobuf-cpp-full",
+        "libscriptedbeaconpayload-protos-lite",
+        "lib-netsimd-proto",
+        "lib-netsim",
+        "lib-netsim-frontend-proto",
+    ],
+    whole_static_libs: [
+        "libnetsim_cxx",
+        "libbt-rootcanal",
+    ],
+    ldflags: ["-Wl,--allow-multiple-definition"],
+    required: netsim_ui_modules,
+    strip: {
+        keep_symbols_and_debug_frame: true,
+    },
+}
+
+cc_binary_host {
+    name: "netsimd-rs",
+    defaults: ["netsim_defaults"],
+    srcs: [
         "rust/netsimd.cc",
     ],
     generated_headers: [
@@ -220,7 +259,7 @@ cc_binary_host {
         "breakpad_client",
         "libc++fs",
         "libprotobuf-cpp-full",
-        "libscriptedbeaconpayload-protos-lite", // TODO: Remove this after using pdl library.
+        "libscriptedbeaconpayload-protos-lite",
         "lib-netsimd-proto",
         "lib-netsim",
         "lib-netsim-frontend-proto",
@@ -235,6 +274,7 @@ cc_binary_host {
         keep_symbols_and_debug_frame: true,
     },
 }
+
 
 cc_test_host {
     name: "netsim-test",
@@ -260,7 +300,7 @@ cc_test_host {
         "libc++fs",
         "libjsoncpp",
         "libprotobuf-cpp-full",
-        "libscriptedbeaconpayload-protos-lite", // TODO: Remove this after using pdl library.
+        "libscriptedbeaconpayload-protos-lite",
         "lib-netsim-frontend-proto",
         "lib-netsim",
         "lib-netsimd-proto",
