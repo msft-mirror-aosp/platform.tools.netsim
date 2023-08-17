@@ -66,7 +66,7 @@ rust_defaults {
         "libclap",
         "libcxx",
         "libdata_encoding",
-        "libfrontend_proto",
+        "libnetsim_proto",
         "libhttp",
         "libnetsim_common",
         "libprotobuf",
@@ -311,9 +311,9 @@ cc_test_host {
 }
 
 rust_library_host {
-    name: "libfrontend_proto",
-    crate_name: "frontend_proto",
-    srcs: ["rust/frontend-proto/src/lib.rs"],
+    name: "libnetsim_proto",
+    crate_name: "netsim_proto",
+    srcs: ["rust/proto/src/lib.rs"],
     rustlibs: [
         "libprotobuf",
     ],
@@ -372,7 +372,7 @@ rust_defaults {
     srcs: ["rust/netsim-cli/src/lib.rs"],
     rustlibs: [
         "libclap",
-        "libfrontend_proto",
+        "libnetsim_proto",
         "libfrontend_client_cxx",
         "libnetsim_common",
         "libprotobuf",

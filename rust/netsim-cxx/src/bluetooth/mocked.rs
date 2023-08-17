@@ -15,11 +15,11 @@
 use crate::bluetooth::{BeaconChip, BEACON_CHIPS};
 use crate::devices::chip::{ChipIdentifier, FacadeIdentifier};
 use crate::devices::device::{AddChipResult, DeviceIdentifier};
-use frontend_proto::model::chip::{Bluetooth, BluetoothBeacon};
-use frontend_proto::model::chip_create::Chip as Builtin;
-use frontend_proto::model::{ChipCreate, DeviceCreate};
 use lazy_static::lazy_static;
 use log::info;
+use netsim_proto::model::chip::{Bluetooth, BluetoothBeacon};
+use netsim_proto::model::chip_create::Chip as Builtin;
+use netsim_proto::model::{ChipCreate, DeviceCreate};
 use std::sync::Mutex;
 use std::sync::RwLock;
 use std::{collections::HashMap, ptr::null};

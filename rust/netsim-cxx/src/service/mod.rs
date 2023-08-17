@@ -173,16 +173,16 @@ pub unsafe fn create_service(
 
 pub fn new_test_beacon(idx: u32) {
     use crate::devices::devices_handler::create_device;
-    use frontend_proto::common::ChipKind;
-    use frontend_proto::frontend::CreateDeviceRequest;
-    use frontend_proto::model::chip::bluetooth_beacon::{
+    use netsim_proto::common::ChipKind;
+    use netsim_proto::frontend::CreateDeviceRequest;
+    use netsim_proto::model::chip::bluetooth_beacon::{
         AdvertiseData as AdvertiseDataProto, AdvertiseSettings as AdvertiseSettingsProto,
     };
-    use frontend_proto::model::chip_create::{
+    use netsim_proto::model::chip_create::{
         BluetoothBeaconCreate as BluetoothBeaconCreateProto, Chip as ChipProto,
     };
-    use frontend_proto::model::ChipCreate as ChipCreateProto;
-    use frontend_proto::model::DeviceCreate as DeviceCreateProto;
+    use netsim_proto::model::ChipCreate as ChipCreateProto;
+    use netsim_proto::model::DeviceCreate as DeviceCreateProto;
     use protobuf::MessageField;
     use protobuf_json_mapping::print_to_string;
 

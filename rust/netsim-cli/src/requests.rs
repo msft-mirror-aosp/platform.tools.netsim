@@ -49,7 +49,7 @@ mod tests {
     use super::*;
     use args::{BinaryProtobuf, NetsimArgs};
     use clap::Parser;
-    use frontend_proto::{
+    use netsim_proto::{
         common::ChipKind,
         frontend,
         model::{
