@@ -37,18 +37,18 @@ use crate::resource::clone_devices;
 use crate::wifi as wifi_facade;
 use crate::CxxServerResponseWriterWrapper;
 use cxx::CxxString;
-use frontend_proto::common::ChipKind as ProtoChipKind;
-use frontend_proto::frontend::CreateDeviceRequest;
-use frontend_proto::frontend::CreateDeviceResponse;
-use frontend_proto::frontend::ListDeviceResponse;
-use frontend_proto::frontend::PatchDeviceRequest;
-use frontend_proto::model::chip_create::Chip as ProtoBuiltin;
-use frontend_proto::model::ChipCreate;
-use frontend_proto::model::Position as ProtoPosition;
-use frontend_proto::model::Scene as ProtoScene;
 use http::Request;
 use http::Version;
 use log::{info, warn};
+use netsim_proto::common::ChipKind as ProtoChipKind;
+use netsim_proto::frontend::CreateDeviceRequest;
+use netsim_proto::frontend::CreateDeviceResponse;
+use netsim_proto::frontend::ListDeviceResponse;
+use netsim_proto::frontend::PatchDeviceRequest;
+use netsim_proto::model::chip_create::Chip as ProtoBuiltin;
+use netsim_proto::model::ChipCreate;
+use netsim_proto::model::Position as ProtoPosition;
+use netsim_proto::model::Scene as ProtoScene;
 use protobuf::MessageField;
 use protobuf_json_mapping::merge_from_str;
 use protobuf_json_mapping::print_to_string;
@@ -677,11 +677,11 @@ pub fn get_facade_id(chip_id: u32) -> Result<u32, String> {
 mod tests {
     use std::{sync::Once, thread, time::Duration};
 
-    use frontend_proto::model::{
+    use netsim_common::util::netsim_logger::init_for_test;
+    use netsim_proto::model::{
         Device as ProtoDevice, DeviceCreate as ProtoDeviceCreate, Orientation as ProtoOrientation,
         State,
     };
-    use netsim_common::util::netsim_logger::init_for_test;
     use protobuf_json_mapping::print_to_string;
 
     use super::*;
@@ -1112,13 +1112,13 @@ mod tests {
             .unwrap()
     }
 
-    use frontend_proto::model::chip::{
+    use netsim_proto::model::chip::{
         bluetooth_beacon::AdvertiseData, bluetooth_beacon::AdvertiseSettings, BluetoothBeacon, Chip,
     };
-    use frontend_proto::model::chip_create::{BluetoothBeaconCreate, Chip as BuiltChipProto};
-    use frontend_proto::model::Chip as ChipProto;
-    use frontend_proto::model::ChipCreate;
-    use frontend_proto::model::Device as DeviceProto;
+    use netsim_proto::model::chip_create::{BluetoothBeaconCreate, Chip as BuiltChipProto};
+    use netsim_proto::model::Chip as ChipProto;
+    use netsim_proto::model::ChipCreate;
+    use netsim_proto::model::Device as DeviceProto;
     use protobuf::{EnumOrUnknown, MessageField};
 
     fn get_test_create_device_request(device_name: Option<String>) -> CreateDeviceRequest {

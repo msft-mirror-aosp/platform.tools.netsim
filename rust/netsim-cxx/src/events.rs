@@ -14,7 +14,7 @@
 
 //! A module with mpmc channels for distributing global events.
 
-use frontend_proto::common::ChipKind;
+use netsim_proto::common::ChipKind;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 

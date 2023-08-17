@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use frontend_proto::model::chip::bluetooth_beacon::{
+use netsim_proto::model::chip::bluetooth_beacon::{
     advertise_settings::{
         AdvertiseMode as Mode, AdvertiseTxPower as Level, Interval as IntervalProto,
         Tx_power as TxPowerProto,

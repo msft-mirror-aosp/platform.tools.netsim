@@ -28,11 +28,11 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::pcap_util::write_pcap_header;
-use frontend_proto::{
+use log::info;
+use netsim_proto::{
     common::ChipKind,
     model::{Capture as ProtoCapture, State},
 };
-use log::info;
 use protobuf::well_known_types::timestamp::Timestamp;
 
 use crate::events::Event;

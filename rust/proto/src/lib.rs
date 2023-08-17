@@ -13,8 +13,12 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-//! frontend protobuf library for netsim
+//! protobuf library for netsim
 
 pub mod common;
+pub mod configuration;
 pub mod frontend;
+pub mod hci_packet;
 pub mod model;
+pub mod packet_streamer;
+pub mod startup;
