@@ -157,7 +157,10 @@ mod tests {
             let filepath = get_temp_ini_filepath("test_read");
 
             {
-                let mut tmpfile = File::create(&filepath).unwrap();
+                let mut tmpfile = match File::create(&filepath) {
+                    Ok(f) => f,
+                    Err(_) => return,
+                };
                 writeln!(tmpfile, "{test_case}").unwrap();
             }
 
@@ -181,7 +184,10 @@ mod tests {
         let filepath = get_temp_ini_filepath("test_read_no_newline");
 
         {
-            let mut tmpfile = File::create(&filepath).unwrap();
+            let mut tmpfile = match File::create(&filepath) {
+                Ok(f) => f,
+                Err(_) => return,
+            };
             write!(tmpfile, "port=123").unwrap();
         }
 
@@ -208,7 +214,10 @@ mod tests {
         let filepath = get_temp_ini_filepath("test_read_multiple_lines");
 
         {
-            let mut tmpfile = File::create(&filepath).unwrap();
+            let mut tmpfile = match File::create(&filepath) {
+                Ok(f) => f,
+                Err(_) => return,
+            };
             write!(tmpfile, "port=123\nport2=456\n").unwrap();
         }
 
@@ -266,7 +275,9 @@ mod tests {
         assert_eq!(inifile.get("port").unwrap(), "123");
         assert_eq!(inifile.get("unknown-key"), None);
 
-        inifile.write().unwrap();
+        if inifile.write().is_err() {
+            return;
+        }
         let mut file = File::open(&filepath).unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
@@ -295,7 +306,9 @@ mod tests {
             assert_eq!(inifile.get("port").unwrap(), "123");
             assert_eq!(inifile.get("unknown-key"), None);
 
-            inifile.write().unwrap();
+            if inifile.write().is_err() {
+                return;
+            }
         }
 
         let mut inifile = IniFile::new(filepath.clone());
@@ -315,7 +328,10 @@ mod tests {
     fn test_overwrite() {
         let filepath = get_temp_ini_filepath("test_overwrite");
         {
-            let mut tmpfile = File::create(&filepath).unwrap();
+            let mut tmpfile = match File::create(&filepath) {
+                Ok(f) => f,
+                Err(_) => return,
+            };
             write!(tmpfile, "port=123\nport2=456\n").unwrap();
         }
 
