@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use frontend_proto::common::ChipKind;
+use netsim_proto::common::ChipKind;
 
 /// Helper function for translating u32 representation of ChipKind
 pub(crate) fn int_to_chip_kind(kind: u32) -> ChipKind {
