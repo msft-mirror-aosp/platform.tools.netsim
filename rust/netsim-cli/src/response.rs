@@ -16,12 +16,12 @@ use std::cmp::max;
 
 use crate::args::{self, Beacon, BeaconCreate, BeaconPatch, Capture, Command, OnOffState};
 use crate::display::Displayer;
-use frontend_proto::{
+use netsim_common::util::time_display::TimeDisplay;
+use netsim_proto::{
     common::ChipKind,
     frontend::{CreateDeviceResponse, ListCaptureResponse, ListDeviceResponse, VersionResponse},
     model::{self, State},
 };
-use netsim_common::util::time_display::TimeDisplay;
 use protobuf::Message;
 
 impl args::Command {

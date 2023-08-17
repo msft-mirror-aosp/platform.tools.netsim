@@ -14,17 +14,17 @@
 
 // Device.rs
 
-use frontend_proto::model::State;
+use netsim_proto::model::State;
 use protobuf::Message;
 
 use crate::devices::chip;
 use crate::devices::chip::Chip;
 use crate::devices::chip::ChipIdentifier;
 use crate::devices::chip::FacadeIdentifier;
-use frontend_proto::common::ChipKind as ProtoChipKind;
-use frontend_proto::model::Device as ProtoDevice;
-use frontend_proto::model::Orientation as ProtoOrientation;
-use frontend_proto::model::Position as ProtoPosition;
+use netsim_proto::common::ChipKind as ProtoChipKind;
+use netsim_proto::model::Device as ProtoDevice;
+use netsim_proto::model::Orientation as ProtoOrientation;
+use netsim_proto::model::Position as ProtoPosition;
 use std::collections::BTreeMap;
 
 pub type DeviceIdentifier = u32;

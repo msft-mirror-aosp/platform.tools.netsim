@@ -10,7 +10,7 @@ test = false
 
 [dependencies]
 clap = { version = "4.1.8", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
-frontend-proto = { path = "../frontend-proto" }
+netsim-proto = { path = "../proto" }
 netsim-common = { path = "../netsim-common" }
 frontend-client-cxx = { path = "../frontend-client-cxx" }
 protobuf = "3.2.0"

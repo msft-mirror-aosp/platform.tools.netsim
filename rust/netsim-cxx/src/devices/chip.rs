@@ -20,9 +20,9 @@
 use crate::bluetooth as bluetooth_facade;
 use crate::devices::id_factory::IdFactory;
 use crate::wifi as wifi_facade;
-use frontend_proto::common::ChipKind as ProtoChipKind;
-use frontend_proto::model::Chip as ProtoChip;
 use lazy_static::lazy_static;
+use netsim_proto::common::ChipKind as ProtoChipKind;
+use netsim_proto::model::Chip as ProtoChip;
 use protobuf::EnumOrUnknown;
 use std::sync::RwLock;
 

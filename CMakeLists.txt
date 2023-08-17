@@ -42,15 +42,17 @@ if(TARGET Rust::Rustc)
     DEPS frontend-client grpc++ netsim-cli-proto-lib netsim-cli-rust-lib
          protobuf::libprotobuf util-lib)
 
-    android_add_executable(
-        TARGET netsimd-rs LICENSE Apache-2.0 INSTALL . SRC rust/netsimd.cc
-        DEPS grpc++
-        libbt-rootcanal
-        netsim-cli-proto-lib
-        netsim-cxx
-        netsimd-lib
-        netsimd-proto-lib
-        packet-streamer-proto-lib)
+  android_add_executable(
+    TARGET netsimd-rs
+    LICENSE Apache-2.0 INSTALL .
+    SRC rust/netsimd.cc
+    DEPS grpc++
+         libbt-rootcanal
+         netsim-cli-proto-lib
+         netsim-cxx
+         netsimd-lib
+         netsimd-proto-lib
+         packet-streamer-proto-lib)
 
   android_add_executable(
     TARGET netsimd
@@ -81,14 +83,13 @@ if(TARGET Rust::Rustc)
     SRC src/util/ini_file_test.cc src/util/os_utils_test.cc
         src/util/string_utils_test.cc src/wifi/wifi_facade_test.cc
     DEPS android-emu-base-headers
-         frontend-proto
-         backend-proto
          grpc++
          gtest
          gtest_main
          libbt-rootcanal
          netsim-cli-proto-lib
          netsim-cxx
+         netsim-proto
          netsimd-lib
          netsimd-proto-lib
          protobuf::libprotobuf
