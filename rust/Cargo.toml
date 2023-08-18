@@ -17,7 +17,7 @@
 members = [
     "frontend-client-cxx",
     "proto",
-    "netsim-cli",
-    "netsim-common",
-    "netsim-cxx",
+    "cli",
+    "common",
+    "daemon",
 ]
