@@ -24,9 +24,9 @@ const DEFAULT_HTTP_PORT: u16 = 7681;
 
 /// Start the HTTP Server.
 
-pub fn run_http_server(instance_num: u16) {
+pub fn run_http_server(instance_num: u16) -> u16 {
+    let http_port = DEFAULT_HTTP_PORT + instance_num;
     let _ = thread::Builder::new().name("http_server".to_string()).spawn(move || {
-        let http_port = DEFAULT_HTTP_PORT + instance_num;
         let listener = match TcpListener::bind(format!("127.0.0.1:{}", http_port)) {
             Ok(listener) => listener,
             Err(e) => {
@@ -46,4 +46,5 @@ pub fn run_http_server(instance_num: u16) {
         }
         info!("Shutting down frontend http server.");
     });
+    http_port
 }
