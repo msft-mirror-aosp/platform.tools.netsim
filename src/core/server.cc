@@ -59,7 +59,7 @@ std::pair<std::unique_ptr<grpc::Server>, uint32_t> RunGrpcServer(
   if (vsock != 0) {
     std::string vsock_uri =
         "vsock:" + std::to_string(VMADDR_CID_ANY) + ":" + std::to_string(vsock);
-    BtsLog("vsock_uri: %s", vsock_uri.c_str());
+    BtsLogInfo("vsock_uri: %s", vsock_uri.c_str());
     builder.AddListeningPort(vsock_uri, grpc::InsecureServerCredentials());
   }
 #endif
@@ -72,8 +72,8 @@ std::pair<std::unique_ptr<grpc::Server>, uint32_t> RunGrpcServer(
     return std::make_pair(nullptr, static_cast<uint32_t>(selected_port));
   }
 
-  BtsLog("Grpc server listening on localhost: %s",
-         std::to_string(selected_port).c_str());
+  BtsLogInfo("Grpc server listening on localhost: %s",
+             std::to_string(selected_port).c_str());
 
   return std::make_pair(std::move(server),
                         static_cast<uint32_t>(selected_port));

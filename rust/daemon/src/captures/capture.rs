@@ -253,11 +253,11 @@ pub fn spawn_capture_event_subscriber(event_rx: Receiver<Event>) {
                     // Currently, the default capture state is ON
                     let _ = capture_info.start_capture();
                     clone_captures().write().unwrap().insert(capture_info);
-                    info!("Capture event: ChipAdded {chip_id} {device_name} facade_id:{facade_id}");
+                    info!("Capture event: ChipAdded chip_id: {chip_id} device_name: {device_name} facade_id:{facade_id}");
                 }
                 Ok(Event::ChipRemoved { chip_id }) => {
                     clone_captures().write().unwrap().remove(&chip_id);
-                    info!("Capture event: ChipRemoved {chip_id}");
+                    info!("Capture event: ChipRemoved chip_id: {chip_id}");
                 }
                 _ => {}
             }
