@@ -49,7 +49,7 @@ if(TARGET Rust::Rustc)
     DEPS grpc++
          libbt-rootcanal
          netsim-cli-proto-lib
-         netsim-cxx
+         netsim-daemon
          netsimd-lib
          netsimd-proto-lib
          packet-streamer-proto-lib)
@@ -61,7 +61,7 @@ if(TARGET Rust::Rustc)
     DEPS grpc++
          libbt-rootcanal
          netsim-cli-proto-lib
-         netsim-cxx
+         netsim-daemon
          netsimd-lib
          netsimd-proto-lib
          packet-streamer-proto-lib)
@@ -88,7 +88,7 @@ if(TARGET Rust::Rustc)
          gtest_main
          libbt-rootcanal
          netsim-cli-proto-lib
-         netsim-cxx
+         netsim-daemon
          netsim-proto
          netsimd-lib
          netsimd-proto-lib
