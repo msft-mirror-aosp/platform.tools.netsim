@@ -1,5 +1,5 @@
 [package]
-name = "netsim-cxx"
+name = "netsim-daemon"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
@@ -15,7 +15,7 @@ cxx = { version = ">=1.0.85", features = ["c++17"] }
 data-encoding = "2.4.0"
 netsim-proto = { path = "../proto" }
 http = "0.2.9"
-netsim-common = { path = "../netsim-common" }
+netsim-common = { path = "../common" }
 protobuf = "3.2.0"
 protobuf-json-mapping = "3.2.0"
 regex = "1.6.0"
