@@ -119,13 +119,17 @@ impl Service {
         let forge_job = netsim_grpc_port != 0;
 
         // forge and no_web_ui disables the web server
+        let mut web_port: Option<u16> = None;
         if !forge_job && !self.service_params.no_web_ui {
-            run_http_server(self.service_params.instance_num);
+            web_port = Some(run_http_server(self.service_params.instance_num));
         }
 
         // Write to netsim.ini file
         let filepath = get_netsim_ini_file_path_cxx(self.service_params.instance_num);
         let mut ini_file = IniFile::new(filepath.to_string());
+        if let Some(num) = web_port {
+            ini_file.insert("web.port", &num.to_string());
+        }
         ini_file.insert("grpc.port", &grpc_server.get_grpc_port().to_string());
         if let Err(err) = ini_file.write() {
             error!("{err:?}");
