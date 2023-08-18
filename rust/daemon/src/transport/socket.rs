@@ -115,7 +115,7 @@ fn handle_hci_client(stream: TcpStream) {
     if let Err(err) = remove_chip(result.device_id, result.chip_id) {
         warn!("{err}");
     };
-    info!("Removed chip: device_id={}, chip_id={}.", result.device_id, result.chip_id);
+    info!("Removed chip: device_id: {} chip_id: {}.", result.device_id, result.chip_id);
 }
 
 /// read from the socket and pass to the packet hub.

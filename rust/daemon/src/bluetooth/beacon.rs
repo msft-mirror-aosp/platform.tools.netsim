@@ -111,7 +111,7 @@ impl BeaconChip {
                 tx_power,
             );
         } else {
-            warn!("Failed to get RustBluetoothChip for unknown chip id {}", self.chip_id);
+            warn!("Failed to get RustBluetoothChip for unknown chip id: {}", self.chip_id);
         };
     }
 }
@@ -189,7 +189,10 @@ pub fn bluetooth_beacon_add(
     );
     let rust_chip = add_rust_device_result.rust_chip;
     let facade_id = add_rust_device_result.facade_id;
-    info!("Creating HCI facade {} for device {} chip {}", facade_id, device_id, chip_id);
+    info!(
+        "Creating HCI facade_id: {} for device_id: {} chip_id: {}",
+        facade_id, device_id, chip_id
+    );
     BT_CHIPS.write().unwrap().insert(chip_id, Mutex::new(rust_chip));
 
     Ok(facade_id)
