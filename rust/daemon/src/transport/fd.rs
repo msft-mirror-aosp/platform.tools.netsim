@@ -103,7 +103,7 @@ unsafe fn fd_reader(
             // SAFETY: The caller promises that `fd_rx` is valid and open.
             let mut rx = unsafe { File::from_raw_fd(fd_rx) };
 
-            info!("Handling fd={} for kind={:?} facade_id={:?}", fd_rx, kind, facade_id);
+            info!("Handling fd={} for kind: {:?} facade_id: {:?}", fd_rx, kind, facade_id);
 
             loop {
                 match kind {
@@ -132,7 +132,7 @@ unsafe fn fd_reader(
                         }
                     },
                     _ => {
-                        error!("unknown control packet kind: {:?}", kind);
+                        error!("unknown control packet chip_kind: {:?}", kind);
                         break;
                     }
                 };
@@ -259,7 +259,7 @@ mod tests {
     }"#;
         let startup_info = serde_json::from_str::<StartupInfo>(s).unwrap();
         for device in startup_info.devices {
-            info!("device {:?}", device);
+            info!("device: {:?}", device);
         }
     }
 }
