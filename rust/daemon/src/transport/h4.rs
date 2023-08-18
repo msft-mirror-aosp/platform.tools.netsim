@@ -92,7 +92,7 @@ pub fn read_h4_packet<R: Read>(reader: &mut R) -> Result<Packet, PacketError> {
     let result = reader.read_exact(&mut packet[preamble_size..]);
     if let Err(e) = result {
         error!(
-            "h4 failed to read {payload_length} bytes for type={h4_type}, preamble={:?}: {e}",
+            "h4 failed to read {payload_length} bytes for type: {h4_type} preamble: {:?} error: {e}",
             &packet[0..preamble_size]
         );
         return Err(PacketError::IoError(e));

@@ -66,21 +66,21 @@ pub fn register_transport(kind: u32, facade_id: u32, mut responder: Box<dyn Resp
     match SENDERS.lock() {
         Ok(mut map) => {
             if map.contains_key(&key) {
-                error!("register_transport: key already present for {key}");
+                error!("register_transport: key already present for chip_kind/facade_id: {key}");
             }
             map.insert(key.clone(), tx);
         }
         Err(_) => panic!("register_transport: poisoned lock"),
     }
     let _ = thread::Builder::new().name("transport writer {key}".to_string()).spawn(move || {
-        info!("register_transport: started thread {key}");
+        info!("register_transport: started thread chip_kind/facade_id: {key}");
         loop {
             match rx.recv() {
                 Ok(ResponsePacket { packet, packet_type }) => {
                     responder.response(packet, packet_type);
                 }
                 Err(_) => {
-                    info!("register_transport: finished thread {key}");
+                    info!("register_transport: finished thread chip_kind/facade_id: {key}");
                     break;
                 }
             }
@@ -107,11 +107,11 @@ pub fn handle_response(kind: u32, facade_id: u32, packet: &cxx::CxxVector<u8>, p
     let mut binding = SENDERS.lock().unwrap();
     if let Some(responder) = binding.get(&key) {
         if responder.send(ResponsePacket { packet: packet_vec, packet_type }).is_err() {
-            warn!("handle_response: send failed for {key}");
+            warn!("handle_response: send failed for chip_kind/facade_id: {key}");
             binding.remove(&key);
         }
     } else {
-        warn!("handle_response: unknown chip kind `{kind}` and facade ID `{facade_id}`.");
+        warn!("handle_response: unknown chip_kind: {kind} facade_id: {facade_id}");
     };
 }
 
@@ -127,7 +127,7 @@ pub fn handle_request(kind: u32, facade_id: u32, packet: &Vec<u8>, packet_type: 
             handle_wifi_request(facade_id, packet);
         }
         chip_kind => {
-            warn!("Unable to handle request from ChipKind {:?}", chip_kind);
+            warn!("Unable to handle request from chip_kind: {:?}", chip_kind);
         }
     }
 }
