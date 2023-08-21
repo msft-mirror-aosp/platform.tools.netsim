@@ -29,7 +29,7 @@
 #include "model/setup/async_manager.h"
 #include "model/setup/test_command_handler.h"
 #include "model/setup/test_model.h"
-#include "netsim-cxx/src/lib.rs.h"
+#include "netsim-daemon/src/lib.rs.h"
 #include "rust/cxx.h"
 #include "util/filesystem.h"
 #include "util/log.h"
@@ -96,8 +96,8 @@ class SimTestModel : public rootcanal::TestModel {
 size_t phy_low_energy_index_;
 size_t phy_classic_index_;
 
-bool mStarted = false;
-std::shared_ptr<rootcanal::AsyncManager> mAsyncManager;
+bool gStarted = false;
+std::shared_ptr<rootcanal::AsyncManager> gAsyncManager;
 rootcanal::AsyncUserId gSocketUserId{};
 std::shared_ptr<SimTestModel> gTestModel;
 std::unique_ptr<rootcanal::ControllerProperties> controller_properties_;
@@ -122,14 +122,14 @@ using ::android::net::PosixAsyncSocketServer;
 
 void SetUpTestChannel(uint16_t instance_num) {
   gTestSocketServer = std::make_shared<PosixAsyncSocketServer>(
-      kDefaultTestPort + instance_num, mAsyncManager.get());
+      kDefaultTestPort + instance_num, gAsyncManager.get());
 
   gTestChannel = std::make_unique<rootcanal::TestCommandHandler>(*gTestModel);
 
   gTestChannelTransport = std::make_unique<rootcanal::TestChannelTransport>();
   gTestChannelTransport->RegisterCommandHandler(
       [](const std::string &name, const std::vector<std::string> &args) {
-        mAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0),
+        gAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0),
                                  [name, args]() {
                                    std::string args_str = "";
                                    for (auto arg : args) args_str += " " + arg;
@@ -184,7 +184,7 @@ void SetUpTestChannel(uint16_t instance_num) {
 
 // Initialize the rootcanal library.
 void Start(uint16_t instance_num) {
-  if (mStarted) return;
+  if (gStarted) return;
 
   // output is to a file, so no color wanted
   rootcanal::log::SetLogColorEnable(false);
@@ -199,21 +199,21 @@ void Start(uint16_t instance_num) {
   controller_properties_ = std::make_unique<rootcanal::ControllerProperties>();
   controller_properties_->quirks.hardware_error_before_reset = true;
 
-  mAsyncManager = std::make_shared<rootcanal::AsyncManager>();
+  gAsyncManager = std::make_shared<rootcanal::AsyncManager>();
   // Get a user ID for tasks scheduled within the test environment.
-  gSocketUserId = mAsyncManager->GetNextUserId();
+  gSocketUserId = gAsyncManager->GetNextUserId();
 
   gTestModel = std::make_unique<SimTestModel>(
-      std::bind(&rootcanal::AsyncManager::GetNextUserId, mAsyncManager),
-      std::bind(&rootcanal::AsyncManager::ExecAsync, mAsyncManager,
+      std::bind(&rootcanal::AsyncManager::GetNextUserId, gAsyncManager),
+      std::bind(&rootcanal::AsyncManager::ExecAsync, gAsyncManager,
                 std::placeholders::_1, std::placeholders::_2,
                 std::placeholders::_3),
-      std::bind(&rootcanal::AsyncManager::ExecAsyncPeriodically, mAsyncManager,
+      std::bind(&rootcanal::AsyncManager::ExecAsyncPeriodically, gAsyncManager,
                 std::placeholders::_1, std::placeholders::_2,
                 std::placeholders::_3, std::placeholders::_4),
       std::bind(&rootcanal::AsyncManager::CancelAsyncTasksFromUser,
-                mAsyncManager, std::placeholders::_1),
-      std::bind(&rootcanal::AsyncManager::CancelAsyncTask, mAsyncManager,
+                gAsyncManager, std::placeholders::_1),
+      std::bind(&rootcanal::AsyncManager::CancelAsyncTask, gAsyncManager,
                 std::placeholders::_1),
       [](const std::string & /* server */, int /* port */,
          rootcanal::Phy::Type /* phy_type */) { return nullptr; });
@@ -231,14 +231,14 @@ void Start(uint16_t instance_num) {
 #else
   SetUpTestChannel(instance_num);
 #endif
-  mStarted = true;
+  gStarted = true;
 };
 
 // Resets the root canal library.
 void Stop() {
   // TODO: Fix TestModel::Reset() in test_model.cc.
   // gTestModel->Reset();
-  mStarted = false;
+  gStarted = false;
 }
 
 void PatchPhy(int device_id, bool isAddToPhy, bool isLowEnergy) {
@@ -321,7 +321,7 @@ void Remove(uint32_t id) {
   id_to_chip_info_.erase(id);
   // Call the transport close callback. This invokes HciDevice::Close and
   // TestModel close callback.
-  mAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0), [id]() {
+  gAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0), [id]() {
     // rootcanal will call HciPacketTransport::Close().
     HciPacketTransport::Remove(id);
   });
@@ -330,7 +330,7 @@ void Remove(uint32_t id) {
 // Rename AddChip(model::Chip, device, transport)
 
 uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
-  auto transport = std::make_shared<HciPacketTransport>(mAsyncManager);
+  auto transport = std::make_shared<HciPacketTransport>(gAsyncManager);
   auto hci_device = std::make_shared<rootcanal::HciDevice>(
       transport, *controller_properties_);
 
@@ -343,7 +343,7 @@ uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
   if (address_string != "") {
     address_option = rootcanal::Address::FromString(address_string);
   }
-  mAsyncManager->ExecAsync(
+  gAsyncManager->ExecAsync(
       gSocketUserId, std::chrono::milliseconds(0),
       [hci_device, &facade_id_promise, address_option]() {
         facade_id_promise.set_value(
