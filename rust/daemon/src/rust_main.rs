@@ -15,6 +15,8 @@
 use clap::Parser;
 use log::warn;
 
+use netsim_common::util::netsim_logger;
+
 use crate::args::NetsimdArgs;
 use crate::ffi;
 use crate::service::{Service, ServiceParams};
@@ -28,8 +30,7 @@ use crate::service::{Service, ServiceParams};
 #[no_mangle]
 pub unsafe extern "C" fn rust_main() {
     ffi::set_up_crash_report();
-
-    // TODO: Initialize netsim logger in the beginning of main.
+    netsim_logger::init("netsimd");
     let netsimd_args = NetsimdArgs::parse();
 
     // Redirect stdout and stderr to files only if netsimd is not invoked
