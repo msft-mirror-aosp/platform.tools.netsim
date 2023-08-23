@@ -12,10 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Version library.
+// [cfg(test)] gets compiled during local Rust unit tests
+// [cfg(not(test))] avoids getting compiled during local Rust unit tests
 
-pub const VERSION: &str = "0.1.0";
-
-pub fn get_version() -> String {
-    VERSION.to_owned()
-}
+#![allow(unused)]
+mod beacon;
+#[cfg(not(test))]
+mod facade;
+#[cfg(test)]
+mod mocked;
+pub(crate) use self::beacon::*;
+#[cfg(not(test))]
+pub(crate) use self::facade::*;
+#[cfg(test)]
+pub(crate) use self::mocked::*;
+pub(crate) mod advertise_data;
+pub(crate) mod advertise_settings;
+pub(crate) mod chip;
+pub(crate) mod packets;

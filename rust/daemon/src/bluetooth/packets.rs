@@ -1,10 +1,10 @@
-// Copyright 2023 Google LLC
+// Copyright 2023 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     https://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,20 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// [cfg(test)] gets compiled during local Rust unit tests
-// [cfg(not(test))] avoids getting compiled during local Rust unit tests
+pub mod link_layer {
+    #![allow(clippy::all)]
+    #![allow(unused)]
+    #![allow(missing_docs)]
 
-#![allow(unused)]
-mod beacon;
-#[cfg(not(test))]
-mod facade;
-#[cfg(test)]
-mod mocked;
-pub(crate) use self::beacon::*;
-#[cfg(not(test))]
-pub(crate) use self::facade::*;
-#[cfg(test)]
-pub(crate) use self::mocked::*;
-pub(crate) mod advertise_data;
-pub(crate) mod advertise_settings;
-pub(crate) mod chip;
+    include!(concat!(env!("OUT_DIR"), "/link_layer_packets.rs"));
+}

@@ -29,7 +29,7 @@
 #include "model/setup/async_manager.h"
 #include "model/setup/test_command_handler.h"
 #include "model/setup/test_model.h"
-#include "netsim-cxx/src/lib.rs.h"
+#include "netsim-daemon/src/lib.rs.h"
 #include "rust/cxx.h"
 #include "util/filesystem.h"
 #include "util/log.h"
@@ -143,10 +143,10 @@ void SetUpTestChannel(uint16_t instance_num) {
   bool transport_configured = gTestChannelTransport->SetUp(
       gTestSocketServer, [](std::shared_ptr<AsyncDataChannel> conn_fd,
                             AsyncDataChannelServer *server) {
-        BtsLog("Test channel connection accepted.");
+        BtsLogInfo("Test channel connection accepted.");
         server->StartListening();
         if (gTestChannelOpen) {
-          BtsLog("Warning: Only one connection at a time is supported");
+          BtsLogWarn("Only one connection at a time is supported");
           rootcanal::TestChannelTransport::SendResponse(
               conn_fd, "The connection is broken");
           return false;
@@ -172,11 +172,11 @@ void SetUpTestChannel(uint16_t instance_num) {
   gTestChannel->StartTimer({});
 
   if (!transport_configured) {
-    BtsLog("Error: Failed to set up test channel.");
+    BtsLogError("Failed to set up test channel.");
     return;
   }
 
-  BtsLog("Set up test channel.");
+  BtsLogInfo("Set up test channel.");
 }
 #endif
 
@@ -295,7 +295,7 @@ void Reset(uint32_t id) {
 
 void Patch(uint32_t id, const model::Chip::Bluetooth &request) {
   if (id_to_chip_info_.find(id) == id_to_chip_info_.end()) {
-    BtsLog("Patch an unknown id %d", id);
+    BtsLogWarn("Patch an unknown facade_id: %d", id);
     return;
   }
   auto model = id_to_chip_info_[id]->model;
@@ -317,7 +317,7 @@ void Patch(uint32_t id, const model::Chip::Bluetooth &request) {
 }
 
 void Remove(uint32_t id) {
-  BtsLog("Removing HCI chip %d.", id);
+  BtsLogInfo("Removing HCI chip facade_id: %d.", id);
   id_to_chip_info_.erase(id);
   // Call the transport close callback. This invokes HciDevice::Close and
   // TestModel close callback.
@@ -352,7 +352,8 @@ uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
   auto facade_id = facade_id_future.get();
 
   HciPacketTransport::Add(facade_id, transport);
-  BtsLog("Creating HCI facade %d for device %d", facade_id, simulation_device);
+  BtsLogInfo("Creating HCI facade_id: %d for device_id: %d", facade_id,
+             simulation_device);
 
   auto model = std::make_shared<model::Chip::Bluetooth>();
   model->mutable_classic()->set_state(model::State::ON);
@@ -361,6 +362,10 @@ uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
   id_to_chip_info_.emplace(
       facade_id, std::make_shared<ChipInfo>(simulation_device, model));
   return facade_id;
+}
+
+void RemoveRustDevice(uint32_t facade_id) {
+  gTestModel->RemoveDevice(facade_id);
 }
 
 rust::Box<AddRustDeviceResult> AddRustDevice(
@@ -415,7 +420,7 @@ int8_t SimComputeRssi(int send_id, int recv_id, int8_t tx_power) {
 #ifdef NETSIM_ANDROID_EMULATOR
     // NOTE: Ignore log messages in Cuttlefish for beacon devices created by
     // test channel.
-    BtsLog("Missing chip_info");
+    BtsLogWarn("Missing chip_info");
 #endif
     return tx_power;
   }

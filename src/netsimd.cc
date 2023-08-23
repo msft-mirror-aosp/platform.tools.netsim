@@ -23,7 +23,7 @@
 
 #include "core/server.h"
 #include "frontend/frontend_client_stub.h"
-#include "netsim-cxx/src/lib.rs.h"
+#include "netsim-daemon/src/lib.rs.h"
 #include "util/crash_report.h"
 #include "util/os_utils.h"
 
@@ -36,6 +36,7 @@ void ArgError(char *argv[], int c) {
 
 int main(int argc, char *argv[]) {
   netsim::SetUpCrashReport();
+  netsim::InitializeNetsimdLogger();
 
   bool no_web_ui = false;
   bool no_cli_ui = false;
