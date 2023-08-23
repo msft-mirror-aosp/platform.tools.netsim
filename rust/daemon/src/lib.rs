@@ -311,6 +311,10 @@ mod ffi {
             address: &CxxString,
         ) -> Box<AddRustDeviceResult>;
 
+        #[rust_name = bluetooth_remove_rust_device]
+        #[namespace = "netsim::hci::facade"]
+        pub fn RemoveRustDevice(facade_id: u32);
+
         #[rust_name = bluetooth_start]
         #[namespace = "netsim::hci::facade"]
         pub fn Start(instance_num: u16);
