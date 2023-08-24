@@ -38,7 +38,7 @@ impl args::Command {
             Command::Beacon(action) => match action {
                 Beacon::Create(_) => GrpcMethod::CreateDevice,
                 Beacon::Patch(_) => GrpcMethod::PatchDevice,
-                Beacon::Remove(_) => todo!("Beacon remove grpc method not yet implemented"),
+                Beacon::Remove(_) => GrpcMethod::DeleteChip,
             },
         }
     }
