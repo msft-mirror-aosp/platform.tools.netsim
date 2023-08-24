@@ -118,7 +118,18 @@ impl args::Command {
                         }
                     }
                 },
-                Beacon::Remove(_) => todo!("Beacon remove response not yet implemented."),
+                Beacon::Remove(args) => {
+                    if verbose {
+                        if let Some(chip_name) = &args.chip_name {
+                            println!(
+                                "Removed chip '{}' from device '{}'",
+                                chip_name, args.device_name
+                            )
+                        } else {
+                            println!("Removed device '{}'", args.device_name)
+                        }
+                    }
+                }
             },
         }
     }
