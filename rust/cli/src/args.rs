@@ -209,9 +209,7 @@ impl Command {
                         result.write_to_bytes().unwrap()
                     }
                 },
-                Beacon::Remove(_) => {
-                    todo!("get_request_bytes is not yet implemented for beacon remove command.")
-                }
+                Beacon::Remove(_) => Vec::new(),
             },
         }
     }
@@ -404,7 +402,7 @@ pub struct BeaconPatchBle {
 pub struct BeaconRemove {
     /// Name of the device to remove
     pub device_name: String,
-    /// Name of the beacon chip to remove
+    /// Name of the beacon chip to remove. Can be omitted if the device has exactly 1 chip
     pub chip_name: Option<String>,
 }
 
