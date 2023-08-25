@@ -207,26 +207,9 @@ mod ffi {
 
         #[namespace = "netsim::hci::facade"]
         type RustBluetoothChip;
-        #[rust_name = send_link_layer_packet]
+        #[rust_name = send_link_layer_le_packet]
         #[namespace = "netsim::hci::facade"]
-        fn SendLinkLayerPacket(
-            self: &RustBluetoothChip,
-            packet: &[u8],
-            packet_type: u8,
-            tx_power: i8,
-        );
-
-        #[rust_name = generate_advertising_packet]
-        #[namespace = "netsim::hci::facade"]
-        fn GenerateAdvertisingPacket(address: &String, packet: &[u8]) -> Vec<u8>;
-
-        #[rust_name = generate_scan_response_packet]
-        #[namespace = "netsim::hci::facade"]
-        fn GenerateScanResponsePacket(
-            source_address: &String,
-            destination_address: &String,
-            packet: &[u8],
-        ) -> Vec<u8>;
+        fn SendLinkLayerLePacket(self: &RustBluetoothChip, packet: &[u8], tx_power: i8);
 
         include!("hci/bluetooth_facade.h");
 
