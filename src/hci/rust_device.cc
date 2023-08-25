@@ -16,7 +16,7 @@
 
 #include <cstdint>
 
-#include "netsim-daemon/src/lib.rs.h"
+#include "netsim-daemon/src/ffi.rs.h"
 #include "packets/link_layer_packets.h"
 #include "phy.h"
 #include "rust/cxx.h"
