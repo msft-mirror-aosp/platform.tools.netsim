@@ -38,7 +38,7 @@ impl args::Command {
             Command::Beacon(action) => match action {
                 Beacon::Create(_) => GrpcMethod::CreateDevice,
                 Beacon::Patch(_) => GrpcMethod::PatchDevice,
-                Beacon::Remove(_) => todo!("Beacon remove grpc method not yet implemented"),
+                Beacon::Remove(_) => GrpcMethod::DeleteChip,
             },
         }
     }
@@ -49,6 +49,24 @@ mod tests {
     use super::*;
     use args::{BinaryProtobuf, NetsimArgs};
     use clap::Parser;
+    use netsim_proto::frontend::{CreateDeviceRequest, PatchDeviceRequest};
+    use netsim_proto::model::chip::bluetooth_beacon::AdvertiseData as AdvertiseDataProto;
+    use netsim_proto::model::chip::{
+        bluetooth_beacon::{
+            advertise_settings::{
+                AdvertiseMode as AdvertiseModeProto, AdvertiseTxPower as AdvertiseTxPowerProto,
+                Interval as IntervalProto, Tx_power as TxPowerProto,
+            },
+            AdvertiseSettings as AdvertiseSettingsProto,
+        },
+        BluetoothBeacon as BluetoothBeaconProto, Chip as ChipKindProto,
+    };
+    use netsim_proto::model::chip_create::{
+        BluetoothBeaconCreate as BluetoothBeaconCreateProto, Chip as ChipKindCreateProto,
+    };
+    use netsim_proto::model::{
+        Chip as ChipProto, ChipCreate as ChipCreateProto, DeviceCreate as DeviceCreateProto,
+    };
     use netsim_proto::{
         common::ChipKind,
         frontend,
@@ -59,6 +77,7 @@ mod tests {
         },
     };
     use protobuf::Message;
+    use protobuf::MessageField;
 
     fn test_command(
         command: &str,
@@ -259,4 +278,224 @@ mod tests {
     }
 
     //TODO: Add capture patch and get tests once able to run tests with cxx definitions
+
+    fn get_create_device_req_bytes(
+        device_name: &str,
+        chip_name: &str,
+        settings: AdvertiseSettingsProto,
+        adv_data: AdvertiseDataProto,
+    ) -> Vec<u8> {
+        let device = MessageField::some(DeviceCreateProto {
+            name: String::from(device_name),
+            chips: vec![ChipCreateProto {
+                name: String::from(chip_name),
+                kind: ChipKind::BLUETOOTH_BEACON.into(),
+                chip: Some(ChipKindCreateProto::BleBeacon(BluetoothBeaconCreateProto {
+                    settings: MessageField::some(settings),
+                    adv_data: MessageField::some(adv_data),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+
+        CreateDeviceRequest { device, ..Default::default() }.write_to_bytes().unwrap()
+    }
+
+    fn get_patch_device_req_bytes(
+        device_name: &str,
+        chip_name: &str,
+        settings: AdvertiseSettingsProto,
+        adv_data: AdvertiseDataProto,
+    ) -> Vec<u8> {
+        let device = MessageField::some(Device {
+            name: String::from(device_name),
+            chips: vec![ChipProto {
+                name: String::from(chip_name),
+                kind: ChipKind::BLUETOOTH_BEACON.into(),
+                chip: Some(ChipKindProto::BleBeacon(BluetoothBeaconProto {
+                    bt: MessageField::some(Chip_Bluetooth::new()),
+                    settings: MessageField::some(settings),
+                    adv_data: MessageField::some(adv_data),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+
+        PatchDeviceRequest { device, ..Default::default() }.write_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn test_beacon_create_all_params_ble() {
+        let device_name = String::from("device");
+        let chip_name = String::from("chip");
+
+        let timeout = 1234;
+        let manufacturer_data = String::from("google");
+
+        let settings = AdvertiseSettingsProto {
+            interval: Some(IntervalProto::AdvertiseMode(AdvertiseModeProto::BALANCED.into())),
+            tx_power: Some(TxPowerProto::TxPowerLevel(AdvertiseTxPowerProto::ULTRA_LOW.into())),
+            scannable: true,
+            timeout,
+            ..Default::default()
+        };
+
+        let adv_data = AdvertiseDataProto {
+            include_device_name: true,
+            include_tx_power_level: true,
+            manufacturer_data: manufacturer_data.as_bytes().to_vec(),
+            ..Default::default()
+        };
+
+        let request = get_create_device_req_bytes(&device_name, &chip_name, settings, adv_data);
+
+        test_command(
+            format!(
+                "netsim-cli beacon create ble {} {} --advertise-mode balanced --tx-power-level ultra-low --scannable --timeout {} --include-device-name --include-tx-power-level --manufacturer-data {}",
+                device_name, chip_name, timeout, manufacturer_data
+            )
+            .as_str(),
+            GrpcMethod::CreateDevice,
+            request,
+        )
+    }
+
+    #[test]
+    fn test_beacon_patch_all_params_ble() {
+        let device_name = String::from("device");
+        let chip_name = String::from("chip");
+
+        let interval = 1234;
+        let timeout = 9999;
+        let tx_power_level = -3;
+        let manufacturer_data = String::from("test12345");
+
+        let settings = AdvertiseSettingsProto {
+            interval: Some(IntervalProto::Milliseconds(interval)),
+            tx_power: Some(TxPowerProto::Dbm(tx_power_level)),
+            scannable: true,
+            timeout,
+            ..Default::default()
+        };
+        let adv_data = AdvertiseDataProto {
+            include_device_name: true,
+            include_tx_power_level: true,
+            manufacturer_data: manufacturer_data.as_bytes().to_vec(),
+            ..Default::default()
+        };
+
+        let request = get_patch_device_req_bytes(&device_name, &chip_name, settings, adv_data);
+
+        test_command(
+            format!(
+                "netsim-cli beacon patch ble {} {} --advertise-mode {} --scannable --timeout {} --tx-power-level {} --manufacturer-data {} --include-device-name --include-tx-power-level",
+                device_name, chip_name, interval, timeout, tx_power_level, manufacturer_data
+            )
+            .as_str(),
+            GrpcMethod::PatchDevice,
+            request,
+        )
+    }
+
+    #[test]
+    fn test_beacon_create_ble_tx_power() {
+        let device_name = String::from("device");
+        let chip_name = String::from("chip");
+
+        let settings = AdvertiseSettingsProto {
+            tx_power: Some(TxPowerProto::TxPowerLevel(AdvertiseTxPowerProto::HIGH.into())),
+            ..Default::default()
+        };
+        let adv_data = AdvertiseDataProto { include_tx_power_level: true, ..Default::default() };
+
+        let request = get_create_device_req_bytes(&device_name, &chip_name, settings, adv_data);
+
+        test_command(
+            format!(
+                "netsim-cli beacon create ble {} {} --tx-power-level high --include-tx-power-level",
+                device_name, chip_name
+            )
+            .as_str(),
+            GrpcMethod::CreateDevice,
+            request,
+        )
+    }
+
+    #[test]
+    fn test_beacon_create_default() {
+        let request = get_create_device_req_bytes(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        );
+
+        test_command("netsim-cli beacon create ble", GrpcMethod::CreateDevice, request)
+    }
+
+    #[test]
+    fn test_beacon_patch_interval() {
+        let device_name = String::from("device");
+        let chip_name = String::from("chip");
+
+        let settings = AdvertiseSettingsProto {
+            interval: Some(IntervalProto::AdvertiseMode(AdvertiseModeProto::LOW_LATENCY.into())),
+            ..Default::default()
+        };
+
+        let request =
+            get_patch_device_req_bytes(&device_name, &chip_name, settings, Default::default());
+
+        test_command(
+            format!(
+                "netsim-cli beacon patch ble {} {} --advertise-mode low-latency",
+                device_name, chip_name
+            )
+            .as_str(),
+            GrpcMethod::PatchDevice,
+            request,
+        )
+    }
+
+    #[test]
+    fn test_create_beacon_negative_timeout_fails() {
+        let command = String::from("netsim-cli beacon create ble --timeout -1234");
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
+
+    #[test]
+    fn test_create_beacon_large_tx_power_fails() {
+        let command =
+            format!("netsim-cli beacon create ble --tx-power-level {}", (i8::MAX as i32) + 1);
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
+
+    #[test]
+    fn test_create_beacon_unknown_mode() {
+        let command = String::from("netsim-cli beacon create ble --advertise-mode not-a-mode");
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
+
+    #[test]
+    fn test_patch_beacon_negative_timeout_fails() {
+        let command = String::from("netsim-cli beacon patch ble --timeout -1234");
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
+
+    #[test]
+    fn test_patch_beacon_large_tx_power_fails() {
+        let command =
+            format!("netsim-cli beacon patch ble --tx-power-level {}", (i8::MAX as i32) + 1);
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
+
+    #[test]
+    fn test_patch_beacon_unknown_mode() {
+        let command = String::from("netsim-cli beacon patch ble --advertise-mode not-a-mode");
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
 }
