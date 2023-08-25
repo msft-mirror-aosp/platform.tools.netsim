@@ -358,7 +358,7 @@ pub mod tests {
     };
 
     use super::*;
-    use crate::bluetooth::{bluetooth_beacon_add, refresh_resource};
+    use crate::bluetooth::bluetooth_beacon_add;
 
     lazy_static! {
         static ref TEST_GUID_GENERATOR: Mutex<IdFactory<u32>> = Mutex::new(IdFactory::new(0, 1));
