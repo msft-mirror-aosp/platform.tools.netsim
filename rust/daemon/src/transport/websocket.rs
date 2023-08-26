@@ -185,5 +185,5 @@ pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) 
     if let Err(err) = remove_chip(result.device_id, result.chip_id) {
         warn!("{err}");
     };
-    info!("Removed chip: device_id={}, chip_id={}", result.device_id, result.chip_id);
+    info!("Removed chip: device_id: {}, chip_id: {}", result.device_id, result.chip_id);
 }

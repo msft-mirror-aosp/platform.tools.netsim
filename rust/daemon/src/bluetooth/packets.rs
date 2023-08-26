@@ -1,10 +1,10 @@
-// Copyright 2023 Google LLC
+// Copyright 2023 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     https://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,28 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Netsim daemon libraries.
+pub mod link_layer {
+    #![allow(clippy::all)]
+    #![allow(unused)]
+    #![allow(missing_docs)]
 
-#![allow(dead_code)]
-
-mod args;
-mod bluetooth;
-pub mod captures;
-mod config;
-mod devices;
-mod events;
-mod ffi;
-mod http_server;
-mod ranging;
-mod resource;
-mod rust_main;
-mod service;
-mod transport;
-mod util;
-mod uwb;
-mod version;
-mod wifi;
-
-// This feature is enabled only for CMake builds
-#[cfg(feature = "local_ssl")]
-mod openssl;
+    include!(concat!(env!("OUT_DIR"), "/link_layer_packets.rs"));
+}

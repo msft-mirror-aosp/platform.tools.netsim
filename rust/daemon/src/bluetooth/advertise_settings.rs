@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::packets::link_layer::LegacyAdvertisingType;
 use netsim_proto::model::chip::bluetooth_beacon::{
     advertise_settings::{
         AdvertiseMode as Mode, AdvertiseTxPower as Level, Interval as IntervalProto,
@@ -22,15 +23,11 @@ use netsim_proto::model::chip::bluetooth_beacon::{
 
 use std::time::Duration;
 
-// From Beacon::Beacon constructor referenced in packages/modules/Bluetooth/tools/model/devices/beacon.cc
-const MODE_DEFAULT_MS: u64 = 1280;
 // From packages/modules/Bluetooth/framework/java/android/bluetooth/le/BluetoothLeAdvertiser.java#151
-const MODE_LOW_POWER_MS: u64 = 160;
-const MODE_BALANCED_MS: u64 = 400;
-const MODE_LOW_LATENCY_MS: u64 = 1600;
+const MODE_LOW_POWER_MS: u64 = 1000;
+const MODE_BALANCED_MS: u64 = 250;
+const MODE_LOW_LATENCY_MS: u64 = 100;
 
-// Default parameter value for SendLinkLayerPacket in packages/modules/Bluetooth/tools/model/devices/device.h
-const TX_POWER_DEFAULT_DBM: i8 = 0;
 // From packages/modules/Bluetooth/framework/java/android/bluetooth/le/BluetoothLeAdvertiser.java#159
 const TX_POWER_ULTRA_LOW_DBM: i8 = -21;
 const TX_POWER_LOW_DBM: i8 = -15;
@@ -54,6 +51,46 @@ impl AdvertiseSettings {
     /// Returns a new advertise settings builder with no fields.
     pub fn builder() -> AdvertiseSettingsBuilder {
         AdvertiseSettingsBuilder::default()
+    }
+
+    /// Returns a new advertise settings with fields from a protobuf.
+    pub fn from_proto(proto: &AdvertiseSettingsProto) -> Result<Self, String> {
+        proto.try_into()
+    }
+
+    /// Returns the PDU type of advertise packets with settings matching `self`'s
+    pub fn get_packet_type(&self) -> LegacyAdvertisingType {
+        if self.scannable {
+            LegacyAdvertisingType::AdvScanInd
+        } else {
+            LegacyAdvertisingType::AdvNonconnInd
+        }
+    }
+}
+
+impl TryFrom<&AdvertiseSettingsProto> for AdvertiseSettings {
+    type Error = String;
+
+    fn try_from(value: &AdvertiseSettingsProto) -> Result<Self, Self::Error> {
+        let mut builder = AdvertiseSettingsBuilder::default();
+
+        if let Some(mode) = value.interval.as_ref() {
+            builder.mode(mode.into());
+        }
+
+        if let Some(tx_power) = value.tx_power.as_ref() {
+            builder.tx_power_level(tx_power.try_into()?);
+        }
+
+        if value.scannable {
+            builder.scannable();
+        }
+
+        if value.timeout != u64::default() {
+            builder.timeout(Duration::from_millis(value.timeout));
+        }
+
+        Ok(builder.build())
     }
 }
 
@@ -86,29 +123,6 @@ impl AdvertiseSettingsBuilder {
     /// Returns a new advertise settings builder with empty fields.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Returns a new advertise settings builder with fields from a protobuf.
-    pub fn from_proto(proto: &AdvertiseSettingsProto) -> Result<AdvertiseSettingsBuilder, String> {
-        let mut builder = AdvertiseSettingsBuilder::default();
-
-        if let Some(mode) = proto.interval.as_ref() {
-            builder.mode(mode.into());
-        }
-
-        if let Some(tx_power) = proto.tx_power.as_ref() {
-            builder.tx_power_level(tx_power.try_into()?);
-        }
-
-        if proto.scannable {
-            builder.scannable();
-        }
-
-        if proto.timeout != u64::default() {
-            builder.timeout(Duration::from_millis(proto.timeout));
-        }
-
-        Ok(builder)
     }
 
     /// Build the advertise settings.
@@ -162,7 +176,7 @@ impl AdvertiseMode {
 
 impl Default for AdvertiseMode {
     fn default() -> Self {
-        Self { interval: Duration::from_millis(MODE_DEFAULT_MS) }
+        Self { interval: Duration::from_millis(MODE_LOW_POWER_MS) }
     }
 }
 
@@ -176,7 +190,7 @@ impl From<&IntervalProto> for AdvertiseMode {
                     Mode::BALANCED => MODE_BALANCED_MS,
                     Mode::LOW_LATENCY => MODE_LOW_LATENCY_MS,
                 },
-                _ => MODE_DEFAULT_MS,
+                _ => MODE_LOW_POWER_MS,
             }),
         }
     }
@@ -215,7 +229,7 @@ impl TxPowerLevel {
 
 impl Default for TxPowerLevel {
     fn default() -> Self {
-        TxPowerLevel { dbm: TX_POWER_DEFAULT_DBM }
+        TxPowerLevel { dbm: TX_POWER_LOW_DBM }
     }
 }
 
@@ -234,7 +248,7 @@ impl TryFrom<&TxPowerProto> for TxPowerLevel {
                     Level::MEDIUM => TX_POWER_MEDIUM_DBM,
                     Level::HIGH => TX_POWER_HIGH_DBM,
                 },
-                _ => TX_POWER_DEFAULT_DBM,
+                _ => TX_POWER_LOW_DBM,
             }),
         })
     }
@@ -289,7 +303,7 @@ mod tests {
             ..Default::default()
         };
 
-        let settings = AdvertiseSettingsBuilder::from_proto(&proto);
+        let settings = AdvertiseSettings::from_proto(&proto);
         assert!(settings.is_ok());
 
         let tx_power: Result<TxPowerLevel, _> = (&tx_power).try_into();
@@ -303,7 +317,7 @@ mod tests {
             .timeout(Duration::from_millis(timeout_ms))
             .build();
 
-        assert_eq!(exp_settings, settings.unwrap().build());
+        assert_eq!(exp_settings, settings.unwrap());
     }
 
     #[test]
@@ -313,7 +327,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(AdvertiseSettingsBuilder::from_proto(&proto).is_err());
+        assert!(AdvertiseSettings::from_proto(&proto).is_err());
     }
 
     #[test]
@@ -326,9 +340,9 @@ mod tests {
             ..Default::default()
         };
 
-        let settings = AdvertiseSettingsBuilder::from_proto(&proto);
+        let settings = AdvertiseSettings::from_proto(&proto);
         assert!(settings.is_ok());
-        let settings: Result<AdvertiseSettingsProto, _> = (&settings.unwrap().build()).try_into();
+        let settings: Result<AdvertiseSettingsProto, _> = settings.as_ref().unwrap().try_into();
         assert!(settings.is_ok());
 
         assert_eq!(proto, settings.unwrap());
@@ -342,7 +356,7 @@ mod tests {
             ..Default::default()
         };
 
-        let settings = AdvertiseSettingsBuilder::from_proto(&proto);
+        let settings = AdvertiseSettings::from_proto(&proto);
         assert!(settings.is_ok());
         let settings = settings.unwrap();
 
@@ -355,15 +369,15 @@ mod tests {
         let interval: Duration =
             proto.interval.as_ref().map(AdvertiseMode::from).unwrap_or_default().interval;
 
-        assert_eq!(TX_POWER_DEFAULT_DBM, tx_power);
-        assert_eq!(Duration::from_millis(MODE_DEFAULT_MS), interval);
+        assert_eq!(TX_POWER_LOW_DBM, tx_power);
+        assert_eq!(Duration::from_millis(MODE_LOW_POWER_MS), interval);
     }
 
     #[test]
     fn test_from_proto_timeout_unset() {
         let proto = AdvertiseSettingsProto::default();
 
-        let settings = AdvertiseSettingsBuilder::from_proto(&proto);
+        let settings = AdvertiseSettings::from_proto(&proto);
         assert!(settings.is_ok());
         let settings = settings.unwrap();
 
