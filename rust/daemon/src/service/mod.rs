@@ -189,13 +189,14 @@ pub fn new_test_beacon(idx: u32) {
     use protobuf_json_mapping::print_to_string;
 
     let beacon_proto = BluetoothBeaconCreateProto {
-        address: format!("be:ac:01:55:00:{:02x}", idx),
+        address: format!("be:ac:01:be:ef:{:02x}", idx),
         settings: MessageField::some(AdvertiseSettingsProto {
             interval: Some(
                 ble_advertise_settings::AdvertiseMode::new(Duration::from_millis(1280))
                     .try_into()
                     .unwrap(),
             ),
+            scannable: true,
             ..Default::default()
         }),
         adv_data: MessageField::some(AdvertiseDataProto {
