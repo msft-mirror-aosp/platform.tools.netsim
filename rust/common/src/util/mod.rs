@@ -17,5 +17,4 @@
 
 pub mod ini_file;
 pub mod netsim_logger;
-pub mod os_utils;
 pub mod time_display;

@@ -449,7 +449,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
       let checkboxes: {[name: string]: undefined|TemplateResult} = {};
 
       if (chip.bleBeacon.bt) {
-        [checkboxes['Bluetooth LE'], checkboxes['Bluetooth Classic']] =
+        [checkboxes['Low Energy'], checkboxes['Classic']] =
             this.getBluetoothRadioCheckboxes(chip.bleBeacon.bt);
       }
 
@@ -496,7 +496,7 @@ export class DeviceInformation extends LitElement implements Notifiable {
     for (const chip of this.selectedDevice.chips) {
       if (chip) {
         if (chip.bt) {
-          [checkboxes['Bluetooth LE'], checkboxes['Bluetooth Classic']] =
+          [checkboxes['Low Energy'], checkboxes['Classic']] =
               this.getBluetoothRadioCheckboxes(chip.bt);
         }
         if (chip.wifi) {
