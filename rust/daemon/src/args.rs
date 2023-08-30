@@ -28,6 +28,10 @@ pub struct NetsimdArgs {
     #[arg(long)]
     pub no_web_ui: bool,
 
+    /// Enable packet capture
+    #[arg(long)]
+    pub pcap: bool,
+
     /// Set custom hci port
     #[arg(long, alias = "hci_port")]
     pub hci_port: Option<u32>,
