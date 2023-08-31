@@ -16,15 +16,18 @@
 
 #include <sys/types.h>
 
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <future>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <utility>
 
+#include "hci/address.h"
 #include "hci/hci_packet_transport.h"
 #include "model/setup/async_manager.h"
 #include "model/setup/test_command_handler.h"
@@ -391,6 +394,14 @@ rust::Box<AddRustDeviceResult> AddRustDevice(
       facade_id, std::make_shared<ChipInfo>(simulation_device, model));
   return CreateAddRustDeviceResult(
       facade_id, std::make_unique<RustBluetoothChip>(rust_device));
+}
+
+void SetRustDeviceAddress(
+    uint32_t facade_id,
+    std::array<uint8_t, rootcanal::Address::kLength> address) {
+  uint8_t addr[rootcanal::Address::kLength];
+  std::memcpy(addr, address.data(), rootcanal::Address::kLength);
+  gTestModel->SetDeviceAddress(facade_id, rootcanal::Address(addr));
 }
 
 void IncrTx(uint32_t id, rootcanal::Phy::Type phy_type) {
