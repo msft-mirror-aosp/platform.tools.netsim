@@ -29,7 +29,7 @@
 #include "model/setup/async_manager.h"
 #include "model/setup/test_command_handler.h"
 #include "model/setup/test_model.h"
-#include "netsim-daemon/src/lib.rs.h"
+#include "netsim-daemon/src/ffi.rs.h"
 #include "rust/cxx.h"
 #include "util/filesystem.h"
 #include "util/log.h"
@@ -217,6 +217,9 @@ void Start(uint16_t instance_num) {
                 std::placeholders::_1),
       [](const std::string & /* server */, int /* port */,
          rootcanal::Phy::Type /* phy_type */) { return nullptr; });
+
+  // Disable Address Reuse if '--disable_address_reuse' flag is true
+  gTestModel->SetReuseDeviceAddresses(!netsim::GetDisableAddressReuse());
 
   // NOTE: 0:BR_EDR, 1:LOW_ENERGY. The order is used by bluetooth CTS.
   phy_classic_index_ = gTestModel->AddPhy(rootcanal::Phy::Type::BR_EDR);
