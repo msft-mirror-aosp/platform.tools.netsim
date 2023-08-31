@@ -334,7 +334,7 @@ mod tests {
         let chip_name = String::from("chip");
 
         let timeout = 1234;
-        let manufacturer_data = String::from("google");
+        let manufacturer_data = vec![0x12, 0x34];
 
         let settings = AdvertiseSettingsProto {
             interval: Some(IntervalProto::AdvertiseMode(AdvertiseModeProto::BALANCED.into())),
@@ -347,7 +347,7 @@ mod tests {
         let adv_data = AdvertiseDataProto {
             include_device_name: true,
             include_tx_power_level: true,
-            manufacturer_data: manufacturer_data.as_bytes().to_vec(),
+            manufacturer_data,
             ..Default::default()
         };
 
@@ -355,8 +355,8 @@ mod tests {
 
         test_command(
             format!(
-                "netsim-cli beacon create ble {} {} --advertise-mode balanced --tx-power-level ultra-low --scannable --timeout {} --include-device-name --include-tx-power-level --manufacturer-data {}",
-                device_name, chip_name, timeout, manufacturer_data
+                "netsim-cli beacon create ble {} {} --advertise-mode balanced --tx-power-level ultra-low --scannable --timeout {} --include-device-name --include-tx-power-level --manufacturer-data 0x1234",
+                device_name, chip_name, timeout,
             )
             .as_str(),
             GrpcMethod::CreateDevice,
@@ -372,7 +372,7 @@ mod tests {
         let interval = 1234;
         let timeout = 9999;
         let tx_power_level = -3;
-        let manufacturer_data = String::from("test12345");
+        let manufacturer_data = vec![0xab, 0xcd, 0xef];
 
         let settings = AdvertiseSettingsProto {
             interval: Some(IntervalProto::Milliseconds(interval)),
@@ -384,7 +384,7 @@ mod tests {
         let adv_data = AdvertiseDataProto {
             include_device_name: true,
             include_tx_power_level: true,
-            manufacturer_data: manufacturer_data.as_bytes().to_vec(),
+            manufacturer_data,
             ..Default::default()
         };
 
@@ -392,8 +392,8 @@ mod tests {
 
         test_command(
             format!(
-                "netsim-cli beacon patch ble {} {} --advertise-mode {} --scannable --timeout {} --tx-power-level {} --manufacturer-data {} --include-device-name --include-tx-power-level",
-                device_name, chip_name, interval, timeout, tx_power_level, manufacturer_data
+                "netsim-cli beacon patch ble {} {} --advertise-mode {} --scannable --timeout {} --tx-power-level {} --manufacturer-data 0xabcdef --include-device-name --include-tx-power-level",
+                device_name, chip_name, interval, timeout, tx_power_level
             )
             .as_str(),
             GrpcMethod::PatchDevice,
@@ -541,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn test_create_beacon_unknown_mode() {
+    fn test_create_beacon_unknown_mode_fails() {
         let command = String::from("netsim-cli beacon create ble --advertise-mode not-a-mode");
         assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
     }
@@ -560,8 +560,20 @@ mod tests {
     }
 
     #[test]
-    fn test_patch_beacon_unknown_mode() {
+    fn test_patch_beacon_unknown_mode_fails() {
         let command = String::from("netsim-cli beacon patch ble --advertise-mode not-a-mode");
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
+
+    #[test]
+    fn test_create_beacon_mfg_data_fails() {
+        let command = String::from("netsim-cli beacon create ble --manufacturer-data not-a-number");
+        assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
+    }
+
+    #[test]
+    fn test_patch_beacon_mfg_data_fails() {
+        let command = String::from("netsim-cli beacon patch ble --manufacturer-data not-a-number");
         assert!(NetsimArgs::try_parse_from(command.split_whitespace()).is_err());
     }
 }
