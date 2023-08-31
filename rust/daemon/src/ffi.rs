@@ -176,6 +176,11 @@ pub mod ffi_bluetooth {
             address: &CxxString,
         ) -> Box<AddRustDeviceResult>;
 
+        /// The provided address must be 6 bytes in length
+        #[rust_name = bluetooth_set_rust_device_address]
+        #[namespace = "netsim::hci::facade"]
+        pub fn SetRustDeviceAddress(facade_id: u32, address: [u8; 6]);
+
         #[rust_name = bluetooth_remove_rust_device]
         #[namespace = "netsim::hci::facade"]
         pub fn RemoveRustDevice(facade_id: u32);
