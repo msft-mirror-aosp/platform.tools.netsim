@@ -172,9 +172,6 @@ impl Command {
                                         address: args.address.clone().unwrap_or_default(),
                                         settings: MessageField::some((&args.settings).into()),
                                         adv_data: MessageField::some((&args.advertise_data).into()),
-                                        scan_response: MessageField::some(
-                                            (&args.scan_response_data).into(),
-                                        ),
                                         ..Default::default()
                                     },
                                 )),
@@ -199,9 +196,6 @@ impl Command {
                                     address: args.address.clone().unwrap_or_default(),
                                     settings: MessageField::some((&args.settings).into()),
                                     adv_data: MessageField::some((&args.advertise_data).into()),
-                                    scan_response: MessageField::some(
-                                        (&args.scan_response_data).into(),
-                                    ),
                                     ..Default::default()
                                 })),
                                 ..Default::default()
@@ -388,8 +382,6 @@ pub struct BeaconCreateBle {
     pub settings: BeaconBleSettings,
     #[command(flatten)]
     pub advertise_data: BeaconBleAdvertiseData,
-    #[command(flatten)]
-    pub scan_response_data: BeaconBleScanResponseData,
 }
 
 #[derive(Debug, Subcommand)]
@@ -411,8 +403,6 @@ pub struct BeaconPatchBle {
     pub settings: BeaconBleSettings,
     #[command(flatten)]
     pub advertise_data: BeaconBleAdvertiseData,
-    #[command(flatten)]
-    pub scan_response_data: BeaconBleScanResponseData,
 }
 
 #[derive(Debug, Args)]
@@ -450,19 +440,6 @@ impl FromStr for ParsableBytes {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         hex_to_bytes(s.strip_prefix("0x").unwrap_or(s)).map(ParsableBytes)
     }
-}
-
-#[derive(Debug, Args)]
-pub struct BeaconBleScanResponseData {
-    /// Whether the device name should be included in the scan response packet
-    #[arg(long, required = false)]
-    pub scan_response_include_device_name: bool,
-    /// Whether the transmission power level should be included in the scan response packet
-    #[arg(long, required = false)]
-    pub scan_response_include_tx_power_level: bool,
-    /// Manufacturer-specific data to include in the scan response packet given as bytes in hexadecimal
-    #[arg(long, value_name = "MANUFACTURER_DATA")]
-    pub scan_response_manufacturer_data: Option<ParsableBytes>,
 }
 
 #[derive(Debug, Args)]
@@ -672,21 +649,6 @@ impl From<&BeaconBleAdvertiseData> for AdvertiseDataProto {
             include_tx_power_level: value.include_tx_power_level,
             manufacturer_data: value
                 .manufacturer_data
-                .clone()
-                .map(ParsableBytes::unwrap)
-                .unwrap_or_default(),
-            ..Default::default()
-        }
-    }
-}
-
-impl From<&BeaconBleScanResponseData> for AdvertiseDataProto {
-    fn from(value: &BeaconBleScanResponseData) -> Self {
-        AdvertiseDataProto {
-            include_device_name: value.scan_response_include_device_name,
-            include_tx_power_level: value.scan_response_include_tx_power_level,
-            manufacturer_data: value
-                .scan_response_manufacturer_data
                 .clone()
                 .map(ParsableBytes::unwrap)
                 .unwrap_or_default(),
