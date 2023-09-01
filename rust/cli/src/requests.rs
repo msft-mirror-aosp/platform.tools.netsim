@@ -284,6 +284,7 @@ mod tests {
         chip_name: &str,
         settings: AdvertiseSettingsProto,
         adv_data: AdvertiseDataProto,
+        scan_response: AdvertiseDataProto,
     ) -> Vec<u8> {
         let device = MessageField::some(DeviceCreateProto {
             name: String::from(device_name),
@@ -293,6 +294,7 @@ mod tests {
                 chip: Some(ChipKindCreateProto::BleBeacon(BluetoothBeaconCreateProto {
                     settings: MessageField::some(settings),
                     adv_data: MessageField::some(adv_data),
+                    scan_response: MessageField::some(scan_response),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -308,6 +310,7 @@ mod tests {
         chip_name: &str,
         settings: AdvertiseSettingsProto,
         adv_data: AdvertiseDataProto,
+        scan_response: AdvertiseDataProto,
     ) -> Vec<u8> {
         let device = MessageField::some(Device {
             name: String::from(device_name),
@@ -318,6 +321,7 @@ mod tests {
                     bt: MessageField::some(Chip_Bluetooth::new()),
                     settings: MessageField::some(settings),
                     adv_data: MessageField::some(adv_data),
+                    scan_response: MessageField::some(scan_response),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -351,7 +355,13 @@ mod tests {
             ..Default::default()
         };
 
-        let request = get_create_device_req_bytes(&device_name, &chip_name, settings, adv_data);
+        let request = get_create_device_req_bytes(
+            &device_name,
+            &chip_name,
+            settings,
+            adv_data,
+            Default::default(),
+        );
 
         test_command(
             format!(
@@ -388,7 +398,13 @@ mod tests {
             ..Default::default()
         };
 
-        let request = get_patch_device_req_bytes(&device_name, &chip_name, settings, adv_data);
+        let request = get_patch_device_req_bytes(
+            &device_name,
+            &chip_name,
+            settings,
+            adv_data,
+            Default::default(),
+        );
 
         test_command(
             format!(
@@ -402,6 +418,68 @@ mod tests {
     }
 
     #[test]
+    fn test_beacon_create_scan_response() {
+        let device_name = String::from("device");
+        let chip_name = String::from("chip");
+
+        let scan_response = AdvertiseDataProto {
+            include_device_name: true,
+            include_tx_power_level: true,
+            manufacturer_data: vec![0x21, 0xbe, 0xef],
+            ..Default::default()
+        };
+
+        let request = get_create_device_req_bytes(
+            &device_name,
+            &chip_name,
+            Default::default(),
+            Default::default(),
+            scan_response,
+        );
+
+        test_command(
+            format!(
+                "netsim-cli beacon create ble {} {} --scan-response-include-device-name --scan-response-include-tx-power-level --scan-response-manufacturer-data 0x21beef",
+                device_name, chip_name
+            )
+            .as_str(),
+            GrpcMethod::CreateDevice,
+            request,
+        );
+    }
+
+    #[test]
+    fn test_beacon_patch_scan_response() {
+        let device_name = String::from("device");
+        let chip_name = String::from("chip");
+
+        let scan_response = AdvertiseDataProto {
+            include_device_name: true,
+            include_tx_power_level: true,
+            manufacturer_data: vec![0x59, 0xbe, 0xac, 0x09],
+            ..Default::default()
+        };
+
+        let request = get_patch_device_req_bytes(
+            &device_name,
+            &chip_name,
+            Default::default(),
+            Default::default(),
+            scan_response,
+        );
+
+        test_command(
+            format!(
+                "netsim-cli beacon patch ble {} {} --scan-response-include-device-name --scan-response-include-tx-power-level --scan-response-manufacturer-data 59beac09",
+                device_name, chip_name
+            )
+            .as_str(),
+            GrpcMethod::PatchDevice,
+            request,
+        );
+    }
+
+    #[test]
     fn test_beacon_create_ble_tx_power() {
         let device_name = String::from("device");
         let chip_name = String::from("chip");
@@ -412,7 +490,13 @@ mod tests {
         };
         let adv_data = AdvertiseDataProto { include_tx_power_level: true, ..Default::default() };
 
-        let request = get_create_device_req_bytes(&device_name, &chip_name, settings, adv_data);
+        let request = get_create_device_req_bytes(
+            &device_name,
+            &chip_name,
+            settings,
+            adv_data,
+            Default::default(),
+        );
 
         test_command(
             format!(
@@ -432,6 +516,7 @@ mod tests {
             Default::default(),
             Default::default(),
             Default::default(),
+            Default::default(),
         );
 
         test_command("netsim-cli beacon create ble", GrpcMethod::CreateDevice, request)
@@ -447,8 +532,13 @@ mod tests {
             ..Default::default()
         };
 
-        let request =
-            get_patch_device_req_bytes(&device_name, &chip_name, settings, Default::default());
+        let request = get_patch_device_req_bytes(
+            &device_name,
+            &chip_name,
+            settings,
+            Default::default(),
+            Default::default(),
+        );
 
         test_command(
             format!(
