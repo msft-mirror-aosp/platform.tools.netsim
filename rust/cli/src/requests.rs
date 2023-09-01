@@ -472,6 +472,7 @@ mod tests {
                     address: address.clone(),
                     settings: MessageField::some(AdvertiseSettingsProto::default()),
                     adv_data: MessageField::some(AdvertiseDataProto::default()),
+                    scan_response: MessageField::some(AdvertiseDataProto::default()),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -506,6 +507,7 @@ mod tests {
                     address: address.clone(),
                     settings: MessageField::some(AdvertiseSettingsProto::default()),
                     adv_data: MessageField::some(AdvertiseDataProto::default()),
+                    scan_response: MessageField::some(AdvertiseDataProto::default()),
                     ..Default::default()
                 })),
                 ..Default::default()
