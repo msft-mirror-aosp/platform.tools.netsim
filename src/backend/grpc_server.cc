@@ -25,11 +25,10 @@
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
-#include "netsim-cxx/src/lib.rs.h"
+#include "netsim-daemon/src/ffi.rs.h"
 #include "netsim/common.pb.h"
 #include "netsim/packet_streamer.grpc.pb.h"
 #include "netsim/packet_streamer.pb.h"
-#include "packet_hub/packet_hub.h"
 #include "util/log.h"
 
 #ifdef NETSIM_ANDROID_EMULATOR
@@ -62,14 +61,14 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
                                Stream *stream) override {
     // Now connected to a peer issuing a bi-directional streaming grpc
     auto peer = context->peer();
-    BtsLog("grpc_server new packet_stream for peer %s", peer.c_str());
+    BtsLogInfo("grpc_server new packet_stream for peer %s", peer.c_str());
 
     packet::PacketRequest request;
 
     // First packet must have initial_info describing the peer
     bool success = stream->Read(&request);
     if (!success || !request.has_initial_info()) {
-      BtsLog("ServiceImpl no initial information or stream closed");
+      BtsLogError("ServiceImpl no initial information or stream closed");
       return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                             "Missing initial_info in first packet.");
     }
@@ -80,6 +79,7 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     auto chip_name = request.initial_info().chip().id();
     auto manufacturer = request.initial_info().chip().manufacturer();
     auto product_name = request.initial_info().chip().product_name();
+    auto chip_address = request.initial_info().chip().address();
     // Add a new chip to the device
     std::string chip_kind_string;
     switch (chip_kind) {
@@ -96,9 +96,9 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
         chip_kind_string = "UNSPECIFIED";
         break;
     }
-    auto result =
-        netsim::device::AddChipCxx(peer, device_name, chip_kind_string,
-                                   chip_name, manufacturer, product_name);
+    auto result = netsim::device::AddChipCxx(
+        peer, device_name, chip_kind_string, chip_address, chip_name,
+        manufacturer, product_name);
     if (result->IsError()) {
       return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                             "AddChipCxx failed to add chip into netsim");
@@ -107,8 +107,10 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     uint32_t chip_id = result->GetChipId();
     uint32_t facade_id = result->GetFacadeId();
 
-    BtsLog("grpc_server: adding chip %d with facade %d to %s", chip_id,
-           facade_id, device_name.c_str());
+    BtsLogInfo(
+        "grpc_server: adding chip - chip_id: %d, facade_id: %d, device_name: "
+        "%s",
+        chip_id, facade_id, device_name.c_str());
     // connect packet responses from chip facade to the peer
     facade_to_stream[ChipFacade(chip_kind, facade_id)] = stream;
     netsim::transport::RegisterGrpcTransport(chip_kind, facade_id);
@@ -121,8 +123,10 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     // Remove the chip from the device
     netsim::device::RemoveChipCxx(device_id, chip_id);
 
-    BtsLog("grpc_server: removing chip %d from %s", chip_id,
-           device_name.c_str());
+    BtsLogInfo(
+        "grpc_server: removing chip - chip_id: %d, facade_id: %d, device_name: "
+        "%s",
+        chip_id, facade_id, device_name.c_str());
 
     return ::grpc::Status::OK;
   }
@@ -144,27 +148,29 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     packet::PacketRequest request;
     while (true) {
       if (!stream->Read(&request)) {
-        BtsLog("grpc_server: reading stopped for %d", facade_id);
+        BtsLogWarn("grpc_server: reading stopped - facade_id: %d", facade_id);
         break;
       }
       // All kinds possible (bt, uwb, wifi), but each rpc only streames one.
       if (chip_kind == common::ChipKind::BLUETOOTH) {
         if (!request.has_hci_packet()) {
-          BtsLog("grpc_server: unknown packet type from %d", facade_id);
+          BtsLogWarn("grpc_server: unknown packet type from facade_id: %d",
+                     facade_id);
           continue;
         }
         auto packet_type = request.hci_packet().packet_type();
         auto packet =
             ToSharedVec(request.mutable_hci_packet()->mutable_packet());
-        packet_hub::HandleRequest(chip_kind, facade_id, *packet, packet_type);
+        transport::HandleRequestCxx(chip_kind, facade_id, *packet, packet_type);
       } else if (chip_kind == common::ChipKind::WIFI) {
         if (!request.has_packet()) {
-          BtsLog("grpc_server: unknown packet type from %d", facade_id);
+          BtsLogWarn("grpc_server: unknown packet type from facade_id: %d",
+                     facade_id);
           continue;
         }
         auto packet = ToSharedVec(request.mutable_packet());
-        packet_hub::HandleRequest(chip_kind, facade_id, *packet,
-                                  packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
+        transport::HandleRequestCxx(chip_kind, facade_id, *packet,
+                                    packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
 #ifdef NETSIM_ANDROID_EMULATOR
         // main_loop_wait is a non-blocking call where fds maintained by the
         // WiFi service (slirp) are polled and serviced for I/O. When any fd
@@ -174,7 +180,7 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
 #endif
       } else {
         // TODO: add UWB here
-        BtsLog("grpc_server: unknown chip kind");
+        BtsLogWarn("grpc_server: unknown chip_kind");
       }
     }
   }
@@ -202,18 +208,19 @@ void HandleResponse(ChipKind kind, uint32_t facade_id,
       response.set_packet(str_packet);
     }
     if (!stream->Write(response)) {
-      BtsLog("grpc_server: write failed %d", facade_id);
+      BtsLogWarn("grpc_server: write failed for facade_id: %d", facade_id);
     }
   } else {
-    BtsLog("grpc_server: no stream for %d", facade_id);
+    BtsLogWarn("grpc_server: no stream for facade_id: %d", facade_id);
   }
 }
 
 // for cxx
 void HandleResponseCxx(uint32_t kind, uint32_t facade_id,
-                       const std::vector<uint8_t> &packet,
+                       const rust::Vec<rust::u8> &packet,
                        /* optional */ uint8_t packet_type) {
-  HandleResponse(ChipKind(kind), facade_id, packet,
+  std::vector<uint8_t> vec(packet.begin(), packet.end());
+  HandleResponse(ChipKind(kind), facade_id, vec,
                  packet::HCIPacket_PacketType(packet_type));
 }
 

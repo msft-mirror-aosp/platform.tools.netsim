@@ -15,7 +15,9 @@
 android_add_library(
   TARGET util-lib
   LICENSE Apache-2.0
-  SRC util/filesystem.h
+  SRC util/crash_report.cc
+      util/crash_report.h
+      util/filesystem.h
       util/ini_file.cc
       util/ini_file.h
       util/log.cc
@@ -25,6 +27,7 @@ android_add_library(
       util/string_utils.cc
       util/string_utils.h)
 target_include_directories(util-lib PRIVATE .)
+target_compile_definitions(util-lib PUBLIC NETSIM_ANDROID_EMULATOR)
 
 if(TARGET Rust::Rustc)
   set(cxx_bridge_binary_folder
@@ -73,8 +76,8 @@ if(TARGET Rust::Rustc)
   set(cxx_bridge_binary_folder
       ${CMAKE_BINARY_DIR}/cargo/build/${Rust_CARGO_TARGET_CACHED}/cxxbridge)
   set(common_header ${cxx_bridge_binary_folder}/rust/cxx.h)
-  set(cxx_bridge_source_file "src/lib.rs")
-  set(crate_name "netsim-cxx")
+  set(cxx_bridge_source_file "src/ffi.rs")
+  set(crate_name "netsim-daemon")
   set(binding_header
       ${cxx_bridge_binary_folder}/${crate_name}/${cxx_bridge_source_file}.h)
   set(binding_source
@@ -103,16 +106,10 @@ if(TARGET Rust::Rustc)
         hci/async_manager.cc
         hci/bluetooth_facade.cc
         hci/bluetooth_facade.h
-        hci/hci_debug.cc
-        hci/hci_debug.h
         hci/hci_packet_transport.cc
         hci/hci_packet_transport.h
         hci/rust_device.cc
         hci/rust_device.h
-        packet_hub/packet_hub.cc
-        packet_hub/packet_hub.h
-        uwb/uwb_facade.cc
-        uwb/uwb_facade.h
         wifi/wifi_facade.cc
         wifi/wifi_facade.h
         wifi/wifi_packet_hub.h
@@ -121,14 +118,14 @@ if(TARGET Rust::Rustc)
          android-wifi-service
          grpc++
          libbt-rootcanal
-         netsim-cxx
+         netsim-daemon
          netsimd-proto-lib
          packet-streamer-proto-lib
          protobuf::libprotobuf
          util-lib)
   target_include_directories(
-    netsimd-lib PRIVATE . ${PROTOBUF_INCLUDE_DIR} ../rust/netsim-cxx
-                        ../rust/netsim-cxx/cxx
+    netsimd-lib PRIVATE . ${PROTOBUF_INCLUDE_DIR} ../rust/netsim-daemon
+                        ../rust/netsim-daemon/cxx
     PUBLIC ${cxx_bridge_binary_folder})
   target_compile_definitions(netsimd-lib PUBLIC NETSIM_ANDROID_EMULATOR)
 

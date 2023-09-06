@@ -38,12 +38,14 @@ void Reset(uint32_t);
 void Remove(uint32_t);
 void Patch(uint32_t, const model::Chip::Bluetooth &);
 model::Chip::Bluetooth Get(uint32_t);
-uint32_t Add(uint32_t simulation_device);
+uint32_t Add(uint32_t simulation_device, const std::string &);
 
 rust::Box<AddRustDeviceResult> AddRustDevice(
     uint32_t simulation_device,
     rust::Box<DynRustBluetoothChipCallbacks> callbacks, const std::string &type,
     const std::string &address);
+
+void RemoveRustDevice(uint32_t facade_id);
 
 void Start(uint16_t instance_num);
 void Stop();

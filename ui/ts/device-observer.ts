@@ -1,4 +1,4 @@
-import {Capture, Chip, Device as ProtoDevice, State} from './netsim/model.js';
+import {Capture, Chip, Chip_Radio, Device as ProtoDevice, State,} from './netsim/model.js';
 
 // URL for netsim
 const DEVICES_URL = './v1/devices';
@@ -97,38 +97,8 @@ export class Device {
     this.device.visible = value ? State.ON : State.OFF;
   }
 
-  toggleChipState(chip: Chip, btType?: string) {
-    if ('bt' in chip && chip.bt) {
-      if (typeof (btType) === 'undefined') {
-        // eslint-disable-next-line
-        console.log(
-            'netsim-ui: must specify lowEnergy or classic for Bluetooth');
-        return;
-      }
-      if (btType === 'lowEnergy' && 'lowEnergy' in chip.bt &&
-          chip.bt.lowEnergy) {
-        if ('state' in chip.bt.lowEnergy) {
-          chip.bt.lowEnergy.state =
-              chip.bt.lowEnergy.state === State.ON ? State.OFF : State.ON;
-        }
-      }
-      if (btType === 'classic' && 'classic' in chip.bt && chip.bt.classic) {
-        if ('state' in chip.bt.classic) {
-          chip.bt.classic.state =
-              chip.bt.classic.state === State.ON ? State.OFF : State.ON;
-        }
-      }
-    }
-    if ('wifi' in chip && chip.wifi) {
-      if ('state' in chip.wifi) {
-        chip.wifi.state = chip.wifi.state === State.ON ? State.OFF : State.ON;
-      }
-    }
-    if ('uwb' in chip && chip.uwb) {
-      if ('state' in chip.uwb) {
-        chip.uwb.state = chip.uwb.state === State.ON ? State.OFF : State.ON;
-      }
-    }
+  toggleChipState(radio: Chip_Radio) {
+    radio.state = radio.state === State.ON ? State.OFF : State.ON;
   }
 
   toggleCapture(device: Device, chip: Chip) {
@@ -138,7 +108,7 @@ export class Device {
         device: {
           name: device.name,
           chips: device.chips,
-        }
+        },
       });
     }
   }
@@ -152,7 +122,7 @@ export interface SimulationInfo {
   devices: Device[];
   captures: Capture[];
   selectedId: string;
-  dimension: {x: number; y: number; z: number;};
+  dimension: {x: number; y: number; z: number};
 }
 
 interface Observable {
@@ -176,8 +146,8 @@ class SimulationState implements Observable {
     this.invokeListCaptures();
   }
 
-  invokeGetDevice() {
-    fetch(DEVICES_URL, {
+  async invokeGetDevice() {
+    await fetch(DEVICES_URL, {
       method: 'GET',
     })
         .then(response => response.json())
@@ -190,8 +160,8 @@ class SimulationState implements Observable {
         });
   }
 
-  invokeListCaptures() {
-    fetch(CAPTURES_URL, {
+  async invokeListCaptures() {
+    await fetch(CAPTURES_URL, {
       method: 'GET',
     })
         .then(response => response.json())
@@ -200,7 +170,7 @@ class SimulationState implements Observable {
         })
         .catch(error => {
           console.log('Cannot connect to netsim web server', error);
-        })
+        });
   }
 
   fetchDevice(devices?: ProtoDevice[]) {
@@ -285,13 +255,30 @@ class SimulationState implements Observable {
 /** Subscribed observers must register itself to the simulationState */
 export const simulationState = new SimulationState();
 
-async function subscribe() {
+async function subscribeCaptures() {
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
   while (true) {
-    simulationState.invokeGetDevice();
-    simulationState.invokeListCaptures();
+    await simulationState.invokeListCaptures();
     await delay(1000);
   }
 }
 
-subscribe();
+async function subscribeDevices() {
+  await simulationState.invokeGetDevice();
+  while (true) {
+    await fetch(DEVICES_URL, {
+      method: 'SUBSCRIBE',
+    })
+        .then(response => response.json())
+        .then(data => {
+          simulationState.fetchDevice(data.devices);
+        })
+        .catch(error => {
+          // eslint-disable-next-line
+          console.log('Cannot connect to netsim web server', error);
+        });
+  }
+}
+
+subscribeCaptures();
+subscribeDevices();

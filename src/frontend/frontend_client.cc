@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Frontend command line interface.
+// Frontend client
 #include "frontend/frontend_client.h"
 
 #include <google/protobuf/util/json_util.h>
@@ -21,14 +21,10 @@
 
 #include <chrono>
 #include <cstdint>
-#include <iomanip>
-#include <iostream>
 #include <iterator>
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
-#include <string_view>
 
 #include "frontend-client-cxx/src/lib.rs.h"
 #include "google/protobuf/empty.pb.h"
@@ -38,10 +34,8 @@
 #include "netsim/frontend.grpc.pb.h"
 #include "netsim/frontend.pb.h"
 #include "netsim/model.pb.h"
-#include "util/ini_file.h"
 #include "util/log.h"
 #include "util/os_utils.h"
-#include "util/string_utils.h"
 
 namespace netsim {
 namespace frontend {
@@ -49,21 +43,27 @@ namespace {
 const std::chrono::duration kConnectionDeadline = std::chrono::seconds(1);
 
 std::unique_ptr<frontend::FrontendService::Stub> NewFrontendStub(
-    std::string port) {
+    std::string port, uint16_t instance_num, std::string vsock = "") {
   // Find local grpc port if not specified
-  if (port == "0") {
-    auto local_port = netsim::osutils::GetServerAddress();
-    if (!local_port.has_value()) {
-      return {};
+  std::string server = "";
+  if (vsock.empty()) {
+    if (port == "0") {
+      auto local_port = netsim::osutils::GetServerAddress(instance_num);
+      if (!local_port.has_value()) {
+        return {};
+      }
+      port = local_port.value();
     }
-    port = local_port.value();
+    server = "localhost:" + port;
+  } else {
+    server = "vsock:" + vsock;
   }
-  auto server = "localhost:" + port;
   std::shared_ptr<grpc::Channel> channel =
       grpc::CreateChannel(server, grpc::InsecureChannelCredentials());
 
   auto deadline = std::chrono::system_clock::now() + kConnectionDeadline;
   if (!channel->WaitForConnected(deadline)) {
+    BtsLogWarn("Frontend gRPC channel not connected");
     return nullptr;
   }
 
@@ -111,6 +111,24 @@ class FrontendClientImpl : public FrontendClient {
     return make_result(status, response);
   }
 
+  std::unique_ptr<ClientResult> CreateDevice(
+      rust::Vec<::rust::u8> const &request_byte_vec) const {
+    frontend::CreateDeviceResponse response;
+    grpc::ClientContext context_;
+    frontend::CreateDeviceRequest request;
+    if (!request.ParseFromArray(request_byte_vec.data(),
+                                request_byte_vec.size())) {
+      return make_result(
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing CreateDevice request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
+          response);
+    }
+    auto status = stub_->CreateDevice(&context_, request, &response);
+    return make_result(status, response);
+  }
+
   // Patchs the information of the device
   std::unique_ptr<ClientResult> PatchDevice(
       rust::Vec<::rust::u8> const &request_byte_vec) const override {
@@ -127,6 +145,24 @@ class FrontendClientImpl : public FrontendClient {
           response);
     };
     auto status = stub_->PatchDevice(&context_, request, &response);
+    return make_result(status, response);
+  }
+
+  std::unique_ptr<ClientResult> DeleteChip(
+      rust::Vec<::rust::u8> const &request_byte_vec) const {
+    google::protobuf::Empty response;
+    grpc::ClientContext context_;
+    frontend::DeleteChipRequest request;
+    if (!request.ParseFromArray(request_byte_vec.data(),
+                                request_byte_vec.size())) {
+      return make_result(
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing DeleteChip request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
+          response);
+    }
+    auto status = stub_->DeleteChip(&context_, request, &response);
     return make_result(status, response);
   }
 
@@ -197,6 +233,10 @@ class FrontendClientImpl : public FrontendClient {
     switch (grpc_method) {
       case frontend::GrpcMethod::GetVersion:
         return GetVersion();
+      case frontend::GrpcMethod::CreateDevice:
+        return CreateDevice(request_byte_vec);
+      case frontend::GrpcMethod::DeleteChip:
+        return DeleteChip(request_byte_vec);
       case frontend::GrpcMethod::PatchDevice:
         return PatchDevice(request_byte_vec);
       case frontend::GrpcMethod::ListDevice:
@@ -221,20 +261,22 @@ class FrontendClientImpl : public FrontendClient {
                           const std::string &message) {
     if (status.ok()) return true;
     if (status.error_code() == grpc::StatusCode::UNAVAILABLE)
-      BtsLog(
-          "error: netsim frontend service is unavailable, "
+      BtsLogError(
+          "netsim frontend service is unavailable, "
           "please restart.");
     else
-      BtsLog("error: request to service failed (%d) - %s", status.error_code(),
-             status.error_message().c_str());
+      BtsLogError("request to frontend service failed (%d) - %s",
+                  status.error_code(), status.error_message().c_str());
     return false;
   }
 };
 
 }  // namespace
 
-std::unique_ptr<FrontendClient> NewFrontendClient(int32_t port) {
-  auto stub = NewFrontendStub(std::to_string(port));
+std::unique_ptr<FrontendClient> NewFrontendClient(int32_t port,
+                                                  uint16_t instance_num,
+                                                  const std::string &vsock) {
+  auto stub = NewFrontendStub(std::to_string(port), instance_num, vsock);
   return (stub == nullptr
               ? nullptr
               : std::make_unique<FrontendClientImpl>(std::move(stub)));

@@ -16,7 +16,8 @@
 
 #include <memory>
 
-#include "packet_hub/packet_hub.h"
+#include "netsim-daemon/src/ffi.rs.h"
+#include "netsim/hci_packet.pb.h"
 #include "rust/cxx.h"
 #include "util/log.h"
 #ifdef NETSIM_ANDROID_EMULATOR
@@ -84,7 +85,7 @@ void Patch(uint32_t id, const model::Chip::Radio &request) {
   BtsLog("wifi::facade::Patch(%d)", id);
   auto it = id_to_chip_info_.find(id);
   if (it == id_to_chip_info_.end()) {
-    BtsLog("Patch an unknown id %d", id);
+    BtsLogWarn("Patch an unknown facade_id: %d", id);
     return;
   }
   auto &model = it->second->model;
@@ -135,8 +136,8 @@ size_t HandleWifiCallback(const uint8_t *buf, size_t size) {
   //  Broadcast the response to all WiFi chips.
   std::vector<uint8_t> packet(buf, buf + size);
   for (auto [chip_id, _] : id_to_chip_info_) {
-    packet_hub::HandleWifiResponse(
-        chip_id, std::make_shared<std::vector<uint8_t>>(packet));
+    transport::HandleResponse(common::ChipKind::WIFI, chip_id, packet,
+                              packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
   }
   return size;
 }
@@ -154,7 +155,7 @@ void Start() {
                      .withVerboseLogging(true);
   wifi_service = builder.build();
   if (!wifi_service->init()) {
-    BtsLog("Failed to initialize wifi service");
+    BtsLogWarn("Failed to initialize wifi service");
   }
 #endif
 }
