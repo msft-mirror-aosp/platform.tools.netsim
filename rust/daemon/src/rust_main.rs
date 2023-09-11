@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use clap::Parser;
-use log::warn;
+use log::{error, info, warn};
 
 use netsim_common::util::netsim_logger;
 
@@ -55,15 +55,35 @@ fn get_netsimd_args(argc: c_int, argv: *const *const c_char) -> NetsimdArgs {
     NetsimdArgs::parse()
 }
 
-fn run_netsimd_with_args(netsimd_args: NetsimdArgs) {
+fn run_netsimd_with_args(args: NetsimdArgs) {
     // Redirect stdout and stderr to files only if netsimd is not invoked
     // by Cuttlefish. Some Cuttlefish builds fail when writing logs to files.
     #[cfg(not(feature = "cuttlefish"))]
-    if !netsimd_args.logtostderr {
+    if !args.logtostderr {
         cxx::let_cxx_string!(netsimd_temp_dir = netsim_common::system::netsimd_temp_dir_string());
         ffi_util::redirect_std_stream(&netsimd_temp_dir);
     }
 
+    match args.connector_instance {
+        Some(connector_instance) => run_netsimd_connector(args, connector_instance),
+        None => run_netsimd_primary(args),
+    }
+}
+
+// Forwards packets to another netsim daemon.
+fn run_netsimd_connector(args: NetsimdArgs, instance: u16) {
+    if args.fd_startup_str.is_none() {
+        error!("Failed to start netsimd forwarder, missing `-s` arg");
+        return;
+    }
+    if !ffi_util::is_netsimd_alive(instance) {
+        error!("Failed to start netsimd forwarder, no primary at {}", instance);
+        return;
+    }
+    info!("Starting netsim daemon in forwarding mode");
+}
+
+fn run_netsimd_primary(netsimd_args: NetsimdArgs) {
     let fd_startup_str = netsimd_args.fd_startup_str.unwrap_or_default();
     let no_cli_ui = netsimd_args.no_cli_ui;
     let no_web_ui = netsimd_args.no_web_ui;

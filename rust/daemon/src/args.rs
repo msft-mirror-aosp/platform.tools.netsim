@@ -40,6 +40,10 @@ pub struct NetsimdArgs {
     #[arg(long, alias = "hci_port")]
     pub hci_port: Option<u32>,
 
+    /// Enables connector mode to forward packets to another instance.
+    #[arg(short, long, visible_alias = "connector_instance_num")]
+    pub connector_instance: Option<u16>,
+
     /// Netsimd instance number
     #[arg(short, long, visible_alias = "instance_num")]
     pub instance: Option<u16>,
