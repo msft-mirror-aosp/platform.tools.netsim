@@ -78,8 +78,8 @@ std::unique_ptr<android::base::ObservableProcess> RunNetsimd(
     NetsimdOptions options) {
   auto exe = android::base::System::get()->findBundledExecutable("netsimd");
   std::vector<std::string> program_with_args{exe};
-  if (options.no_cli_ui) program_with_args.push_back("--no_cli_ui");
-  if (options.no_web_ui) program_with_args.push_back("--no_web_ui");
+  if (options.no_cli_ui) program_with_args.push_back("--no-cli-ui");
+  if (options.no_web_ui) program_with_args.push_back("--no-web-ui");
   auto cmd = android::base::Command::create(program_with_args);
 
   auto netsimd = cmd.asDeamon().execute();
