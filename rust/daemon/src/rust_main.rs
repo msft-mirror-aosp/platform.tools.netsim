@@ -15,6 +15,7 @@
 use clap::Parser;
 use log::warn;
 use log::{error, info};
+use netsim_common::util::zip_artifact::zip_artifacts;
 
 use crate::bluetooth as bluetooth_facade;
 use crate::config_file;
@@ -165,4 +166,9 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     wifi_facade::wifi_start(&config.wifi);
 
     service.run();
+
+    // Once service.run is complete, zip all the artifacts
+    if let Err(err) = zip_artifacts() {
+        error!("Failed to zip artifacts: {err:?}");
+    }
 }
