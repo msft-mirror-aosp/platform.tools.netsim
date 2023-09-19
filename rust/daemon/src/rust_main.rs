@@ -90,12 +90,26 @@ fn run_netsimd_connector(args: NetsimdArgs, instance: u16) {
     };
 
     info!("Starting netsim daemon in forwarding mode");
+    let mut server: Option<String> = None;
+    // Attempts multiple time for fetching netsim.ini
+    for second in [1, 2, 4, 8, 0] {
+        match get_server_address(instance)
+            .map(|port| format!("localhost:{}", port))
+            .ok_or_else(|| warn!("Unable to find server address for instance {}", instance))
+        {
+            Ok(address) => {
+                server = Some(address);
+                break;
+            }
+            Err(_) => std::thread::sleep(std::time::Duration::from_secs(second)),
+        }
+    }
+    if server.is_none() {
+        error!("Failed to run netsimd connector");
+        return;
+    }
     // TODO: Make this function returns Result to use `?` instead of unwrap().
-    let server = get_server_address(instance)
-        .map(|port| format!("localhost:{}", port))
-        .ok_or_else(|| warn!("Unable to find server address for instance {}", instance))
-        .unwrap();
-    crate::transport::fd::run_fd_connector(&fd_startup, server.as_str())
+    crate::transport::fd::run_fd_connector(&fd_startup, server.unwrap().as_str())
         .map_err(|e| error!("Failed to run fd connector: {}", e))
         .unwrap();
 }
