@@ -19,6 +19,7 @@
 #include <memory>
 #include <string>
 
+#include "hci/address.h"
 #include "hci/rust_device.h"
 #include "netsim/model.pb.h"
 #include "rust/cxx.h"
@@ -44,8 +45,13 @@ rust::Box<AddRustDeviceResult> AddRustDevice(
     uint32_t simulation_device,
     rust::Box<DynRustBluetoothChipCallbacks> callbacks, const std::string &type,
     const std::string &address);
+void SetRustDeviceAddress(
+    uint32_t facade_id,
+    std::array<uint8_t, rootcanal::Address::kLength> address);
+void RemoveRustDevice(uint32_t facade_id);
 
-void Start(uint16_t instance_num);
+void Start(const rust::Slice<::std::uint8_t const> proto_bytes,
+           uint16_t instance_num);
 void Stop();
 
 // Cxx functions for rust ffi.

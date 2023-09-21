@@ -16,20 +16,24 @@
 
 #include <sys/types.h>
 
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <future>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <utility>
 
+#include "hci/address.h"
 #include "hci/hci_packet_transport.h"
 #include "model/setup/async_manager.h"
 #include "model/setup/test_command_handler.h"
 #include "model/setup/test_model.h"
-#include "netsim-cxx/src/lib.rs.h"
+#include "netsim-daemon/src/ffi.rs.h"
+#include "netsim/config.pb.h"
 #include "rust/cxx.h"
 #include "util/filesystem.h"
 #include "util/log.h"
@@ -96,8 +100,8 @@ class SimTestModel : public rootcanal::TestModel {
 size_t phy_low_energy_index_;
 size_t phy_classic_index_;
 
-bool mStarted = false;
-std::shared_ptr<rootcanal::AsyncManager> mAsyncManager;
+bool gStarted = false;
+std::shared_ptr<rootcanal::AsyncManager> gAsyncManager;
 rootcanal::AsyncUserId gSocketUserId{};
 std::shared_ptr<SimTestModel> gTestModel;
 std::unique_ptr<rootcanal::ControllerProperties> controller_properties_;
@@ -122,14 +126,14 @@ using ::android::net::PosixAsyncSocketServer;
 
 void SetUpTestChannel(uint16_t instance_num) {
   gTestSocketServer = std::make_shared<PosixAsyncSocketServer>(
-      kDefaultTestPort + instance_num, mAsyncManager.get());
+      kDefaultTestPort + instance_num, gAsyncManager.get());
 
   gTestChannel = std::make_unique<rootcanal::TestCommandHandler>(*gTestModel);
 
   gTestChannelTransport = std::make_unique<rootcanal::TestChannelTransport>();
   gTestChannelTransport->RegisterCommandHandler(
       [](const std::string &name, const std::vector<std::string> &args) {
-        mAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0),
+        gAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0),
                                  [name, args]() {
                                    std::string args_str = "";
                                    for (auto arg : args) args_str += " " + arg;
@@ -143,10 +147,10 @@ void SetUpTestChannel(uint16_t instance_num) {
   bool transport_configured = gTestChannelTransport->SetUp(
       gTestSocketServer, [](std::shared_ptr<AsyncDataChannel> conn_fd,
                             AsyncDataChannelServer *server) {
-        BtsLog("Test channel connection accepted.");
+        BtsLogInfo("Test channel connection accepted.");
         server->StartListening();
         if (gTestChannelOpen) {
-          BtsLog("Warning: Only one connection at a time is supported");
+          BtsLogWarn("Only one connection at a time is supported");
           rootcanal::TestChannelTransport::SendResponse(
               conn_fd, "The connection is broken");
           return false;
@@ -172,22 +176,28 @@ void SetUpTestChannel(uint16_t instance_num) {
   gTestChannel->StartTimer({});
 
   if (!transport_configured) {
-    BtsLog("Error: Failed to set up test channel.");
+    BtsLogError("Failed to set up test channel.");
     return;
   }
 
-  BtsLog("Set up test channel.");
+  BtsLogInfo("Set up test channel.");
 }
 #endif
 
 }  // namespace
 
 // Initialize the rootcanal library.
-void Start(uint16_t instance_num) {
-  if (mStarted) return;
+void Start(const rust::Slice<::std::uint8_t const> proto_bytes,
+           uint16_t instance_num) {
+  if (gStarted) return;
 
   // output is to a file, so no color wanted
   rootcanal::log::SetLogColorEnable(false);
+
+  config::Bluetooth config;
+  config.ParseFromArray(proto_bytes.data(), proto_bytes.size());
+  controller_properties_ =
+      std::make_unique<rootcanal::ControllerProperties>(config.properties());
 
   // When emulators restore from a snapshot the PacketStreamer connection to
   // netsim is recreated with a new (uninitialized) Rootcanal device. However
@@ -196,27 +206,30 @@ void Start(uint16_t instance_num) {
   // before a HCI Reset. The flag below causes a hardware error event that
   // triggers the Reset from the Bluetooth Stack.
 
-  controller_properties_ = std::make_unique<rootcanal::ControllerProperties>();
   controller_properties_->quirks.hardware_error_before_reset = true;
 
-  mAsyncManager = std::make_shared<rootcanal::AsyncManager>();
+  gAsyncManager = std::make_shared<rootcanal::AsyncManager>();
   // Get a user ID for tasks scheduled within the test environment.
-  gSocketUserId = mAsyncManager->GetNextUserId();
+  gSocketUserId = gAsyncManager->GetNextUserId();
 
   gTestModel = std::make_unique<SimTestModel>(
-      std::bind(&rootcanal::AsyncManager::GetNextUserId, mAsyncManager),
-      std::bind(&rootcanal::AsyncManager::ExecAsync, mAsyncManager,
+      std::bind(&rootcanal::AsyncManager::GetNextUserId, gAsyncManager),
+      std::bind(&rootcanal::AsyncManager::ExecAsync, gAsyncManager,
                 std::placeholders::_1, std::placeholders::_2,
                 std::placeholders::_3),
-      std::bind(&rootcanal::AsyncManager::ExecAsyncPeriodically, mAsyncManager,
+      std::bind(&rootcanal::AsyncManager::ExecAsyncPeriodically, gAsyncManager,
                 std::placeholders::_1, std::placeholders::_2,
                 std::placeholders::_3, std::placeholders::_4),
       std::bind(&rootcanal::AsyncManager::CancelAsyncTasksFromUser,
-                mAsyncManager, std::placeholders::_1),
-      std::bind(&rootcanal::AsyncManager::CancelAsyncTask, mAsyncManager,
+                gAsyncManager, std::placeholders::_1),
+      std::bind(&rootcanal::AsyncManager::CancelAsyncTask, gAsyncManager,
                 std::placeholders::_1),
       [](const std::string & /* server */, int /* port */,
          rootcanal::Phy::Type /* phy_type */) { return nullptr; });
+
+  // Disable Address Reuse if '--disable_address_reuse' flag is true
+  // TODO: once config files are active, use the value from config proto
+  gTestModel->SetReuseDeviceAddresses(!netsim::GetDisableAddressReuse());
 
   // NOTE: 0:BR_EDR, 1:LOW_ENERGY. The order is used by bluetooth CTS.
   phy_classic_index_ = gTestModel->AddPhy(rootcanal::Phy::Type::BR_EDR);
@@ -231,14 +244,14 @@ void Start(uint16_t instance_num) {
 #else
   SetUpTestChannel(instance_num);
 #endif
-  mStarted = true;
+  gStarted = true;
 };
 
 // Resets the root canal library.
 void Stop() {
   // TODO: Fix TestModel::Reset() in test_model.cc.
   // gTestModel->Reset();
-  mStarted = false;
+  gStarted = false;
 }
 
 void PatchPhy(int device_id, bool isAddToPhy, bool isLowEnergy) {
@@ -295,7 +308,7 @@ void Reset(uint32_t id) {
 
 void Patch(uint32_t id, const model::Chip::Bluetooth &request) {
   if (id_to_chip_info_.find(id) == id_to_chip_info_.end()) {
-    BtsLog("Patch an unknown id %d", id);
+    BtsLogWarn("Patch an unknown facade_id: %d", id);
     return;
   }
   auto model = id_to_chip_info_[id]->model;
@@ -317,11 +330,11 @@ void Patch(uint32_t id, const model::Chip::Bluetooth &request) {
 }
 
 void Remove(uint32_t id) {
-  BtsLog("Removing HCI chip %d.", id);
+  BtsLogInfo("Removing HCI chip facade_id: %d.", id);
   id_to_chip_info_.erase(id);
   // Call the transport close callback. This invokes HciDevice::Close and
   // TestModel close callback.
-  mAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0), [id]() {
+  gAsyncManager->ExecAsync(gSocketUserId, std::chrono::milliseconds(0), [id]() {
     // rootcanal will call HciPacketTransport::Close().
     HciPacketTransport::Remove(id);
   });
@@ -330,7 +343,7 @@ void Remove(uint32_t id) {
 // Rename AddChip(model::Chip, device, transport)
 
 uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
-  auto transport = std::make_shared<HciPacketTransport>(mAsyncManager);
+  auto transport = std::make_shared<HciPacketTransport>(gAsyncManager);
   auto hci_device = std::make_shared<rootcanal::HciDevice>(
       transport, *controller_properties_);
 
@@ -343,7 +356,7 @@ uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
   if (address_string != "") {
     address_option = rootcanal::Address::FromString(address_string);
   }
-  mAsyncManager->ExecAsync(
+  gAsyncManager->ExecAsync(
       gSocketUserId, std::chrono::milliseconds(0),
       [hci_device, &facade_id_promise, address_option]() {
         facade_id_promise.set_value(
@@ -352,7 +365,8 @@ uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
   auto facade_id = facade_id_future.get();
 
   HciPacketTransport::Add(facade_id, transport);
-  BtsLog("Creating HCI facade %d for device %d", facade_id, simulation_device);
+  BtsLogInfo("Creating HCI facade_id: %d for device_id: %d", facade_id,
+             simulation_device);
 
   auto model = std::make_shared<model::Chip::Bluetooth>();
   model->mutable_classic()->set_state(model::State::ON);
@@ -361,6 +375,10 @@ uint32_t Add(uint32_t simulation_device, const std::string &address_string) {
   id_to_chip_info_.emplace(
       facade_id, std::make_shared<ChipInfo>(simulation_device, model));
   return facade_id;
+}
+
+void RemoveRustDevice(uint32_t facade_id) {
+  gTestModel->RemoveDevice(facade_id);
 }
 
 rust::Box<AddRustDeviceResult> AddRustDevice(
@@ -383,6 +401,14 @@ rust::Box<AddRustDeviceResult> AddRustDevice(
       facade_id, std::make_shared<ChipInfo>(simulation_device, model));
   return CreateAddRustDeviceResult(
       facade_id, std::make_unique<RustBluetoothChip>(rust_device));
+}
+
+void SetRustDeviceAddress(
+    uint32_t facade_id,
+    std::array<uint8_t, rootcanal::Address::kLength> address) {
+  uint8_t addr[rootcanal::Address::kLength];
+  std::memcpy(addr, address.data(), rootcanal::Address::kLength);
+  gTestModel->SetDeviceAddress(facade_id, rootcanal::Address(addr));
 }
 
 void IncrTx(uint32_t id, rootcanal::Phy::Type phy_type) {
@@ -415,7 +441,7 @@ int8_t SimComputeRssi(int send_id, int recv_id, int8_t tx_power) {
 #ifdef NETSIM_ANDROID_EMULATOR
     // NOTE: Ignore log messages in Cuttlefish for beacon devices created by
     // test channel.
-    BtsLog("Missing chip_info");
+    BtsLogWarn("Missing chip_info");
 #endif
     return tx_power;
   }

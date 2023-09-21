@@ -16,7 +16,8 @@
 
 #include <memory>
 
-#include "netsim-cxx/src/lib.rs.h"
+#include "netsim-daemon/src/ffi.rs.h"
+#include "netsim/config.pb.h"
 #include "netsim/hci_packet.pb.h"
 #include "rust/cxx.h"
 #include "util/log.h"
@@ -85,7 +86,7 @@ void Patch(uint32_t id, const model::Chip::Radio &request) {
   BtsLog("wifi::facade::Patch(%d)", id);
   auto it = id_to_chip_info_.find(id);
   if (it == id_to_chip_info_.end()) {
-    BtsLog("Patch an unknown id %d", id);
+    BtsLogWarn("Patch an unknown facade_id: %d", id);
     return;
   }
   auto &model = it->second->model;
@@ -142,11 +143,35 @@ size_t HandleWifiCallback(const uint8_t *buf, size_t size) {
   return size;
 }
 
-void Start() {
+void Start(const rust::Slice<::std::uint8_t const> proto_bytes) {
 #ifdef NETSIM_ANDROID_EMULATOR
   // Initialize hostapd and slirp inside WiFi Service.
-  android::qemu2::HostapdOptions hostapd = {.disabled = false};
-  android::qemu2::SlirpOptions slirpOpts = {.disabled = false};
+  config::WiFi config;
+  config.ParseFromArray(proto_bytes.data(), proto_bytes.size());
+
+  android::qemu2::HostapdOptions hostapd = {
+      .disabled = config.hostapd_options().disabled(),
+      .ssid = config.hostapd_options().ssid(),
+      .passwd = config.hostapd_options().passwd()};
+
+  android::qemu2::SlirpOptions slirpOpts = {
+      .disabled = config.slirp_options().disabled(),
+      .ipv4 = !config.slirp_options().not_ipv4(),
+      .restricted = config.slirp_options().restricted(),
+      .vnet = config.slirp_options().vnet(),
+      .vhost = config.slirp_options().vhost(),
+      .vmask = config.slirp_options().vmask(),
+      .ipv6 = !config.slirp_options().not_ipv6(),
+      .vprefix6 = config.slirp_options().vprefix6(),
+      .vprefixLen = (uint8_t)config.slirp_options().vprefixlen(),
+      .vhost6 = config.slirp_options().vhost6(),
+      .vhostname = config.slirp_options().vhostname(),
+      .tftpath = config.slirp_options().tftpath(),
+      .bootfile = config.slirp_options().bootfile(),
+      .dhcpstart = config.slirp_options().dhcpstart(),
+      .dns = config.slirp_options().dns(),
+      .dns6 = config.slirp_options().dns6(),
+  };
 
   auto builder = android::qemu2::WifiService::Builder()
                      .withHostapd(hostapd)
@@ -155,7 +180,7 @@ void Start() {
                      .withVerboseLogging(true);
   wifi_service = builder.build();
   if (!wifi_service->init()) {
-    BtsLog("Failed to initialize wifi service");
+    BtsLogWarn("Failed to initialize wifi service");
   }
 #endif
 }

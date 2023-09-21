@@ -17,6 +17,7 @@
 #pragma once
 // OS specific utility functions.
 
+#include <memory>
 #include <optional>
 #include <string>
 
