@@ -15,6 +15,7 @@
 use clap::Parser;
 use log::warn;
 use log::{error, info};
+use netsim_common::util::os_utils::remove_netsim_ini;
 use netsim_common::util::zip_artifact::zip_artifacts;
 
 use crate::bluetooth as bluetooth_facade;
@@ -167,7 +168,9 @@ fn run_netsimd_primary(args: NetsimdArgs) {
 
     service.run();
 
-    // Once service.run is complete, zip all the artifacts
+    // Once service.run is complete, delete the netsim ini file
+    // and zip all artifacts
+    remove_netsim_ini(instance_num);
     if let Err(err) = zip_artifacts() {
         error!("Failed to zip artifacts: {err:?}");
     }
