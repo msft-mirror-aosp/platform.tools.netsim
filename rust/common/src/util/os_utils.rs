@@ -91,7 +91,13 @@ pub fn get_server_address(instance_num: u16) -> Option<String> {
     if let Err(err) = ini_file.read() {
         error!("Error reading ini file: {err:?}");
     }
-    ini_file.get("grpc.port").map(|s| s.to_string())
+    ini_file.get("grpc.port").map(|s| {
+        if s.contains(':') {
+            s.to_string()
+        } else {
+            format!("localhost:{}", s)
+        }
+    })
 }
 
 /// Get the number of netsim instances
