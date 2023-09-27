@@ -15,7 +15,7 @@
 use clap::Parser;
 use log::warn;
 use log::{error, info};
-use netsim_common::util::os_utils::remove_netsim_ini;
+use netsim_common::util::os_utils::{get_hci_port, get_instance, remove_netsim_ini};
 use netsim_common::util::zip_artifact::zip_artifacts;
 
 use crate::bluetooth as bluetooth_facade;
@@ -114,9 +114,9 @@ fn run_netsimd_connector(args: NetsimdArgs, instance: u16) {
 
 fn run_netsimd_primary(args: NetsimdArgs) {
     let fd_startup_str = args.fd_startup_str.unwrap_or_default();
-    let instance_num = ffi_util::get_instance(args.instance.unwrap_or_default());
+    let instance_num = get_instance(args.instance.unwrap_or_default());
     let hci_port: u16 =
-        ffi_util::get_hci_port(args.hci_port.unwrap_or_default(), instance_num).try_into().unwrap();
+        get_hci_port(args.hci_port.unwrap_or_default(), instance_num).try_into().unwrap();
 
     #[cfg(feature = "cuttlefish")]
     if fd_startup_str.is_empty() {
