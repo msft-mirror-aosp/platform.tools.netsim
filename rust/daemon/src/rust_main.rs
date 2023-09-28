@@ -15,6 +15,7 @@
 use clap::Parser;
 use log::warn;
 use log::{error, info};
+use netsim_common::util::os_utils::{get_hci_port, get_instance, remove_netsim_ini};
 use netsim_common::util::zip_artifact::zip_artifacts;
 
 use crate::bluetooth as bluetooth_facade;
@@ -28,6 +29,7 @@ use crate::service::{Service, ServiceParams};
 #[cfg(feature = "cuttlefish")]
 use netsim_common::util::os_utils::get_server_address;
 use netsim_proto::config::Config;
+use std::env;
 use std::ffi::{c_char, c_int};
 
 /// Wireless network simulator for android (and other) emulated devices.
@@ -46,21 +48,32 @@ pub unsafe extern "C" fn rust_main(argc: c_int, argv: *const *const c_char) {
 
 #[allow(unused)]
 fn get_netsimd_args(argc: c_int, argv: *const *const c_char) -> NetsimdArgs {
+    let env_args_or_err = env::var("NETSIM_ARGS");
+
     #[cfg(feature = "cuttlefish")]
     {
         // TODO: Use NetsimdArgs::parse() after netsimd binary is built with netsimd.rs.
         // In linux arm64 in aosp-main, it can't access CLI arguments by std::env::args() with netsimd.cc wrapper.
-        let argv: Vec<_> = (0..argc)
+        let mut argv: Vec<_> = (0..argc)
             .map(|i|
                 // SAFETY: argc and argv will remain valid as long as the program runs.
                 unsafe {
                     std::ffi::CStr::from_ptr(*argv.add(i as usize)).to_str().unwrap().to_owned()
                 })
             .collect();
+        if let Ok(env_args) = env_args_or_err {
+            env_args.split(' ').for_each(|arg| argv.push(arg.to_string()));
+        }
         NetsimdArgs::parse_from(argv)
     }
     #[cfg(not(feature = "cuttlefish"))]
-    NetsimdArgs::parse()
+    {
+        let mut argv = env::args().collect::<Vec<String>>();
+        if let Ok(env_args) = env_args_or_err {
+            env_args.split(' ').for_each(|arg| argv.push(arg.to_string()));
+        }
+        NetsimdArgs::parse_from(argv)
+    }
 }
 
 fn run_netsimd_with_args(args: NetsimdArgs) {
@@ -82,44 +95,40 @@ fn run_netsimd_with_args(args: NetsimdArgs) {
 /// Forwards packets to another netsim daemon.
 #[cfg(feature = "cuttlefish")]
 fn run_netsimd_connector(args: NetsimdArgs, instance: u16) {
-    let fd_startup = match args.fd_startup_str {
-        None => {
-            error!("Failed to start netsimd forwarder, missing `-s` arg");
-            return;
-        }
-        Some(fd_startup) => fd_startup,
-    };
+    if args.fd_startup_str.is_none() {
+        error!("Failed to start netsimd forwarder, missing `-s` arg");
+        return;
+    }
+    let fd_startup = args.fd_startup_str.unwrap();
 
-    info!("Starting netsim daemon in forwarding mode");
     let mut server: Option<String> = None;
     // Attempts multiple time for fetching netsim.ini
     for second in [1, 2, 4, 8, 0] {
-        match get_server_address(instance)
-            .map(|port| format!("localhost:{}", port))
-            .ok_or_else(|| warn!("Unable to find server address for instance {}", instance))
-        {
-            Ok(address) => {
-                server = Some(address);
-                break;
-            }
-            Err(_) => std::thread::sleep(std::time::Duration::from_secs(second)),
+        server = get_server_address(instance);
+        if server.is_some() {
+            break;
+        } else {
+            warn!("Unable to find ini file for instance {}, retrying", instance);
+            std::thread::sleep(std::time::Duration::from_secs(second));
         }
     }
     if server.is_none() {
         error!("Failed to run netsimd connector");
         return;
     }
+    let server = server.unwrap();
     // TODO: Make this function returns Result to use `?` instead of unwrap().
-    crate::transport::fd::run_fd_connector(&fd_startup, server.unwrap().as_str())
+    info!("Starting in Connector mode to {}", server.as_str());
+    crate::transport::fd::run_fd_connector(&fd_startup, server.as_str())
         .map_err(|e| error!("Failed to run fd connector: {}", e))
         .unwrap();
 }
 
 fn run_netsimd_primary(args: NetsimdArgs) {
     let fd_startup_str = args.fd_startup_str.unwrap_or_default();
-    let instance_num = ffi_util::get_instance(args.instance.unwrap_or_default());
+    let instance_num = get_instance(args.instance.unwrap_or_default());
     let hci_port: u16 =
-        ffi_util::get_hci_port(args.hci_port.unwrap_or_default(), instance_num).try_into().unwrap();
+        get_hci_port(args.hci_port.unwrap_or_default(), instance_num).try_into().unwrap();
 
     #[cfg(feature = "cuttlefish")]
     if fd_startup_str.is_empty() {
@@ -167,7 +176,9 @@ fn run_netsimd_primary(args: NetsimdArgs) {
 
     service.run();
 
-    // Once service.run is complete, zip all the artifacts
+    // Once service.run is complete, delete the netsim ini file
+    // and zip all artifacts
+    remove_netsim_ini(instance_num);
     if let Err(err) = zip_artifacts() {
         error!("Failed to zip artifacts: {err:?}");
     }
