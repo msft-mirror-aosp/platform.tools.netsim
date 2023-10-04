@@ -27,10 +27,12 @@
 
 namespace netsim {
 namespace frontend {
+namespace {
 const std::chrono::duration kConnectionDeadline = std::chrono::seconds(1);
 
-std::unique_ptr<frontend::FrontendService::Stub> NewFrontendClient() {
-  auto port = netsim::osutils::GetServerAddress();
+std::unique_ptr<frontend::FrontendService::Stub> NewFrontendClient(
+    uint16_t instance_num) {
+  auto port = netsim::osutils::GetServerAddress(instance_num);
   if (!port.has_value()) {
     return nullptr;
   }
@@ -44,6 +46,11 @@ std::unique_ptr<frontend::FrontendService::Stub> NewFrontendClient() {
   }
 
   return frontend::FrontendService::NewStub(channel);
+}
+}  // namespace
+
+bool IsNetsimdAlive(uint16_t instance_num) {
+  return NewFrontendClient(instance_num) != nullptr;
 }
 
 }  // namespace frontend
