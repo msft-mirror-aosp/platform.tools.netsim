@@ -15,6 +15,8 @@
 use clap::Parser;
 use log::warn;
 use log::{error, info};
+#[cfg(feature = "cuttlefish")]
+use netsim_common::system::netsimd_temp_dir;
 use netsim_common::util::os_utils::{get_hci_port, get_instance, remove_netsim_ini};
 use netsim_common::util::zip_artifact::zip_artifacts;
 
@@ -82,6 +84,10 @@ fn get_netsimd_args(argc: c_int, argv: *const *const c_char) -> NetsimdArgs {
 }
 
 fn run_netsimd_with_args(args: NetsimdArgs) {
+    // Log where netsim artifacts are located
+    #[cfg(feature = "cuttlefish")]
+    info!("netsim artifacts path: {}", netsimd_temp_dir().display());
+
     // Redirect stdout and stderr to files only if netsimd is not invoked
     // by Cuttlefish. Some Cuttlefish builds fail when writing logs to files.
     #[cfg(not(feature = "cuttlefish"))]
@@ -142,9 +148,9 @@ fn main_loop(events_rx: Receiver<Event>) {
 
 fn run_netsimd_primary(args: NetsimdArgs) {
     let fd_startup_str = args.fd_startup_str.unwrap_or_default();
-    let instance_num = get_instance(args.instance.unwrap_or_default());
+    let instance_num = get_instance(args.instance);
     let hci_port: u16 =
-        get_hci_port(args.hci_port.unwrap_or_default(), instance_num).try_into().unwrap();
+        get_hci_port(args.hci_port.unwrap_or_default(), instance_num - 1).try_into().unwrap();
 
     #[cfg(feature = "cuttlefish")]
     if fd_startup_str.is_empty() {
@@ -175,7 +181,6 @@ fn run_netsimd_primary(args: NetsimdArgs) {
         args.no_cli_ui,
         args.no_web_ui,
         args.pcap,
-        args.disable_address_reuse,
         hci_port,
         instance_num,
         args.dev,
@@ -197,7 +202,7 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     wait_devices(device_events_rx);
 
     // Start radio facades
-    bluetooth_facade::bluetooth_start(&config.bluetooth, instance_num);
+    bluetooth_facade::bluetooth_start(&config.bluetooth, instance_num, args.disable_address_reuse);
     wifi_facade::wifi_start(&config.wifi);
 
     // Run all netsimd services (grpc, socket, web)
