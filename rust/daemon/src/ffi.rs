@@ -75,7 +75,6 @@ pub mod ffi_transport {
         pub fn RunGrpcServerCxx(
             netsim_grpc_port: u32,
             no_cli_ui: bool,
-            instance_num: u16,
             vsock: u16,
         ) -> UniquePtr<GrpcServer>;
 
