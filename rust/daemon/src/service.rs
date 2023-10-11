@@ -97,7 +97,6 @@ impl Service {
         let grpc_server = run_grpc_server_cxx(
             netsim_grpc_port,
             self.service_params.no_cli_ui,
-            self.service_params.instance_num,
             self.service_params.vsock,
         );
         match grpc_server.is_null() {
