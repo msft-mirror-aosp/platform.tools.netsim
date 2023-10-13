@@ -26,39 +26,43 @@
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_3_2_0;
 
 #[derive(PartialEq,Clone,Default,Debug)]
-// @@protoc_insertion_point(message:netsim.NetsimChipStats)
-pub struct NetsimChipStats {
+// @@protoc_insertion_point(message:netsim.stats.NetsimRadioStats)
+pub struct NetsimRadioStats {
     // message fields
-    // @@protoc_insertion_point(field:netsim.NetsimChipStats.kind)
-    pub kind: ::std::option::Option<::protobuf::EnumOrUnknown<netsim_chip_stats::Kind>>,
-    // @@protoc_insertion_point(field:netsim.NetsimChipStats.duration_secs)
-    pub duration_secs: ::std::option::Option<i32>,
-    // @@protoc_insertion_point(field:netsim.NetsimChipStats.tx_count)
+    // @@protoc_insertion_point(field:netsim.stats.NetsimRadioStats.kind)
+    pub kind: ::std::option::Option<::protobuf::EnumOrUnknown<netsim_radio_stats::Kind>>,
+    // @@protoc_insertion_point(field:netsim.stats.NetsimRadioStats.duration_secs)
+    pub duration_secs: ::std::option::Option<u64>,
+    // @@protoc_insertion_point(field:netsim.stats.NetsimRadioStats.tx_count)
     pub tx_count: ::std::option::Option<i32>,
-    // @@protoc_insertion_point(field:netsim.NetsimChipStats.rx_count)
+    // @@protoc_insertion_point(field:netsim.stats.NetsimRadioStats.rx_count)
     pub rx_count: ::std::option::Option<i32>,
+    // @@protoc_insertion_point(field:netsim.stats.NetsimRadioStats.tx_bytes)
+    pub tx_bytes: ::std::option::Option<i32>,
+    // @@protoc_insertion_point(field:netsim.stats.NetsimRadioStats.rx_bytes)
+    pub rx_bytes: ::std::option::Option<i32>,
     // special fields
-    // @@protoc_insertion_point(special_field:netsim.NetsimChipStats.special_fields)
+    // @@protoc_insertion_point(special_field:netsim.stats.NetsimRadioStats.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
 
-impl<'a> ::std::default::Default for &'a NetsimChipStats {
-    fn default() -> &'a NetsimChipStats {
-        <NetsimChipStats as ::protobuf::Message>::default_instance()
+impl<'a> ::std::default::Default for &'a NetsimRadioStats {
+    fn default() -> &'a NetsimRadioStats {
+        <NetsimRadioStats as ::protobuf::Message>::default_instance()
     }
 }
 
-impl NetsimChipStats {
-    pub fn new() -> NetsimChipStats {
+impl NetsimRadioStats {
+    pub fn new() -> NetsimRadioStats {
         ::std::default::Default::default()
     }
 
-    // optional .netsim.NetsimChipStats.Kind kind = 1;
+    // optional .netsim.stats.NetsimRadioStats.Kind kind = 1;
 
-    pub fn kind(&self) -> netsim_chip_stats::Kind {
+    pub fn kind(&self) -> netsim_radio_stats::Kind {
         match self.kind {
-            Some(e) => e.enum_value_or(netsim_chip_stats::Kind::UNSPECIFIED),
-            None => netsim_chip_stats::Kind::UNSPECIFIED,
+            Some(e) => e.enum_value_or(netsim_radio_stats::Kind::UNSPECIFIED),
+            None => netsim_radio_stats::Kind::UNSPECIFIED,
         }
     }
 
@@ -71,13 +75,13 @@ impl NetsimChipStats {
     }
 
     // Param is passed by value, moved
-    pub fn set_kind(&mut self, v: netsim_chip_stats::Kind) {
+    pub fn set_kind(&mut self, v: netsim_radio_stats::Kind) {
         self.kind = ::std::option::Option::Some(::protobuf::EnumOrUnknown::new(v));
     }
 
-    // optional int32 duration_secs = 2;
+    // optional uint64 duration_secs = 2;
 
-    pub fn duration_secs(&self) -> i32 {
+    pub fn duration_secs(&self) -> u64 {
         self.duration_secs.unwrap_or(0)
     }
 
@@ -90,7 +94,7 @@ impl NetsimChipStats {
     }
 
     // Param is passed by value, moved
-    pub fn set_duration_secs(&mut self, v: i32) {
+    pub fn set_duration_secs(&mut self, v: u64) {
         self.duration_secs = ::std::option::Option::Some(v);
     }
 
@@ -132,39 +136,87 @@ impl NetsimChipStats {
         self.rx_count = ::std::option::Option::Some(v);
     }
 
+    // optional int32 tx_bytes = 5;
+
+    pub fn tx_bytes(&self) -> i32 {
+        self.tx_bytes.unwrap_or(0)
+    }
+
+    pub fn clear_tx_bytes(&mut self) {
+        self.tx_bytes = ::std::option::Option::None;
+    }
+
+    pub fn has_tx_bytes(&self) -> bool {
+        self.tx_bytes.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_tx_bytes(&mut self, v: i32) {
+        self.tx_bytes = ::std::option::Option::Some(v);
+    }
+
+    // optional int32 rx_bytes = 6;
+
+    pub fn rx_bytes(&self) -> i32 {
+        self.rx_bytes.unwrap_or(0)
+    }
+
+    pub fn clear_rx_bytes(&mut self) {
+        self.rx_bytes = ::std::option::Option::None;
+    }
+
+    pub fn has_rx_bytes(&self) -> bool {
+        self.rx_bytes.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_rx_bytes(&mut self, v: i32) {
+        self.rx_bytes = ::std::option::Option::Some(v);
+    }
+
     fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
-        let mut fields = ::std::vec::Vec::with_capacity(4);
+        let mut fields = ::std::vec::Vec::with_capacity(6);
         let mut oneofs = ::std::vec::Vec::with_capacity(0);
         fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
             "kind",
-            |m: &NetsimChipStats| { &m.kind },
-            |m: &mut NetsimChipStats| { &mut m.kind },
+            |m: &NetsimRadioStats| { &m.kind },
+            |m: &mut NetsimRadioStats| { &mut m.kind },
         ));
         fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
             "duration_secs",
-            |m: &NetsimChipStats| { &m.duration_secs },
-            |m: &mut NetsimChipStats| { &mut m.duration_secs },
+            |m: &NetsimRadioStats| { &m.duration_secs },
+            |m: &mut NetsimRadioStats| { &mut m.duration_secs },
         ));
         fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
             "tx_count",
-            |m: &NetsimChipStats| { &m.tx_count },
-            |m: &mut NetsimChipStats| { &mut m.tx_count },
+            |m: &NetsimRadioStats| { &m.tx_count },
+            |m: &mut NetsimRadioStats| { &mut m.tx_count },
         ));
         fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
             "rx_count",
-            |m: &NetsimChipStats| { &m.rx_count },
-            |m: &mut NetsimChipStats| { &mut m.rx_count },
+            |m: &NetsimRadioStats| { &m.rx_count },
+            |m: &mut NetsimRadioStats| { &mut m.rx_count },
         ));
-        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<NetsimChipStats>(
-            "NetsimChipStats",
+        fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
+            "tx_bytes",
+            |m: &NetsimRadioStats| { &m.tx_bytes },
+            |m: &mut NetsimRadioStats| { &mut m.tx_bytes },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_option_accessor::<_, _>(
+            "rx_bytes",
+            |m: &NetsimRadioStats| { &m.rx_bytes },
+            |m: &mut NetsimRadioStats| { &mut m.rx_bytes },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<NetsimRadioStats>(
+            "NetsimRadioStats",
             fields,
             oneofs,
         )
     }
 }
 
-impl ::protobuf::Message for NetsimChipStats {
-    const NAME: &'static str = "NetsimChipStats";
+impl ::protobuf::Message for NetsimRadioStats {
+    const NAME: &'static str = "NetsimRadioStats";
 
     fn is_initialized(&self) -> bool {
         true
@@ -177,13 +229,19 @@ impl ::protobuf::Message for NetsimChipStats {
                     self.kind = ::std::option::Option::Some(is.read_enum_or_unknown()?);
                 },
                 16 => {
-                    self.duration_secs = ::std::option::Option::Some(is.read_int32()?);
+                    self.duration_secs = ::std::option::Option::Some(is.read_uint64()?);
                 },
                 24 => {
                     self.tx_count = ::std::option::Option::Some(is.read_int32()?);
                 },
                 32 => {
                     self.rx_count = ::std::option::Option::Some(is.read_int32()?);
+                },
+                40 => {
+                    self.tx_bytes = ::std::option::Option::Some(is.read_int32()?);
+                },
+                48 => {
+                    self.rx_bytes = ::std::option::Option::Some(is.read_int32()?);
                 },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
@@ -201,13 +259,19 @@ impl ::protobuf::Message for NetsimChipStats {
             my_size += ::protobuf::rt::int32_size(1, v.value());
         }
         if let Some(v) = self.duration_secs {
-            my_size += ::protobuf::rt::int32_size(2, v);
+            my_size += ::protobuf::rt::uint64_size(2, v);
         }
         if let Some(v) = self.tx_count {
             my_size += ::protobuf::rt::int32_size(3, v);
         }
         if let Some(v) = self.rx_count {
             my_size += ::protobuf::rt::int32_size(4, v);
+        }
+        if let Some(v) = self.tx_bytes {
+            my_size += ::protobuf::rt::int32_size(5, v);
+        }
+        if let Some(v) = self.rx_bytes {
+            my_size += ::protobuf::rt::int32_size(6, v);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
         self.special_fields.cached_size().set(my_size as u32);
@@ -219,13 +283,19 @@ impl ::protobuf::Message for NetsimChipStats {
             os.write_enum(1, ::protobuf::EnumOrUnknown::value(&v))?;
         }
         if let Some(v) = self.duration_secs {
-            os.write_int32(2, v)?;
+            os.write_uint64(2, v)?;
         }
         if let Some(v) = self.tx_count {
             os.write_int32(3, v)?;
         }
         if let Some(v) = self.rx_count {
             os.write_int32(4, v)?;
+        }
+        if let Some(v) = self.tx_bytes {
+            os.write_int32(5, v)?;
+        }
+        if let Some(v) = self.rx_bytes {
+            os.write_int32(6, v)?;
         }
         os.write_unknown_fields(self.special_fields.unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -239,8 +309,8 @@ impl ::protobuf::Message for NetsimChipStats {
         &mut self.special_fields
     }
 
-    fn new() -> NetsimChipStats {
-        NetsimChipStats::new()
+    fn new() -> NetsimRadioStats {
+        NetsimRadioStats::new()
     }
 
     fn clear(&mut self) {
@@ -248,55 +318,61 @@ impl ::protobuf::Message for NetsimChipStats {
         self.duration_secs = ::std::option::Option::None;
         self.tx_count = ::std::option::Option::None;
         self.rx_count = ::std::option::Option::None;
+        self.tx_bytes = ::std::option::Option::None;
+        self.rx_bytes = ::std::option::Option::None;
         self.special_fields.clear();
     }
 
-    fn default_instance() -> &'static NetsimChipStats {
-        static instance: NetsimChipStats = NetsimChipStats {
+    fn default_instance() -> &'static NetsimRadioStats {
+        static instance: NetsimRadioStats = NetsimRadioStats {
             kind: ::std::option::Option::None,
             duration_secs: ::std::option::Option::None,
             tx_count: ::std::option::Option::None,
             rx_count: ::std::option::Option::None,
+            tx_bytes: ::std::option::Option::None,
+            rx_bytes: ::std::option::Option::None,
             special_fields: ::protobuf::SpecialFields::new(),
         };
         &instance
     }
 }
 
-impl ::protobuf::MessageFull for NetsimChipStats {
+impl ::protobuf::MessageFull for NetsimRadioStats {
     fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
         static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
-        descriptor.get(|| file_descriptor().message_by_package_relative_name("NetsimChipStats").unwrap()).clone()
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("NetsimRadioStats").unwrap()).clone()
     }
 }
 
-impl ::std::fmt::Display for NetsimChipStats {
+impl ::std::fmt::Display for NetsimRadioStats {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-impl ::protobuf::reflect::ProtobufValue for NetsimChipStats {
+impl ::protobuf::reflect::ProtobufValue for NetsimRadioStats {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
-/// Nested message and enums of message `NetsimChipStats`
-pub mod netsim_chip_stats {
+/// Nested message and enums of message `NetsimRadioStats`
+pub mod netsim_radio_stats {
     #[derive(Clone,Copy,PartialEq,Eq,Debug,Hash)]
-    // @@protoc_insertion_point(enum:netsim.NetsimChipStats.Kind)
+    // @@protoc_insertion_point(enum:netsim.stats.NetsimRadioStats.Kind)
     pub enum Kind {
-        // @@protoc_insertion_point(enum_value:netsim.NetsimChipStats.Kind.UNSPECIFIED)
+        // @@protoc_insertion_point(enum_value:netsim.stats.NetsimRadioStats.Kind.UNSPECIFIED)
         UNSPECIFIED = 0,
-        // @@protoc_insertion_point(enum_value:netsim.NetsimChipStats.Kind.BLUETOOTH)
-        BLUETOOTH = 1,
-        // @@protoc_insertion_point(enum_value:netsim.NetsimChipStats.Kind.BLE_BEACON)
-        BLE_BEACON = 2,
-        // @@protoc_insertion_point(enum_value:netsim.NetsimChipStats.Kind.WIFI)
-        WIFI = 3,
-        // @@protoc_insertion_point(enum_value:netsim.NetsimChipStats.Kind.UWB)
-        UWB = 4,
-        // @@protoc_insertion_point(enum_value:netsim.NetsimChipStats.Kind.NFC)
-        NFC = 5,
+        // @@protoc_insertion_point(enum_value:netsim.stats.NetsimRadioStats.Kind.BT_LE)
+        BT_LE = 1,
+        // @@protoc_insertion_point(enum_value:netsim.stats.NetsimRadioStats.Kind.BT_CLASSIC)
+        BT_CLASSIC = 2,
+        // @@protoc_insertion_point(enum_value:netsim.stats.NetsimRadioStats.Kind.BT_LE_BEACON)
+        BT_LE_BEACON = 3,
+        // @@protoc_insertion_point(enum_value:netsim.stats.NetsimRadioStats.Kind.WIFI)
+        WIFI = 4,
+        // @@protoc_insertion_point(enum_value:netsim.stats.NetsimRadioStats.Kind.UWB)
+        UWB = 5,
+        // @@protoc_insertion_point(enum_value:netsim.stats.NetsimRadioStats.Kind.NFC)
+        NFC = 6,
     }
 
     impl ::protobuf::Enum for Kind {
@@ -309,19 +385,21 @@ pub mod netsim_chip_stats {
         fn from_i32(value: i32) -> ::std::option::Option<Kind> {
             match value {
                 0 => ::std::option::Option::Some(Kind::UNSPECIFIED),
-                1 => ::std::option::Option::Some(Kind::BLUETOOTH),
-                2 => ::std::option::Option::Some(Kind::BLE_BEACON),
-                3 => ::std::option::Option::Some(Kind::WIFI),
-                4 => ::std::option::Option::Some(Kind::UWB),
-                5 => ::std::option::Option::Some(Kind::NFC),
+                1 => ::std::option::Option::Some(Kind::BT_LE),
+                2 => ::std::option::Option::Some(Kind::BT_CLASSIC),
+                3 => ::std::option::Option::Some(Kind::BT_LE_BEACON),
+                4 => ::std::option::Option::Some(Kind::WIFI),
+                5 => ::std::option::Option::Some(Kind::UWB),
+                6 => ::std::option::Option::Some(Kind::NFC),
                 _ => ::std::option::Option::None
             }
         }
 
         const VALUES: &'static [Kind] = &[
             Kind::UNSPECIFIED,
-            Kind::BLUETOOTH,
-            Kind::BLE_BEACON,
+            Kind::BT_LE,
+            Kind::BT_CLASSIC,
+            Kind::BT_LE_BEACON,
             Kind::WIFI,
             Kind::UWB,
             Kind::NFC,
@@ -331,7 +409,7 @@ pub mod netsim_chip_stats {
     impl ::protobuf::EnumFull for Kind {
         fn enum_descriptor() -> ::protobuf::reflect::EnumDescriptor {
             static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::rt::Lazy::new();
-            descriptor.get(|| super::file_descriptor().enum_by_package_relative_name("NetsimChipStats.Kind").unwrap()).clone()
+            descriptor.get(|| super::file_descriptor().enum_by_package_relative_name("NetsimRadioStats.Kind").unwrap()).clone()
         }
 
         fn descriptor(&self) -> ::protobuf::reflect::EnumValueDescriptor {
@@ -348,25 +426,25 @@ pub mod netsim_chip_stats {
 
     impl Kind {
         pub(in super) fn generated_enum_descriptor_data() -> ::protobuf::reflect::GeneratedEnumDescriptorData {
-            ::protobuf::reflect::GeneratedEnumDescriptorData::new::<Kind>("NetsimChipStats.Kind")
+            ::protobuf::reflect::GeneratedEnumDescriptorData::new::<Kind>("NetsimRadioStats.Kind")
         }
     }
 }
 
 #[derive(PartialEq,Clone,Default,Debug)]
-// @@protoc_insertion_point(message:netsim.NetsimStats)
+// @@protoc_insertion_point(message:netsim.stats.NetsimStats)
 pub struct NetsimStats {
     // message fields
-    // @@protoc_insertion_point(field:netsim.NetsimStats.duration_secs)
-    pub duration_secs: ::std::option::Option<i32>,
-    // @@protoc_insertion_point(field:netsim.NetsimStats.device_count)
+    // @@protoc_insertion_point(field:netsim.stats.NetsimStats.duration_secs)
+    pub duration_secs: ::std::option::Option<u64>,
+    // @@protoc_insertion_point(field:netsim.stats.NetsimStats.device_count)
     pub device_count: ::std::option::Option<i32>,
-    // @@protoc_insertion_point(field:netsim.NetsimStats.peak_concurrent_devices)
+    // @@protoc_insertion_point(field:netsim.stats.NetsimStats.peak_concurrent_devices)
     pub peak_concurrent_devices: ::std::option::Option<i32>,
-    // @@protoc_insertion_point(field:netsim.NetsimStats.chip_stats)
-    pub chip_stats: ::std::vec::Vec<NetsimChipStats>,
+    // @@protoc_insertion_point(field:netsim.stats.NetsimStats.radio_stats)
+    pub radio_stats: ::std::vec::Vec<NetsimRadioStats>,
     // special fields
-    // @@protoc_insertion_point(special_field:netsim.NetsimStats.special_fields)
+    // @@protoc_insertion_point(special_field:netsim.stats.NetsimStats.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
 
@@ -381,9 +459,9 @@ impl NetsimStats {
         ::std::default::Default::default()
     }
 
-    // optional int32 duration_secs = 1;
+    // optional uint64 duration_secs = 1;
 
-    pub fn duration_secs(&self) -> i32 {
+    pub fn duration_secs(&self) -> u64 {
         self.duration_secs.unwrap_or(0)
     }
 
@@ -396,7 +474,7 @@ impl NetsimStats {
     }
 
     // Param is passed by value, moved
-    pub fn set_duration_secs(&mut self, v: i32) {
+    pub fn set_duration_secs(&mut self, v: u64) {
         self.duration_secs = ::std::option::Option::Some(v);
     }
 
@@ -457,9 +535,9 @@ impl NetsimStats {
             |m: &mut NetsimStats| { &mut m.peak_concurrent_devices },
         ));
         fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
-            "chip_stats",
-            |m: &NetsimStats| { &m.chip_stats },
-            |m: &mut NetsimStats| { &mut m.chip_stats },
+            "radio_stats",
+            |m: &NetsimStats| { &m.radio_stats },
+            |m: &mut NetsimStats| { &mut m.radio_stats },
         ));
         ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<NetsimStats>(
             "NetsimStats",
@@ -480,7 +558,7 @@ impl ::protobuf::Message for NetsimStats {
         while let Some(tag) = is.read_raw_tag_or_eof()? {
             match tag {
                 8 => {
-                    self.duration_secs = ::std::option::Option::Some(is.read_int32()?);
+                    self.duration_secs = ::std::option::Option::Some(is.read_uint64()?);
                 },
                 16 => {
                     self.device_count = ::std::option::Option::Some(is.read_int32()?);
@@ -489,7 +567,7 @@ impl ::protobuf::Message for NetsimStats {
                     self.peak_concurrent_devices = ::std::option::Option::Some(is.read_int32()?);
                 },
                 34 => {
-                    self.chip_stats.push(is.read_message()?);
+                    self.radio_stats.push(is.read_message()?);
                 },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
@@ -504,7 +582,7 @@ impl ::protobuf::Message for NetsimStats {
     fn compute_size(&self) -> u64 {
         let mut my_size = 0;
         if let Some(v) = self.duration_secs {
-            my_size += ::protobuf::rt::int32_size(1, v);
+            my_size += ::protobuf::rt::uint64_size(1, v);
         }
         if let Some(v) = self.device_count {
             my_size += ::protobuf::rt::int32_size(2, v);
@@ -512,7 +590,7 @@ impl ::protobuf::Message for NetsimStats {
         if let Some(v) = self.peak_concurrent_devices {
             my_size += ::protobuf::rt::int32_size(3, v);
         }
-        for value in &self.chip_stats {
+        for value in &self.radio_stats {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
         };
@@ -523,7 +601,7 @@ impl ::protobuf::Message for NetsimStats {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
         if let Some(v) = self.duration_secs {
-            os.write_int32(1, v)?;
+            os.write_uint64(1, v)?;
         }
         if let Some(v) = self.device_count {
             os.write_int32(2, v)?;
@@ -531,7 +609,7 @@ impl ::protobuf::Message for NetsimStats {
         if let Some(v) = self.peak_concurrent_devices {
             os.write_int32(3, v)?;
         }
-        for v in &self.chip_stats {
+        for v in &self.radio_stats {
             ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
         };
         os.write_unknown_fields(self.special_fields.unknown_fields())?;
@@ -554,7 +632,7 @@ impl ::protobuf::Message for NetsimStats {
         self.duration_secs = ::std::option::Option::None;
         self.device_count = ::std::option::Option::None;
         self.peak_concurrent_devices = ::std::option::Option::None;
-        self.chip_stats.clear();
+        self.radio_stats.clear();
         self.special_fields.clear();
     }
 
@@ -563,7 +641,7 @@ impl ::protobuf::Message for NetsimStats {
             duration_secs: ::std::option::Option::None,
             device_count: ::std::option::Option::None,
             peak_concurrent_devices: ::std::option::Option::None,
-            chip_stats: ::std::vec::Vec::new(),
+            radio_stats: ::std::vec::Vec::new(),
             special_fields: ::protobuf::SpecialFields::new(),
         };
         &instance
@@ -588,18 +666,20 @@ impl ::protobuf::reflect::ProtobufValue for NetsimStats {
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x12netsim/stats.proto\x12\x06netsim\"\xf2\x01\n\x0fNetsimChipStats\
-    \x120\n\x04kind\x18\x01\x20\x01(\x0e2\x1c.netsim.NetsimChipStats.KindR\
-    \x04kind\x12#\n\rduration_secs\x18\x02\x20\x01(\x05R\x0cdurationSecs\x12\
-    \x19\n\x08tx_count\x18\x03\x20\x01(\x05R\x07txCount\x12\x19\n\x08rx_coun\
-    t\x18\x04\x20\x01(\x05R\x07rxCount\"R\n\x04Kind\x12\x0f\n\x0bUNSPECIFIED\
-    \x10\0\x12\r\n\tBLUETOOTH\x10\x01\x12\x0e\n\nBLE_BEACON\x10\x02\x12\x08\
-    \n\x04WIFI\x10\x03\x12\x07\n\x03UWB\x10\x04\x12\x07\n\x03NFC\x10\x05\"\
-    \xc5\x01\n\x0bNetsimStats\x12#\n\rduration_secs\x18\x01\x20\x01(\x05R\
-    \x0cdurationSecs\x12!\n\x0cdevice_count\x18\x02\x20\x01(\x05R\x0bdeviceC\
-    ount\x126\n\x17peak_concurrent_devices\x18\x03\x20\x01(\x05R\x15peakConc\
-    urrentDevices\x126\n\nchip_stats\x18\x04\x20\x03(\x0b2\x17.netsim.Netsim\
-    ChipStatsR\tchipStats\
+    \n\x12netsim/stats.proto\x12\x0cnetsim.stats\"\xbe\x02\n\x10NetsimRadioS\
+    tats\x127\n\x04kind\x18\x01\x20\x01(\x0e2#.netsim.stats.NetsimRadioStats\
+    .KindR\x04kind\x12#\n\rduration_secs\x18\x02\x20\x01(\x04R\x0cdurationSe\
+    cs\x12\x19\n\x08tx_count\x18\x03\x20\x01(\x05R\x07txCount\x12\x19\n\x08r\
+    x_count\x18\x04\x20\x01(\x05R\x07rxCount\x12\x19\n\x08tx_bytes\x18\x05\
+    \x20\x01(\x05R\x07txBytes\x12\x19\n\x08rx_bytes\x18\x06\x20\x01(\x05R\
+    \x07rxBytes\"`\n\x04Kind\x12\x0f\n\x0bUNSPECIFIED\x10\0\x12\t\n\x05BT_LE\
+    \x10\x01\x12\x0e\n\nBT_CLASSIC\x10\x02\x12\x10\n\x0cBT_LE_BEACON\x10\x03\
+    \x12\x08\n\x04WIFI\x10\x04\x12\x07\n\x03UWB\x10\x05\x12\x07\n\x03NFC\x10\
+    \x06\"\xce\x01\n\x0bNetsimStats\x12#\n\rduration_secs\x18\x01\x20\x01(\
+    \x04R\x0cdurationSecs\x12!\n\x0cdevice_count\x18\x02\x20\x01(\x05R\x0bde\
+    viceCount\x126\n\x17peak_concurrent_devices\x18\x03\x20\x01(\x05R\x15pea\
+    kConcurrentDevices\x12?\n\x0bradio_stats\x18\x04\x20\x03(\x0b2\x1e.netsi\
+    m.stats.NetsimRadioStatsR\nradioStats\
 ";
 
 /// `FileDescriptorProto` object which was a source for this generated file
@@ -618,10 +698,10 @@ pub fn file_descriptor() -> &'static ::protobuf::reflect::FileDescriptor {
         let generated_file_descriptor = generated_file_descriptor_lazy.get(|| {
             let mut deps = ::std::vec::Vec::with_capacity(0);
             let mut messages = ::std::vec::Vec::with_capacity(2);
-            messages.push(NetsimChipStats::generated_message_descriptor_data());
+            messages.push(NetsimRadioStats::generated_message_descriptor_data());
             messages.push(NetsimStats::generated_message_descriptor_data());
             let mut enums = ::std::vec::Vec::with_capacity(1);
-            enums.push(netsim_chip_stats::Kind::generated_enum_descriptor_data());
+            enums.push(netsim_radio_stats::Kind::generated_enum_descriptor_data());
             ::protobuf::reflect::GeneratedFileDescriptor::new_generated(
                 file_descriptor_proto(),
                 deps,
