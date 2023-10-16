@@ -13,11 +13,9 @@
 // limitations under the License.
 
 use lazy_static::lazy_static;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use crate::captures::capture::Captures;
-use crate::devices::devices_handler::Devices;
-use crate::events::Events;
 use crate::version::get_version;
 
 lazy_static! {
@@ -29,33 +27,18 @@ lazy_static! {
 /// protected by a RwLock or Mutex.
 pub struct Resource {
     version: String,
-    devices: Arc<RwLock<Devices>>,
     captures: Arc<RwLock<Captures>>,
-    events: Arc<Mutex<Events>>,
 }
 
 impl Resource {
     pub fn new() -> Self {
-        Self {
-            version: get_version(),
-            devices: Arc::new(RwLock::new(Devices::new())),
-            captures: Arc::new(RwLock::new(Captures::new())),
-            events: Events::new(),
-        }
+        Self { version: get_version(), captures: Arc::new(RwLock::new(Captures::new())) }
     }
 
     #[allow(dead_code)]
     pub fn get_version_resource(self) -> String {
         self.version
     }
-}
-
-pub fn clone_events() -> Arc<Mutex<Events>> {
-    Arc::clone(&RESOURCES.events)
-}
-
-pub fn clone_devices() -> Arc<RwLock<Devices>> {
-    Arc::clone(&RESOURCES.devices)
 }
 
 pub fn clone_captures() -> Arc<RwLock<Captures>> {
