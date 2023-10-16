@@ -13,12 +13,10 @@
 # limitations under the License.
 
 [workspace]
-
+edition = "2021"
 members = [
-    "frontend-client-cxx",
-    "frontend-proto",
-    "backend-proto",
-    "netsim-cli",
-    "netsim-common",
-    "netsim-cxx",
+    "proto",
+    "cli",
+    "common",
+    "daemon",
 ]
