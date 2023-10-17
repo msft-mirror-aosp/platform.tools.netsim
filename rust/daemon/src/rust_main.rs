@@ -24,14 +24,15 @@ use crate::bluetooth as bluetooth_facade;
 use crate::captures::capture::spawn_capture_event_subscriber;
 use crate::config_file;
 use crate::devices::devices_handler::wait_devices;
+use crate::events;
 use crate::events::Event;
-use crate::resource;
+use crate::session::Session;
 use crate::wifi as wifi_facade;
 use netsim_common::util::netsim_logger;
 
 use crate::args::NetsimdArgs;
 use crate::ffi::ffi_util;
-use crate::service::{Service, ServiceParams};
+use crate::service::{new_test_beacon, Service, ServiceParams};
 #[cfg(feature = "cuttlefish")]
 use netsim_common::util::os_utils::get_server_address;
 use netsim_proto::config::Config;
@@ -139,6 +140,7 @@ fn run_netsimd_connector(args: NetsimdArgs, instance: u16) {
 fn main_loop(events_rx: Receiver<Event>) {
     loop {
         // events_rx.recv() will wait until the event is received.
+        // TODO(b/305536480): Remove built-in devices during shutdown.
         if let Ok(Event::ShutDown { reason }) = events_rx.recv() {
             info!("Netsim is shutdown: {reason}");
             return;
@@ -193,9 +195,14 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     service.set_up();
 
     // Create all Event Receivers
-    let capture_events_rx = resource::clone_events().lock().unwrap().subscribe();
-    let device_events_rx = resource::clone_events().lock().unwrap().subscribe();
-    let main_events_rx = resource::clone_events().lock().unwrap().subscribe();
+    let capture_events_rx = events::subscribe();
+    let device_events_rx = events::subscribe();
+    let main_events_rx = events::subscribe();
+    let session_events_rx = events::subscribe();
+
+    // Start Session Event listener
+    let mut session = Session::new();
+    session.start(session_events_rx);
 
     // Pass all event receivers to each modules
     spawn_capture_event_subscriber(capture_events_rx);
@@ -204,6 +211,17 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     // Start radio facades
     bluetooth_facade::bluetooth_start(&config.bluetooth, instance_num, args.disable_address_reuse);
     wifi_facade::wifi_start(&config.wifi);
+
+    // Maybe create test beacons, default true for cuttlefish
+    // TODO: remove default for cuttlefish by adding flag to tests
+    if match args.test_beacons {
+        Some(true) => true,
+        Some(false) => false,
+        None => cfg!(feature = "cuttlefish"),
+    } {
+        new_test_beacon(1, 1000);
+        new_test_beacon(2, 1000);
+    }
 
     // Run all netsimd services (grpc, socket, web)
     service.run();
@@ -214,9 +232,13 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     // Gracefully shutdown netsimd services
     service.shut_down();
 
-    // Once service.run is complete, delete the netsim ini file
-    // and zip all artifacts
+    // Once shutdown is complete, delete the netsim ini file
     remove_netsim_ini(instance_num);
+
+    // write out session stats
+    let _ = session.stop();
+
+    // zip all artifacts
     if let Err(err) = zip_artifacts() {
         error!("Failed to zip artifacts: {err:?}");
     }
