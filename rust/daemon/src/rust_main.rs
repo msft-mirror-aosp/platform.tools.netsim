@@ -89,9 +89,6 @@ fn run_netsimd_with_args(args: NetsimdArgs) {
     #[cfg(feature = "cuttlefish")]
     info!("netsim artifacts path: {}", netsimd_temp_dir().display());
 
-    // Redirect stdout and stderr to files only if netsimd is not invoked
-    // by Cuttlefish. Some Cuttlefish builds fail when writing logs to files.
-    #[cfg(not(feature = "cuttlefish"))]
     if !args.logtostderr {
         cxx::let_cxx_string!(netsimd_temp_dir = netsim_common::system::netsimd_temp_dir_string());
         ffi_util::redirect_std_stream(&netsimd_temp_dir);
