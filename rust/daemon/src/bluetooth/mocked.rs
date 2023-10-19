@@ -15,8 +15,10 @@
 use crate::bluetooth::{BeaconChip, BEACON_CHIPS};
 use crate::devices::chip::{ChipIdentifier, FacadeIdentifier};
 use crate::devices::device::{AddChipResult, DeviceIdentifier};
+use ::protobuf::MessageField;
 use lazy_static::lazy_static;
 use log::info;
+use netsim_proto::configuration::Controller as RootcanalController;
 use netsim_proto::model::chip::{Bluetooth, BluetoothBeacon};
 use netsim_proto::model::chip_create::Chip as Builtin;
 use netsim_proto::model::{ChipCreate, DeviceCreate};
@@ -60,7 +62,11 @@ pub fn bluetooth_get(facade_id: u32) -> Bluetooth {
 }
 
 // Returns facade_id
-pub fn bluetooth_add(device_id: u32, _address: &str) -> u32 {
+pub fn bluetooth_add(
+    device_id: u32,
+    _address: &str,
+    _bt_properties: &MessageField<RootcanalController>,
+) -> u32 {
     info!("hci_add({device_id})");
     let mut resource = IDS.write().unwrap();
     let facade_id = resource.current_id;
