@@ -20,6 +20,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use crate::devices::chip::ChipIdentifier;
 use crate::devices::chip::FacadeIdentifier;
 use crate::devices::device::DeviceIdentifier;
+use netsim_proto::stats::NetsimRadioStats as ProtoRadioStats;
 
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
@@ -41,11 +42,12 @@ pub enum Event {
     DeviceAdded {
         id: DeviceIdentifier,
         name: String,
+        builtin: bool,
     },
     DeviceRemoved {
         id: DeviceIdentifier,
         name: String,
-        remaining_devices: usize,
+        builtin: bool,
     },
     DevicePatched {
         id: DeviceIdentifier,
@@ -56,10 +58,13 @@ pub enum Event {
         chip_kind: ChipKind,
         facade_id: FacadeIdentifier,
         device_name: String,
+        builtin: bool,
     },
     ChipRemoved {
         chip_id: ChipIdentifier,
-        remaining_devices: usize,
+        device_name: String,
+        remaining_nonbuiltin_devices: usize,
+        radio_stats: Vec<ProtoRadioStats>,
     },
     ShutDown {
         reason: String,
@@ -148,14 +153,18 @@ mod tests {
         let events_clone = Arc::clone(&events);
         let rx = events_clone.lock().unwrap().subscribe();
         let handle = thread::spawn(move || match rx.recv() {
-            Ok(Event::DeviceAdded { id, name }) => {
+            Ok(Event::DeviceAdded { id, name, builtin: false }) => {
                 assert_eq!(id, 123);
                 assert_eq!(name, "Device1");
             }
             _ => panic!("Unexpected event"),
         });
 
-        events.lock().unwrap().publish(Event::DeviceAdded { id: 123, name: "Device1".into() });
+        events.lock().unwrap().publish(Event::DeviceAdded {
+            id: 123,
+            name: "Device1".into(),
+            builtin: false,
+        });
 
         // Wait for the other thread to process the message.
         handle.join().unwrap();
@@ -171,7 +180,7 @@ mod tests {
             let events_clone = Arc::clone(&events);
             let rx = events_clone.lock().unwrap().subscribe();
             let handle = thread::spawn(move || match rx.recv() {
-                Ok(Event::DeviceAdded { id, name }) => {
+                Ok(Event::DeviceAdded { id, name, builtin: false }) => {
                     assert_eq!(id, 123);
                     assert_eq!(name, "Device1");
                 }
@@ -180,7 +189,11 @@ mod tests {
             handles.push(handle);
         }
 
-        events.lock().unwrap().publish(Event::DeviceAdded { id: 123, name: "Device1".into() });
+        events.lock().unwrap().publish(Event::DeviceAdded {
+            id: 123,
+            name: "Device1".into(),
+            builtin: false,
+        });
 
         // Wait for the other threads to process the message.
         for handle in handles {
@@ -197,7 +210,11 @@ mod tests {
         let rx = events.lock().unwrap().subscribe();
         assert_eq!(events.lock().unwrap().subscribers.len(), 1);
         std::mem::drop(rx);
-        events.lock().unwrap().publish(Event::DeviceAdded { id: 123, name: "Device1".into() });
+        events.lock().unwrap().publish(Event::DeviceAdded {
+            id: 123,
+            name: "Device1".into(),
+            builtin: false,
+        });
         assert_eq!(events.lock().unwrap().subscribers.len(), 0);
     }
 }
