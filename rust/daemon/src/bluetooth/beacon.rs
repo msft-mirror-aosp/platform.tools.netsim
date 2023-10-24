@@ -59,7 +59,6 @@ pub struct BeaconChip {
     device_name: String,
     chip_id: ChipIdentifier,
     address: Address,
-    address_str: String,
     advertise_settings: AdvertiseSettings,
     advertise_data: AdvertiseData,
     scan_response_data: AdvertiseData,
@@ -76,8 +75,7 @@ impl BeaconChip {
         Ok(BeaconChip {
             chip_id,
             device_name: device_name.clone(),
-            address_str: address.clone(),
-            address: parse_addr(&address)?,
+            address: str_to_addr(&address)?,
             advertise_settings: AdvertiseSettings::builder().build(),
             advertise_data: AdvertiseData::builder(device_name.clone(), TxPowerLevel::default())
                 .build()
@@ -113,11 +111,17 @@ impl BeaconChip {
             &beacon_proto.scan_response,
         )?;
 
+        let address = if beacon_proto.address == String::default() {
+            // Safe to unwrap here because chip_id is a u32 which is less than 6 bytes
+            u64::from(chip_id).try_into().unwrap()
+        } else {
+            str_to_addr(&beacon_proto.address)?
+        };
+
         Ok(BeaconChip {
             device_name,
             chip_id,
-            address_str: beacon_proto.address.clone(),
-            address: parse_addr(&beacon_proto.address)?,
+            address,
             advertise_settings,
             advertise_data,
             scan_response_data,
@@ -204,13 +208,13 @@ impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
         let beacon = beacon.unwrap().lock().unwrap();
 
         if beacon.advertise_settings.scannable
-            && destination_address == beacon.address_str
+            && destination_address == addr_to_str(beacon.address)
             && packet_type == u8::from(PacketType::LeScan)
         {
             let packet = LeScanResponseBuilder {
                 advertising_address_type: AddressType::Public,
                 source_address: beacon.address,
-                destination_address: parse_addr(&source_address).unwrap(),
+                destination_address: beacon.address,
                 scan_response_data: beacon.scan_response_data.to_bytes(),
             }
             .build()
@@ -291,8 +295,7 @@ pub fn bluetooth_beacon_patch(
         .unwrap();
 
     if patch.address != String::default() {
-        beacon.address_str = patch.address.clone();
-        beacon.address = parse_addr(&beacon.address_str)?;
+        beacon.address = str_to_addr(&patch.address)?;
     }
 
     if let Some(patch_settings) = patch.settings.as_ref() {
@@ -347,17 +350,27 @@ pub fn bluetooth_beacon_get(chip_id: ChipIdentifier) -> Result<BluetoothBeaconPr
         .unwrap();
 
     Ok(BluetoothBeaconProto {
-        address: beacon.address_str.clone(),
+        address: addr_to_str(beacon.address),
         settings: MessageField::some((&beacon.advertise_settings).try_into()?),
         adv_data: MessageField::some((&beacon.advertise_data).into()),
         ..Default::default()
     })
 }
 
-fn parse_addr(addr: &str) -> Result<Address, String> {
+fn addr_to_str(addr: Address) -> String {
+    let bytes = u64::from(addr).to_le_bytes();
+    bytes[..5]
+        .iter()
+        .rfold(format!("{:02x}", bytes[5]), |addr, byte| addr + &format!(":{:02x}", byte))
+}
+
+fn str_to_addr(addr: &str) -> Result<Address, String> {
     if addr == String::default() {
         Ok(*EMPTY_ADDRESS)
     } else {
+        if addr.len() != 17 {
+            return Err(String::from("failed to parse address: address was not the right length"));
+        }
         let addr = addr.replace(':', "");
         u64::from_str_radix(&addr, 16)
             .map_err(|_| String::from("failed to parse address: invalid hex"))?
