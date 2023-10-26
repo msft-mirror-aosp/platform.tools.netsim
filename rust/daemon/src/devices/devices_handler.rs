@@ -151,7 +151,7 @@ pub fn add_chip(
                     &chip_create_proto.address,
                     &chip_create_proto.bt_properties,
                 ),
-                ProtoChipKind::BLUETOOTH_BEACON => bluetooth_facade::bluetooth_beacon_add(
+                ProtoChipKind::BLUETOOTH_BEACON => bluetooth_facade::ble_beacon_add(
                     device_id,
                     String::from(device_name),
                     chip_id,
@@ -321,7 +321,7 @@ pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Resu
     let result = {
         let devices_arc = get_devices();
         let mut devices = devices_arc.write().unwrap();
-        let (is_empty, (facade_id_option, device_name, chip_kind, radio_stats)) = match devices
+        let (is_empty, (facade_id_option, _device_name, chip_kind, radio_stats)) = match devices
             .entries
             .entry(device_id)
         {
@@ -337,20 +337,14 @@ pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Resu
         }
         Ok((
             facade_id_option,
-            device_name,
+            device_id,
             chip_kind,
             devices.entries.values().filter(|device| !device.builtin).count(),
             radio_stats,
         ))
     };
     match result {
-        Ok((
-            facade_id_option,
-            device_name,
-            chip_kind,
-            remaining_nonbuiltin_devices,
-            radio_stats,
-        )) => {
+        Ok((facade_id_option, device_id, chip_kind, remaining_nonbuiltin_devices, radio_stats)) => {
             match facade_id_option {
                 Some(facade_id) => match chip_kind {
                     ProtoChipKind::BLUETOOTH => {
@@ -360,7 +354,7 @@ pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Resu
                         wifi_facade::wifi_remove(facade_id);
                     }
                     ProtoChipKind::BLUETOOTH_BEACON => {
-                        bluetooth_facade::bluetooth_beacon_remove(device_id, chip_id, facade_id)?;
+                        bluetooth_facade::ble_beacon_remove(device_id, chip_id, facade_id)?;
                     }
                     _ => Err(format!("Unknown chip kind: {:?}", chip_kind))?,
                 },
@@ -371,7 +365,7 @@ pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Resu
             info!("Removed Chip: device_id: {device_id}, chip_id: {chip_id}");
             events::publish(Event::ChipRemoved {
                 chip_id,
-                device_name,
+                device_id,
                 remaining_nonbuiltin_devices,
                 radio_stats,
             });
@@ -1258,16 +1252,16 @@ mod tests {
     }
 
     use netsim_proto::model::chip::{
-        bluetooth_beacon::AdvertiseData, bluetooth_beacon::AdvertiseSettings, BluetoothBeacon, Chip,
+        ble_beacon::AdvertiseData, ble_beacon::AdvertiseSettings, BleBeacon, Chip,
     };
-    use netsim_proto::model::chip_create::{BluetoothBeaconCreate, Chip as BuiltChipProto};
+    use netsim_proto::model::chip_create::{BleBeaconCreate, Chip as BuiltChipProto};
     use netsim_proto::model::Chip as ChipProto;
     use netsim_proto::model::ChipCreate;
     use netsim_proto::model::Device as DeviceProto;
     use protobuf::{EnumOrUnknown, MessageField};
 
     fn get_test_create_device_request(device_name: Option<String>) -> CreateDeviceRequest {
-        let beacon_proto = BluetoothBeaconCreate {
+        let beacon_proto = BleBeaconCreate {
             settings: MessageField::some(AdvertiseSettings { ..Default::default() }),
             adv_data: MessageField::some(AdvertiseData { ..Default::default() }),
             ..Default::default()
@@ -1431,7 +1425,7 @@ mod tests {
             chips: vec![ChipProto {
                 name: request.device.chips[0].name.clone(),
                 kind: EnumOrUnknown::new(ProtoChipKind::BLUETOOTH_BEACON),
-                chip: Some(Chip::BleBeacon(BluetoothBeacon {
+                chip: Some(Chip::BleBeacon(BleBeacon {
                     bt: MessageField::some(Default::default()),
                     ..Default::default()
                 })),
@@ -1519,7 +1513,7 @@ mod tests {
             &mut events,
             Event::ChipRemoved {
                 chip_id: 0,
-                device_name: "".to_string(),
+                device_id: 0,
                 remaining_nonbuiltin_devices: 0,
                 radio_stats: Vec::new(),
             },
@@ -1563,7 +1557,7 @@ mod tests {
             &mut events,
             Event::ChipRemoved {
                 chip_id: 0,
-                device_name: "".to_string(),
+                device_id: 0,
                 remaining_nonbuiltin_devices: 1,
                 radio_stats: Vec::new(),
             },
