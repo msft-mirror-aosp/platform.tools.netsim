@@ -19,7 +19,7 @@ use netsim_common::util::netsim_logger;
 
 use crate::args::NetsimdArgs;
 use crate::ffi::ffi_util;
-use crate::service::{Service, ServiceParams};
+use crate::service::{new_test_beacon, Service, ServiceParams};
 use std::ffi::{c_char, c_int};
 
 /// Wireless network simulator for android (and other) emulated devices.
@@ -99,5 +99,17 @@ fn run_netsimd_with_args(netsimd_args: NetsimdArgs) {
     // valid and open for as long as the program runs.
     let service = unsafe { Service::new(service_params) };
     service.set_up();
+
+    // Maybe create test beacons, default true for cuttlefish
+    // TODO: remove default for cuttlefish by adding flag to tests
+    if match netsimd_args.test_beacons {
+        Some(true) => true,
+        Some(false) => false,
+        None => cfg!(feature = "cuttlefish"),
+    } {
+        new_test_beacon(1, 1000);
+        new_test_beacon(2, 1000);
+    }
+
     service.run();
 }

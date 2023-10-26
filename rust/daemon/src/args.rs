@@ -47,4 +47,8 @@ pub struct NetsimdArgs {
     /// Set the vsock port number to be listened by the frontend grpc server
     #[arg(short, long)]
     pub vsock: Option<u16>,
+
+    /// Start with test beacons
+    #[arg(long, alias = "test_beacons")]
+    pub test_beacons: Option<bool>,
 }

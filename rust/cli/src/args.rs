@@ -15,6 +15,7 @@
 use clap::builder::{PossibleValue, TypedValueParser};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use frontend_client_cxx::ffi::{FrontendClient, GrpcMethod};
+use hex::{decode as hex_to_bytes, FromHexError};
 use log::error;
 use netsim_common::util::time_display::TimeDisplay;
 use netsim_proto::common::ChipKind;
@@ -38,6 +39,7 @@ use netsim_proto::model::{
 use protobuf::{Message, MessageField};
 use std::fmt;
 use std::iter;
+use std::str::FromStr;
 
 pub type BinaryProtobuf = Vec<u8>;
 
@@ -413,7 +415,23 @@ pub struct BeaconBleAdvertiseData {
     pub include_tx_power_level: bool,
     /// Manufacturer specific data.
     #[arg(long)]
-    pub manufacturer_data: Option<String>,
+    pub manufacturer_data: Option<ParsableBytes>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ParsableBytes(Vec<u8>);
+
+impl ParsableBytes {
+    fn unwrap(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl FromStr for ParsableBytes {
+    type Err = FromHexError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        hex_to_bytes(s.strip_prefix("0x").unwrap_or(s)).map(ParsableBytes)
+    }
 }
 
 #[derive(Debug, Args)]
@@ -624,7 +642,7 @@ impl From<&BeaconBleAdvertiseData> for AdvertiseDataProto {
             manufacturer_data: value
                 .manufacturer_data
                 .clone()
-                .map(String::into_bytes)
+                .map(ParsableBytes::unwrap)
                 .unwrap_or_default(),
             ..Default::default()
         }
