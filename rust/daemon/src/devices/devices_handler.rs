@@ -46,6 +46,7 @@ use netsim_proto::frontend::CreateDeviceResponse;
 use netsim_proto::frontend::DeleteChipRequest;
 use netsim_proto::frontend::ListDeviceResponse;
 use netsim_proto::frontend::PatchDeviceRequest;
+use netsim_proto::frontend::SubscribeDeviceRequest;
 use netsim_proto::model::chip_create::Chip as ProtoBuiltin;
 use netsim_proto::model::ChipCreate;
 use netsim_proto::model::Position as ProtoPosition;
@@ -688,7 +689,21 @@ fn handle_device_reset(writer: ResponseWritable) {
 }
 
 /// Performs SubscribeDevice
-fn handle_device_subscribe(writer: ResponseWritable) {
+fn handle_device_subscribe(writer: ResponseWritable, subscribe_json: &str) {
+    // Check if the provided last_modified timestamp is prior to the current last_modified
+    let mut subscribe_device_request = SubscribeDeviceRequest::new();
+    if merge_from_str(&mut subscribe_device_request, subscribe_json).is_ok() {
+        let timestamp_proto = subscribe_device_request.last_modified;
+        let provided_last_modified =
+            Duration::new(timestamp_proto.seconds as u64, timestamp_proto.nanos as u32);
+        let current_last_modified = { get_devices().read().unwrap().last_modified };
+        if provided_last_modified < current_last_modified {
+            info!("Immediate return for SubscribeDevice");
+            handle_device_list(writer);
+            return;
+        }
+    }
+
     let event_rx = events::subscribe();
     // Timeout after 15 seconds with no event received
     match event_rx.recv_timeout(Duration::from_secs(15)) {
@@ -716,7 +731,9 @@ pub fn handle_device(request: &Request<Vec<u8>>, param: &str, writer: ResponseWr
                 handle_device_reset(writer);
             }
             "SUBSCRIBE" => {
-                handle_device_subscribe(writer);
+                let body = request.body();
+                let subscribe_json = String::from_utf8(body.to_vec()).unwrap();
+                handle_device_subscribe(writer, subscribe_json.as_str());
             }
             "PATCH" => {
                 let body = request.body();
