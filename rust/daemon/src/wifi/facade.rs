@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::medium;
+use super::packets::mac80211_hwsim::{HwsimAttr, HwsimMsg, HwsimMsgHdr};
+use super::packets::netlink::{NlAttrHdr, NlMsgHdr};
 use crate::ffi::ffi_wifi;
 use ::protobuf::MessageField;
+use log::{info, warn};
 use netsim_proto::config::WiFi;
 use netsim_proto::model::chip::Radio;
+
 use protobuf::Message;
 
 pub fn handle_wifi_request(facade_id: u32, packet: &Vec<u8>) {
@@ -47,6 +52,7 @@ pub fn wifi_add(device_id: u32) -> u32 {
 
 /// Starts the WiFi service.
 pub fn wifi_start(config: &MessageField<WiFi>) {
+    medium::test_parse_hwsim_cmd_frame();
     let proto_bytes = config.as_ref().unwrap_or_default().write_to_bytes().unwrap();
     ffi_wifi::wifi_start(&proto_bytes);
 }
@@ -54,4 +60,14 @@ pub fn wifi_start(config: &MessageField<WiFi>) {
 /// Stops the WiFi service.
 pub fn wifi_stop() {
     ffi_wifi::wifi_stop();
+}
+
+#[cfg(test)]
+mod tests {
+    use medium::*;
+
+    #[test]
+    fn test_netlink_attr() {
+        medium::test_parse_hwsim_cmd_frame();
+    }
 }
