@@ -62,3 +62,13 @@ pub fn test_parse_hwsim_cmd_frame() {
     ];
     parse_hwsim_cmd_frame(&packet);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_netlink_attr() {
+        test_parse_hwsim_cmd_frame();
+    }
+}
