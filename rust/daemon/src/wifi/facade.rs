@@ -24,6 +24,10 @@ use netsim_proto::model::chip::Radio;
 use protobuf::Message;
 
 pub fn handle_wifi_request(facade_id: u32, packet: &Vec<u8>) {
+    if crate::config::get_dev() {
+        info!("handle_wifi_request: packet {:?}", packet);
+        medium::parse_hwsim_cmd_frame(packet.as_slice());
+    }
     ffi_wifi::handle_wifi_request(facade_id, packet);
 }
 
@@ -52,7 +56,9 @@ pub fn wifi_add(device_id: u32) -> u32 {
 
 /// Starts the WiFi service.
 pub fn wifi_start(config: &MessageField<WiFi>) {
-    medium::test_parse_hwsim_cmd_frame();
+    if crate::config::get_dev() {
+        medium::test_parse_hwsim_cmd_frame();
+    }
     let proto_bytes = config.as_ref().unwrap_or_default().write_to_bytes().unwrap();
     ffi_wifi::wifi_start(&proto_bytes);
 }
@@ -60,14 +66,4 @@ pub fn wifi_start(config: &MessageField<WiFi>) {
 /// Stops the WiFi service.
 pub fn wifi_stop() {
     ffi_wifi::wifi_stop();
-}
-
-#[cfg(test)]
-mod tests {
-    use medium::*;
-
-    #[test]
-    fn test_netlink_attr() {
-        medium::test_parse_hwsim_cmd_frame();
-    }
 }
