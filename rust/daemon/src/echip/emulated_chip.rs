@@ -81,6 +81,11 @@ pub trait EmulatedChip {
     /// Frontend API
     fn patch(&self, chip: &ProtoChip);
 
+    /// Remove the emulated chip from the emulated chip library. No further calls will
+    /// be made on this emulated chip. This is called when the packet stream from
+    /// the virtual device closes.
+    fn remove(&self);
+
     /// Returns the kind of the emulated chip.
     fn get_kind(&self) -> ProtoChipKind;
 
@@ -104,13 +109,17 @@ pub fn get(chip_id: ChipIdentifier) -> Option<SharedEmulatedChip> {
 /// Remove and return SharedEmulatedchip from ECHIPS.
 /// Returns None if chip_id is non-existent key.
 pub fn remove(chip_id: ChipIdentifier) -> Option<SharedEmulatedChip> {
-    match ECHIPS.lock() {
+    let echip = match ECHIPS.lock() {
         Ok(mut echip) => echip.remove(&chip_id),
         Err(err) => {
             error!("{err:?}");
             None
         }
+    };
+    if echip.is_some() {
+        echip.clone().unwrap().remove();
     }
+    echip
 }
 
 /// This is called when the transport module receives a new packet stream
