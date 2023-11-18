@@ -16,6 +16,7 @@
 
 use crate::devices::devices_handler::get_radio_stats;
 use crate::events::Event;
+use crate::version::get_version;
 use anyhow::Context;
 use log::error;
 use log::info;
@@ -52,7 +53,7 @@ impl Session {
         Session {
             handle: None,
             info: Arc::new(RwLock::new(SessionInfo {
-                stats_proto: NetsimStats::new(),
+                stats_proto: NetsimStats { version: Some(get_version()), ..Default::default() },
                 current_device_count: 0,
                 session_start: Instant::now(),
             })),
