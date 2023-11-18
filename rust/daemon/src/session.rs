@@ -15,6 +15,7 @@
 //! A module to collect and write session stats
 
 use crate::events::Event;
+use crate::version::get_version;
 use anyhow::Context;
 use log::info;
 use netsim_common::system::netsimd_temp_dir;
@@ -47,7 +48,7 @@ impl Session {
         Session {
             handle: None,
             info: Arc::new(RwLock::new(SessionInfo {
-                stats_proto: NetsimStats::new(),
+                stats_proto: NetsimStats { version: Some(get_version()), ..Default::default() },
                 current_device_count: 0,
                 session_start: Instant::now(),
             })),
