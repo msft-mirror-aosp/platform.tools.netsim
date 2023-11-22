@@ -22,12 +22,14 @@
 // -- inactivity instant
 // -- vending device identifiers
 
+use super::chip;
 use super::chip::ChipIdentifier;
 use super::device::DeviceIdentifier;
 use super::id_factory::IdFactory;
 use crate::bluetooth as bluetooth_facade;
 use crate::devices::device::AddChipResult;
 use crate::devices::device::Device;
+use crate::echip;
 use crate::events;
 use crate::events::Event;
 use crate::ffi::ffi_response_writable::CxxServerResponseWriter;
@@ -46,10 +48,12 @@ use netsim_proto::frontend::CreateDeviceResponse;
 use netsim_proto::frontend::DeleteChipRequest;
 use netsim_proto::frontend::ListDeviceResponse;
 use netsim_proto::frontend::PatchDeviceRequest;
+use netsim_proto::frontend::SubscribeDeviceRequest;
 use netsim_proto::model::chip_create::Chip as ProtoBuiltin;
-use netsim_proto::model::ChipCreate;
 use netsim_proto::model::Position as ProtoPosition;
 use netsim_proto::model::Scene as ProtoScene;
+use netsim_proto::stats::NetsimRadioStats;
+use protobuf::well_known_types::timestamp::Timestamp;
 use protobuf::Message;
 use protobuf::MessageField;
 use protobuf_json_mapping::merge_from_str;
@@ -63,7 +67,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::RwLockWriteGuard;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 // The amount of seconds netsimd will wait until the first device has attached.
 static IDLE_SECS_FOR_SHUTDOWN: u64 = 15;
@@ -89,17 +93,19 @@ struct Devices {
     // BTreeMap allows ListDevice to output devices in order of identifiers.
     entries: BTreeMap<DeviceIdentifier, Device>,
     id_factory: IdFactory<DeviceIdentifier>,
+    last_modified: Duration,
 }
 
 impl Devices {
     fn new() -> Self {
-        Devices { entries: BTreeMap::new(), id_factory: IdFactory::new(INITIAL_DEVICE_ID, 1) }
+        Devices {
+            entries: BTreeMap::new(),
+            id_factory: IdFactory::new(INITIAL_DEVICE_ID, 1),
+            last_modified: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards"),
+        }
     }
-}
-
-#[allow(dead_code)]
-fn notify_all() {
-    // TODO
 }
 
 /// Returns a Result<AddChipResult, String> after adding chip to resource.
@@ -112,9 +118,10 @@ fn notify_all() {
 pub fn add_chip(
     device_guid: &str,
     device_name: &str,
-    chip_create_proto: &ChipCreate,
+    chip_create_params: &chip::CreateParams,
+    echip_create_params: &echip::CreateParam,
 ) -> Result<AddChipResult, String> {
-    let chip_kind = chip_create_proto.kind.enum_value_or(ProtoChipKind::UNSPECIFIED);
+    let chip_kind = chip_create_params.kind;
     let result = {
         let devices_arc = get_devices();
         let mut devices = devices_arc.write().unwrap();
@@ -124,58 +131,39 @@ pub fn add_chip(
             Some(device_name),
             chip_kind == ProtoChipKind::BLUETOOTH_BEACON,
         );
-
-        let chip_name = (chip_create_proto.name != String::default())
-            .then_some(chip_create_proto.name.as_str());
         // This is infrequent, so we can afford to do another lookup for the device.
         devices
             .entries
             .get_mut(&device_id)
             .ok_or(format!("Device not found for device_id: {device_id}"))?
-            .add_chip(
-                chip_kind,
-                &chip_create_proto.address,
-                chip_name,
-                &chip_create_proto.manufacturer,
-                &chip_create_proto.product_name,
-            )
+            .add_chip(chip_create_params)
     };
 
     // Device resource is no longer locked
     match result {
         // id_tuple = (DeviceIdentifier, ChipIdentifier)
         Ok((device_id, chip_id)) => {
-            let facade_id = match chip_kind {
-                ProtoChipKind::BLUETOOTH => bluetooth_facade::bluetooth_add(
-                    device_id,
-                    &chip_create_proto.address,
-                    &chip_create_proto.bt_properties,
-                ),
-                ProtoChipKind::BLUETOOTH_BEACON => bluetooth_facade::ble_beacon_add(
-                    device_id,
-                    String::from(device_name),
-                    chip_id,
-                    chip_create_proto,
-                )?,
-                ProtoChipKind::WIFI => wifi_facade::wifi_add(device_id),
-                _ => return Err(format!("Unknown chip kind: {:?}", chip_kind)),
-            };
-            // Add the facade_id into the resources
+            let emulated_chip = echip::new(echip_create_params, device_id, chip_id);
+            let facade_id = emulated_chip.get_facade_id();
+            // Lock Device Resource
             {
-                get_devices()
-                    .write()
-                    .unwrap()
+                let devices_arc = get_devices();
+                let mut devices = devices_arc.write().unwrap();
+
+                // Add the facade_id into the resources
+                devices
                     .entries
                     .get_mut(&device_id)
                     .ok_or(format!("Device not found for device_id: {device_id}"))?
                     .chips
                     .get_mut(&chip_id)
                     .ok_or(format!("Chip not found for device_id: {device_id}, chip_id:{chip_id}"))?
-                    .facade_id = Some(facade_id);
+                    .emulated_chip = Some(emulated_chip);
+
+                // Update last modified timestamp for devices
+                devices.last_modified =
+                    SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
             }
-            info!(
-                "Added Chip: device_name: {device_name}, chip_kind: {chip_kind:?}, device_id: {device_id}, chip_id: {chip_id}, facade_id: {facade_id}",
-            );
             // Update Capture resource
             events::publish(Event::ChipAdded {
                 chip_id,
@@ -234,24 +222,65 @@ pub fn add_chip_cxx(
     chip_product_name: &str,
     bt_properties: &CxxVector<u8>,
 ) -> Box<AddChipResultCxx> {
-    let chip_kind_proto = match chip_kind.to_string().as_str() {
-        "BLUETOOTH" => ProtoChipKind::BLUETOOTH,
-        "WIFI" => ProtoChipKind::WIFI,
-        "UWB" => ProtoChipKind::UWB,
-        _ => ProtoChipKind::UNSPECIFIED,
+    let bt_properties_proto = Controller::parse_from_bytes(bt_properties.as_slice());
+    #[cfg(not(test))]
+    let (chip_kind_enum, echip_create_param) = match chip_kind.to_string().as_str() {
+        "BLUETOOTH" => (
+            ProtoChipKind::BLUETOOTH,
+            echip::CreateParam::Bluetooth(echip::bluetooth::CreateParams {
+                address: chip_address.to_string(),
+                bt_properties: bt_properties_proto
+                    .as_ref()
+                    .map_or(None, |p| Some(MessageField::some(p.clone()))),
+            }),
+        ),
+        "WIFI" => (ProtoChipKind::WIFI, echip::CreateParam::Wifi(echip::wifi::CreateParams {})),
+        "UWB" => (ProtoChipKind::UWB, echip::CreateParam::Uwb),
+        _ => {
+            return Box::new(AddChipResultCxx {
+                device_id: u32::MAX,
+                chip_id: u32::MAX,
+                facade_id: u32::MAX,
+                is_error: true,
+            })
+        }
     };
-    let mut chip_create_proto = ChipCreate {
-        kind: chip_kind_proto.into(),
+    #[cfg(test)]
+    let (chip_kind_enum, echip_create_param) = match chip_kind.to_string().as_str() {
+        "BLUETOOTH" => (
+            ProtoChipKind::BLUETOOTH,
+            echip::CreateParam::Mock(echip::mocked::CreateParams {
+                chip_kind: ProtoChipKind::BLUETOOTH,
+            }),
+        ),
+        "WIFI" => (
+            ProtoChipKind::WIFI,
+            echip::CreateParam::Mock(echip::mocked::CreateParams {
+                chip_kind: ProtoChipKind::WIFI,
+            }),
+        ),
+        "UWB" => (
+            ProtoChipKind::UWB,
+            echip::CreateParam::Mock(echip::mocked::CreateParams { chip_kind: ProtoChipKind::UWB }),
+        ),
+        _ => {
+            return Box::new(AddChipResultCxx {
+                device_id: u32::MAX,
+                chip_id: u32::MAX,
+                facade_id: u32::MAX,
+                is_error: true,
+            })
+        }
+    };
+    let chip_create_params = chip::CreateParams {
+        kind: chip_kind_enum,
         address: chip_address.to_string(),
-        name: chip_name.to_string(),
+        name: if chip_name.is_empty() { None } else { Some(chip_name.to_string()) },
         manufacturer: chip_manufacturer.to_string(),
         product_name: chip_product_name.to_string(),
-        ..Default::default()
+        bt_properties: bt_properties_proto.ok(),
     };
-    if let Ok(bt_properties_proto) = Controller::parse_from_bytes(bt_properties.as_slice()) {
-        chip_create_proto.bt_properties = Some(bt_properties_proto).into();
-    }
-    match add_chip(device_guid, device_name, &chip_create_proto) {
+    match add_chip(device_guid, device_name, &chip_create_params, &echip_create_param) {
         Ok(result) => Box::new(AddChipResultCxx {
             device_id: result.device_id,
             chip_id: result.chip_id,
@@ -293,6 +322,9 @@ fn get_or_create_device(
         id,
         Device::new(id, String::from(guid.unwrap_or(&default)), String::from(name), builtin),
     );
+    // Update last modified timestamp for devices
+    devices.last_modified =
+        SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
     events::publish(Event::DeviceAdded { id, name: name.to_string(), builtin });
 
     (id, String::from(name))
@@ -309,6 +341,9 @@ fn remove_device(
     let name = device.name.clone();
     let builtin = device.builtin;
     guard.entries.remove(&id).ok_or(format!("Error removing device with id {id}"))?;
+    // Update last modified timestamp for devices
+    guard.last_modified =
+        SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
     // Publish DeviceRemoved Event
     events::publish(Event::DeviceRemoved { id, name, builtin });
     Ok(())
@@ -354,7 +389,7 @@ pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Resu
                         wifi_facade::wifi_remove(facade_id);
                     }
                     ProtoChipKind::BLUETOOTH_BEACON => {
-                        bluetooth_facade::ble_beacon_remove(device_id, chip_id, facade_id)?;
+                        bluetooth_facade::ble_beacon_remove(chip_id, facade_id)?;
                     }
                     _ => Err(format!("Unknown chip kind: {:?}", chip_kind))?,
                 },
@@ -363,6 +398,11 @@ pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Resu
                 ))?,
             }
             info!("Removed Chip: device_id: {device_id}, chip_id: {chip_id}");
+            {
+                // Update last modified timestamp for devices
+                get_devices().write().unwrap().last_modified =
+                    SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
+            }
             events::publish(Event::ChipRemoved {
                 chip_id,
                 device_id,
@@ -444,10 +484,25 @@ pub fn create_device(create_json: &str) -> Result<DeviceIdentifier, String> {
 
     // Release devices lock so that add_chip can take it.
     drop(devices);
-    new_device
-        .chips
-        .iter()
-        .try_for_each(|chip| add_chip(&device_name, &device_name, chip).map(|_| ()))?;
+    new_device.chips.iter().try_for_each(|chip| {
+        {
+            let chip_create_params = chip::CreateParams {
+                kind: chip.kind.enum_value_or_default(),
+                address: chip.address.clone(),
+                name: if chip.name.is_empty() { None } else { Some(chip.name.to_string()) },
+                manufacturer: chip.manufacturer.clone(),
+                product_name: chip.product_name.clone(),
+                bt_properties: chip.bt_properties.as_ref().cloned(),
+            };
+            let echip_create_params =
+                echip::CreateParam::BleBeacon(echip::ble_beacon::CreateParams {
+                    device_name: device_name.clone(),
+                    chip_proto: chip.clone(),
+                });
+            add_chip(&device_name, &device_name, &chip_create_params, &echip_create_params)
+        }
+        .map(|_| ())
+    })?;
 
     Ok(device_id)
 }
@@ -464,9 +519,15 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
             Some(id) => match devices.entries.get_mut(&id) {
                 Some(device) => {
                     let result = device.patch(&proto_device);
+                    let name = device.name.clone();
                     if result.is_ok() {
+                        // Update last modified timestamp for devices
+                        devices.last_modified = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("Time went backwards");
+
                         // Publish Device Patched event
-                        events::publish(Event::DevicePatched { id, name: device.name.clone() });
+                        events::publish(Event::DevicePatched { id, name });
                     }
                     result
                 }
@@ -479,12 +540,16 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
                     if device.name.contains(&proto_device.name) {
                         if device.name == proto_device.name {
                             let result = device.patch(&proto_device);
+                            let id = device.id;
+                            let name = device.name.clone();
                             if result.is_ok() {
+                                // Update last modified timestamp for devices
+                                devices.last_modified = SystemTime::now()
+                                    .duration_since(UNIX_EPOCH)
+                                    .expect("Time went backwards");
+
                                 // Publish Device Patched event
-                                events::publish(Event::DevicePatched {
-                                    id: device.id,
-                                    name: device.name.clone(),
-                                });
+                                events::publish(Event::DevicePatched { id, name });
                             }
                             return result;
                         }
@@ -501,12 +566,16 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
                 match target {
                     Some(device) => {
                         let result = device.patch(&proto_device);
+                        let id = device.id;
+                        let name = device.name.clone();
                         if result.is_ok() {
+                            // Update last modified timestamp for devices
+                            devices.last_modified = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .expect("Time went backwards");
+
                             // Publish Device Patched event
-                            events::publish(Event::DevicePatched {
-                                id: device.id,
-                                name: device.name.clone(),
-                            });
+                            events::publish(Event::DevicePatched { id, name });
                         }
                         result
                     }
@@ -567,11 +636,14 @@ pub fn get_devices_proto() -> Result<ProtoScene, String> {
 fn reset_all() -> Result<(), String> {
     let devices_arc = get_devices();
     let mut devices = devices_arc.write().unwrap();
+    // Perform reset for all devices
     for device in devices.entries.values_mut() {
         device.reset()?;
-        // Publish Device Patched event
-        events::publish(Event::DevicePatched { id: device.id, name: device.name.clone() });
     }
+    // Update last modified timestamp for devices
+    devices.last_modified =
+        SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
+    events::publish(Event::DeviceReset);
     Ok(())
 }
 
@@ -616,8 +688,18 @@ fn handle_device_list(writer: ResponseWritable) {
     // Instantiate ListDeviceResponse and add Devices
     let mut response = ListDeviceResponse::new();
     for device in devices.entries.values() {
-        response.devices.push(device.get().unwrap());
+        if let Ok(device_proto) = device.get() {
+            response.devices.push(device_proto);
+        }
     }
+
+    // Add Last Modified Timestamp into ListDeviceResponse
+    response.last_modified = Some(Timestamp {
+        seconds: devices.last_modified.as_secs() as i64,
+        nanos: devices.last_modified.subsec_nanos() as i32,
+        ..Default::default()
+    })
+    .into();
 
     // Perform protobuf-json-mapping with the given protobuf
     if let Ok(json_response) = print_to_string_with_options(&response, &JSON_PRINT_OPTION) {
@@ -636,13 +718,30 @@ fn handle_device_reset(writer: ResponseWritable) {
 }
 
 /// Performs SubscribeDevice
-fn handle_device_subscribe(writer: ResponseWritable) {
+fn handle_device_subscribe(writer: ResponseWritable, subscribe_json: &str) {
+    // Check if the provided last_modified timestamp is prior to the current last_modified
+    let mut subscribe_device_request = SubscribeDeviceRequest::new();
+    if merge_from_str(&mut subscribe_device_request, subscribe_json).is_ok() {
+        let timestamp_proto = subscribe_device_request.last_modified;
+        let provided_last_modified =
+            Duration::new(timestamp_proto.seconds as u64, timestamp_proto.nanos as u32);
+        let current_last_modified = { get_devices().read().unwrap().last_modified };
+        if provided_last_modified < current_last_modified {
+            info!("Immediate return for SubscribeDevice");
+            handle_device_list(writer);
+            return;
+        }
+    }
+
     let event_rx = events::subscribe();
     // Timeout after 15 seconds with no event received
     match event_rx.recv_timeout(Duration::from_secs(15)) {
-        Ok(Event::ChipAdded { .. })
+        Ok(Event::DeviceAdded { .. })
+        | Ok(Event::DeviceRemoved { .. })
+        | Ok(Event::ChipAdded { .. })
         | Ok(Event::ChipRemoved { .. })
-        | Ok(Event::DevicePatched { .. }) => handle_device_list(writer),
+        | Ok(Event::DevicePatched { .. })
+        | Ok(Event::DeviceReset) => handle_device_list(writer),
         Err(err) => writer.put_error(404, format!("{err:?}").as_str()),
         _ => writer.put_error(404, "disconnecting due to unrelated event"),
     }
@@ -661,7 +760,9 @@ pub fn handle_device(request: &Request<Vec<u8>>, param: &str, writer: ResponseWr
                 handle_device_reset(writer);
             }
             "SUBSCRIBE" => {
-                handle_device_subscribe(writer);
+                let body = request.body();
+                let subscribe_json = String::from_utf8(body.to_vec()).unwrap();
+                handle_device_subscribe(writer, subscribe_json.as_str());
             }
             "PATCH" => {
                 let body = request.body();
@@ -736,7 +837,7 @@ pub fn get_facade_id(chip_id: u32) -> Result<u32, String> {
     for device in devices.entries.values() {
         for (id, chip) in &device.chips {
             if *id == chip_id {
-                return chip.facade_id.ok_or(format!(
+                return chip.emulated_chip.as_ref().map(|c| c.get_facade_id()).ok_or(format!(
                     "Facade Id hasn't been added yet to frontend resource for chip_id: {chip_id}"
                 ));
             }
@@ -808,6 +909,23 @@ pub fn wait_devices(events_rx: Receiver<Event>) {
         });
 }
 
+/// Return vector containing current radio chip stats from all devices
+pub fn get_radio_stats() -> Vec<NetsimRadioStats> {
+    let mut result: Vec<NetsimRadioStats> = Vec::new();
+    // TODO: b/309805437 - optimize logic using get_stats for EmulatedChip
+    let binding = get_devices();
+    let devices = &binding.read().unwrap().entries;
+    for (device_id, device) in devices {
+        for chip in device.chips.values() {
+            for mut radio_stats in chip.get_stats() {
+                radio_stats.set_device_id(*device_id);
+                result.push(radio_stats);
+            }
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use crate::events;
@@ -845,14 +963,22 @@ mod tests {
 
     impl TestChipParameters {
         fn add_chip(&self) -> Result<AddChipResult, String> {
-            let chip_create_proto = ChipCreate {
-                kind: self.chip_kind.into(),
-                name: self.chip_name.to_string(),
-                manufacturer: self.chip_manufacturer.to_string(),
-                product_name: self.chip_product_name.to_string(),
-                ..Default::default()
+            let chip_create_params = chip::CreateParams {
+                kind: self.chip_kind,
+                address: "".to_string(),
+                name: Some(self.chip_name.clone()),
+                manufacturer: self.chip_manufacturer.clone(),
+                product_name: self.chip_product_name.clone(),
+                bt_properties: None,
             };
-            super::add_chip(&self.device_guid, &self.device_name, &chip_create_proto)
+            let echip_create_params =
+                echip::CreateParam::Mock(echip::mocked::CreateParams { chip_kind: self.chip_kind });
+            super::add_chip(
+                &self.device_guid,
+                &self.device_name,
+                &chip_create_params,
+                &echip_create_params,
+            )
         }
 
         fn get_or_create_device(&self) -> DeviceIdentifier {
@@ -1256,7 +1382,7 @@ mod tests {
     };
     use netsim_proto::model::chip_create::{BleBeaconCreate, Chip as BuiltChipProto};
     use netsim_proto::model::Chip as ChipProto;
-    use netsim_proto::model::ChipCreate;
+    use netsim_proto::model::ChipCreate as ProtoChipCreate;
     use netsim_proto::model::Device as DeviceProto;
     use protobuf::{EnumOrUnknown, MessageField};
 
@@ -1267,7 +1393,7 @@ mod tests {
             ..Default::default()
         };
 
-        let chip_proto = ChipCreate {
+        let chip_proto = ProtoChipCreate {
             name: String::from("test-beacon-chip"),
             kind: ProtoChipKind::BLUETOOTH_BEACON.into(),
             chip: Some(BuiltChipProto::BleBeacon(beacon_proto)),
@@ -1333,7 +1459,7 @@ mod tests {
 
         let request = CreateDeviceRequest {
             device: MessageField::some(ProtoDeviceCreate {
-                chips: vec![ChipCreate::default()],
+                chips: vec![ProtoChipCreate::default()],
                 ..Default::default()
             }),
             ..Default::default()

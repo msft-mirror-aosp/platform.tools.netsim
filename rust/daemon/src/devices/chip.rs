@@ -19,11 +19,13 @@
 ///
 use crate::bluetooth as bluetooth_facade;
 use crate::devices::id_factory::IdFactory;
+use crate::echip::SharedEmulatedChip;
 use crate::wifi as wifi_facade;
 use lazy_static::lazy_static;
 use log::info;
 use log::warn;
 use netsim_proto::common::ChipKind as ProtoChipKind;
+use netsim_proto::configuration::Controller as ProtoController;
 use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 use protobuf::EnumOrUnknown;
@@ -41,9 +43,20 @@ lazy_static! {
         RwLock::new(IdFactory::new(INITIAL_CHIP_ID, 1));
 }
 
+pub struct CreateParams {
+    pub kind: ProtoChipKind,
+    pub address: String,
+    pub name: Option<String>,
+    pub manufacturer: String,
+    pub product_name: String,
+    pub bt_properties: Option<ProtoController>, // TODO: move to echip CreateParams
+}
+
+/// Chip contains the common information for each Chip/Controller.
+/// Radio-specific information is contained in the emulated_chip.
 pub struct Chip {
     pub id: ChipIdentifier,
-    pub facade_id: Option<FacadeIdentifier>,
+    pub emulated_chip: Option<SharedEmulatedChip>,
     pub kind: ProtoChipKind,
     pub address: String,
     pub name: String,
@@ -56,26 +69,21 @@ pub struct Chip {
 }
 
 impl Chip {
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        id: ChipIdentifier,
-        facade_id: Option<FacadeIdentifier>,
-        kind: ProtoChipKind,
-        address: &str,
-        name: &str,
-        device_name: &str,
-        manufacturer: &str,
-        product_name: &str,
-    ) -> Self {
+    // Use an Option here so that the Chip can be created and
+    // inserted into the Device prior to creation of the echip.
+    // Any Chip with an emulated_chip == None is temporary.
+    // Creating the echip first required holding a Chip+Device lock through
+    // initialization which caused a deadlock under certain (rare) conditions.
+    fn new(id: ChipIdentifier, device_name: &str, create_params: &CreateParams) -> Self {
         Self {
             id,
-            facade_id,
-            kind,
-            address: address.to_string(),
-            name: name.to_string(),
+            emulated_chip: None,
+            kind: create_params.kind,
+            address: create_params.address.clone(),
+            name: create_params.name.clone().unwrap_or(format!("chip-{id}")),
             device_name: device_name.to_string(),
-            manufacturer: manufacturer.to_string(),
-            product_name: product_name.to_string(),
+            manufacturer: create_params.manufacturer.clone(),
+            product_name: create_params.product_name.clone(),
             start: Instant::now(),
         }
     }
@@ -89,22 +97,23 @@ impl Chip {
         let mut vec = Vec::<ProtoRadioStats>::new();
         let mut stats = ProtoRadioStats::new();
         stats.set_duration_secs(self.start.elapsed().as_secs());
-        if let Some(facade_id) = self.facade_id {
+        // TODO(b/309805437): Implement EmulatedChip.get_stats and replace this block
+        if let Some(facade_id) = self.emulated_chip.as_ref().map(|c| c.get_facade_id()) {
             match self.kind {
                 ProtoChipKind::BLUETOOTH => {
                     let bt = bluetooth_facade::bluetooth_get(facade_id);
-                    stats.set_kind(netsim_radio_stats::Kind::BT_LE);
+                    stats.set_kind(netsim_radio_stats::Kind::BLUETOOTH_LOW_ENERGY);
                     stats.set_tx_count(bt.low_energy.tx_count);
                     stats.set_rx_count(bt.low_energy.rx_count);
                     vec.push(stats);
                     stats = ProtoRadioStats::new();
                     stats.set_duration_secs(self.start.elapsed().as_secs());
-                    stats.set_kind(netsim_radio_stats::Kind::BT_CLASSIC);
+                    stats.set_kind(netsim_radio_stats::Kind::BLUETOOTH_CLASSIC);
                     stats.set_tx_count(bt.classic.tx_count);
                     stats.set_rx_count(bt.classic.rx_count);
                 }
                 ProtoChipKind::BLUETOOTH_BEACON => {
-                    stats.set_kind(netsim_radio_stats::Kind::BT_LE_BEACON);
+                    stats.set_kind(netsim_radio_stats::Kind::BLE_BEACON);
                     if let Ok(beacon) = bluetooth_facade::ble_beacon_get(self.id, facade_id) {
                         stats.set_tx_count(beacon.bt.low_energy.tx_count);
                         stats.set_rx_count(beacon.bt.low_energy.rx_count);
@@ -131,33 +140,17 @@ impl Chip {
 
     /// Create the model protobuf
     pub fn get(&self) -> Result<ProtoChip, String> {
-        let mut chip = ProtoChip::new();
-        chip.kind = EnumOrUnknown::new(self.kind);
-        chip.id = self.id;
-        chip.name = self.name.clone();
-        chip.manufacturer = self.manufacturer.clone();
-        chip.product_name = self.product_name.clone();
-        match (chip.kind.enum_value(), self.facade_id) {
-            (Ok(ProtoChipKind::BLUETOOTH), Some(facade_id)) => {
-                chip.set_bt(bluetooth_facade::bluetooth_get(facade_id));
-            }
-            (Ok(ProtoChipKind::BLUETOOTH_BEACON), Some(facade_id)) => {
-                chip.set_ble_beacon(bluetooth_facade::ble_beacon_get(self.id, facade_id)?);
-            }
-            (Ok(ProtoChipKind::WIFI), Some(facade_id)) => {
-                chip.set_wifi(wifi_facade::wifi_get(facade_id));
-            }
-            (_, None) => {
-                return Err(format!(
-                    "Facade Id hasn't been added yet to frontend resource for chip_id: {}",
-                    self.id
-                ));
-            }
-            _ => {
-                return Err(format!("Unknown chip kind: {:?}", chip.kind));
-            }
-        }
-        Ok(chip)
+        let mut proto_chip = self
+            .emulated_chip
+            .as_ref()
+            .map(|c| c.get())
+            .ok_or(format!("EmulatedChip hasn't been instantiated yet for chip_id {}", self.id))?;
+        proto_chip.kind = EnumOrUnknown::new(self.kind);
+        proto_chip.id = self.id;
+        proto_chip.name = self.name.clone();
+        proto_chip.manufacturer = self.manufacturer.clone();
+        proto_chip.product_name = self.product_name.clone();
+        Ok(proto_chip)
     }
 
     /// Patch processing for the chip. Validate and move state from the patch
@@ -169,70 +162,22 @@ impl Chip {
         if !patch.product_name.is_empty() {
             self.product_name = patch.product_name.clone();
         }
-        match self.facade_id {
-            Some(facade_id) => {
-                // Check both ChipKind and RadioKind fields, they should be consistent
-                if self.kind == ProtoChipKind::BLUETOOTH && patch.has_bt() {
-                    bluetooth_facade::bluetooth_patch(facade_id, patch.bt());
-                    Ok(())
-                } else if self.kind == ProtoChipKind::BLUETOOTH_BEACON
-                    && patch.has_ble_beacon()
-                    && patch.ble_beacon().bt.is_some()
-                {
-                    bluetooth_facade::ble_beacon_patch(facade_id, self.id, patch.ble_beacon())?;
-                    Ok(())
-                } else if self.kind == ProtoChipKind::WIFI && patch.has_wifi() {
-                    wifi_facade::wifi_patch(facade_id, patch.wifi());
-                    Ok(())
-                } else {
-                    Err(format!("Unknown chip kind or missing radio: {:?}", self.kind))
-                }
-            }
-            None => Err(format!(
-                "Facade Id hasn't been added yet to frontend resource for chip_id: {}",
-                self.id
-            )),
-        }
+        self.emulated_chip
+            .as_ref()
+            .map(|c| c.patch(patch))
+            .ok_or(format!("EmulatedChip hasn't been instantiated yet for chip_id {}", self.id))
     }
 
     pub fn reset(&mut self) -> Result<(), String> {
-        match (self.kind, self.facade_id) {
-            (ProtoChipKind::BLUETOOTH, Some(facade_id)) => {
-                bluetooth_facade::bluetooth_reset(facade_id);
-                Ok(())
-            }
-            (ProtoChipKind::WIFI, Some(facade_id)) => {
-                wifi_facade::wifi_reset(facade_id);
-                Ok(())
-            }
-            (_, None) => Err(format!(
-                "Facade Id hasn't been added yet to frontend resource for chip_id: {}",
-                self.id
-            )),
-            _ => Err(format!("Unknown chip kind: {:?}", self.kind)),
-        }
+        self.emulated_chip
+            .as_ref()
+            .map(|c| c.reset())
+            .ok_or(format!("EmulatedChip hasn't been instantiated yet for chip_id {}", self.id))
     }
 }
 
 /// Allocates a new chip with a facade_id.
-pub fn chip_new(
-    chip_kind: ProtoChipKind,
-    chip_address: &str,
-    chip_name: Option<&str>,
-    device_name: &str,
-    chip_manufacturer: &str,
-    chip_product_name: &str,
-) -> Result<Chip, String> {
+pub fn chip_new(device_name: &str, create_params: &CreateParams) -> Result<Chip, String> {
     let id = IDS.write().unwrap().next_id();
-
-    Ok(Chip::new(
-        id,
-        None,
-        chip_kind,
-        chip_address,
-        chip_name.unwrap_or(&format!("chip-{id}")),
-        device_name,
-        chip_manufacturer,
-        chip_product_name,
-    ))
+    Ok(Chip::new(id, device_name, create_params))
 }

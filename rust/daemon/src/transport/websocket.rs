@@ -18,9 +18,10 @@ use std::{collections::HashMap, io::Cursor, net::TcpStream};
 use http::Request;
 use log::{error, info, warn};
 use netsim_proto::common::ChipKind;
-use netsim_proto::model::ChipCreate;
 use tungstenite::{protocol::Role, Message, WebSocket};
 
+use crate::devices::chip;
+use crate::echip;
 use crate::http_server::server_response::ResponseWritable;
 use crate::{
     devices::devices_handler::{add_chip, remove_chip},
@@ -89,21 +90,30 @@ impl Response for WebSocketTransport {
 
 /// Run websocket transport for packet flow in netsim
 pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) {
-    let chip_create_proto = ChipCreate {
-        kind: ChipKind::BLUETOOTH.into(),
+    let chip_create_params = chip::CreateParams {
+        kind: ChipKind::BLUETOOTH,
         address: queries.get("address").unwrap_or(&"").to_string(),
-        name: format!("websocket-{}", stream.peer_addr().unwrap()),
+        name: Some(format!("websocket-{}", stream.peer_addr().unwrap())),
         manufacturer: "Google".to_string(),
         product_name: "Google".to_string(),
-        ..Default::default()
+        bt_properties: None,
     };
+    #[cfg(not(test))]
+    let echip_create_params = echip::CreateParam::Bluetooth(echip::bluetooth::CreateParams {
+        address: chip_create_params.address.clone(),
+        bt_properties: None,
+    });
+    #[cfg(test)]
+    let echip_create_params =
+        echip::CreateParam::Mock(echip::mocked::CreateParams { chip_kind: ChipKind::BLUETOOTH });
     // Add Chip
     let result = match add_chip(
         &stream.peer_addr().unwrap().port().to_string(),
         queries
             .get("name")
             .unwrap_or(&format!("websocket-device-{}", stream.peer_addr().unwrap()).as_str()),
-        &chip_create_proto,
+        &chip_create_params,
+        &echip_create_params,
     ) {
         Ok(chip_result) => chip_result,
         Err(err) => {

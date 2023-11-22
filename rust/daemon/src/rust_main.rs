@@ -85,6 +85,12 @@ fn get_netsimd_args(argc: c_int, argv: *const *const c_char) -> NetsimdArgs {
 }
 
 fn run_netsimd_with_args(args: NetsimdArgs) {
+    // Log version and terminate netsimd
+    if args.version {
+        println!("Netsimd Version: {}", get_version());
+        return;
+    }
+
     // Log where netsim artifacts are located
     info!("netsim artifacts path: {}", netsimd_temp_dir().display());
 
@@ -136,13 +142,15 @@ fn run_netsimd_connector(args: NetsimdArgs, instance: u16) {
 }
 
 // loop until ShutDown event is received, then log and return.
-fn main_loop(events_rx: Receiver<Event>) {
+fn main_loop(events_rx: Receiver<Event>, no_shutdown_flag: bool) {
     loop {
         // events_rx.recv() will wait until the event is received.
         // TODO(b/305536480): Remove built-in devices during shutdown.
         if let Ok(Event::ShutDown { reason }) = events_rx.recv() {
             info!("Netsim is shutdown: {reason}");
-            return;
+            if !no_shutdown_flag {
+                return;
+            }
         }
     }
 }
@@ -228,13 +236,10 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     service.run();
 
     // Runs a synchronous main loop
-    main_loop(main_events_rx);
+    main_loop(main_events_rx, args.no_shutdown.unwrap_or(false));
 
     // Gracefully shutdown netsimd services
     service.shut_down();
-
-    // Once shutdown is complete, delete the netsim ini file
-    remove_netsim_ini(instance_num);
 
     // write out session stats
     let _ = session.stop();
@@ -243,4 +248,7 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     if let Err(err) = zip_artifacts() {
         error!("Failed to zip artifacts: {err:?}");
     }
+
+    // Once shutdown is complete, delete the netsim ini file
+    remove_netsim_ini(instance_num);
 }

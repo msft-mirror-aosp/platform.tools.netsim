@@ -112,14 +112,15 @@ pub fn ble_beacon_add(
     let facade_id = resource.current_id;
     resource.current_id += 1;
 
+    info!("ble_beacon_add successful with chip_id: {chip_id}");
     Ok(facade_id)
 }
 
 pub fn ble_beacon_remove(
-    device_id: DeviceIdentifier,
     chip_id: ChipIdentifier,
     facade_id: FacadeIdentifier,
 ) -> Result<(), String> {
+    info!("{:?}", BEACON_CHIPS.read().unwrap().keys());
     if BEACON_CHIPS.write().unwrap().remove(&chip_id).is_none() {
         Err(format!("failed to delete ble beacon chip: chip with id {chip_id} does not exist"))
     } else {

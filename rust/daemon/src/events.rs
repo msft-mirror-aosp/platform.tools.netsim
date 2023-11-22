@@ -53,6 +53,7 @@ pub enum Event {
         id: DeviceIdentifier,
         name: String,
     },
+    DeviceReset,
     ChipAdded {
         chip_id: ChipIdentifier,
         chip_kind: ChipKind,
@@ -116,6 +117,7 @@ impl Events {
         } else {
             // Any channel with a disconnected receiver will return an
             // error and be removed by retain.
+            log::info!("{msg:?}");
             self.subscribers.retain(|subscriber| subscriber.send(msg.clone()).is_ok())
         }
     }

@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Version library.
+pub mod ble_beacon;
+pub mod bluetooth;
+pub mod emulated_chip;
+pub mod mocked;
+pub mod wifi;
 
-pub const VERSION: &str = "0.2.0";
+pub use crate::echip::emulated_chip::new;
+pub use crate::echip::emulated_chip::CreateParam;
+pub use crate::echip::emulated_chip::EmulatedChip;
+use std::sync::Arc;
 
-pub fn get_version() -> String {
-    VERSION.to_owned()
-}
+pub type SharedEmulatedChip = Arc<Box<dyn EmulatedChip + Send + Sync>>;

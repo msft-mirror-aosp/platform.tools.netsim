@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Version library.
+/// FrameInfo stores mac80211 hwsim attributes once parsed
 
-pub const VERSION: &str = "0.2.0";
-
-pub fn get_version() -> String {
-    VERSION.to_owned()
+pub struct FrameInfo {
+    cookie: u64,
+    flags: u32,
+    channel: u32,
+    // tx_rates
+    transmitter: [u8; 6],
 }

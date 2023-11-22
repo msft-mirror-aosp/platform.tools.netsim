@@ -14,11 +14,12 @@
 
 use super::dispatcher::{handle_request, register_transport, unregister_transport, Response};
 use super::h4::PacketError;
+use crate::devices::chip;
 use crate::devices::devices_handler::{add_chip, remove_chip};
+use crate::echip;
 use crate::transport::h4;
 use log::{error, info, warn};
 use netsim_proto::common::ChipKind;
-use netsim_proto::model::ChipCreate;
 use std::io::{ErrorKind, Write};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
 use std::thread;
@@ -79,18 +80,27 @@ fn accept_incoming(hci_port: u16) -> std::io::Result<()> {
 
 fn handle_hci_client(stream: TcpStream) {
     // ...
-    let chip_create_proto = ChipCreate {
-        kind: ChipKind::BLUETOOTH.into(),
+    let chip_create_params = chip::CreateParams {
+        kind: ChipKind::BLUETOOTH,
         address: String::new(),
-        name: format!("socket-{}", stream.peer_addr().unwrap()),
+        name: Some(format!("socket-{}", stream.peer_addr().unwrap())),
         manufacturer: "Google".to_string(),
         product_name: "Google".to_string(),
-        ..Default::default()
+        bt_properties: None,
     };
+    #[cfg(not(test))]
+    let echip_create_params = echip::CreateParam::Bluetooth(echip::bluetooth::CreateParams {
+        address: String::new(),
+        bt_properties: None,
+    });
+    #[cfg(test)]
+    let echip_create_params =
+        echip::CreateParam::Mock(echip::mocked::CreateParams { chip_kind: ChipKind::BLUETOOTH });
     let result = match add_chip(
         &stream.peer_addr().unwrap().port().to_string(),
         &format!("socket-{}", stream.peer_addr().unwrap()),
-        &chip_create_proto,
+        &chip_create_params,
+        &echip_create_params,
     ) {
         Ok(chip_result) => chip_result,
         Err(err) => {
