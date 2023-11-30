@@ -34,13 +34,13 @@ endif()
 
 add_subdirectory(proto)
 add_subdirectory(src)
-add_subdirectory(ui)
+# add_subdirectory(ui)
 
 if(TARGET Rust::Rustc)
-  android_add_executable(
-    TARGET netsim LICENSE Apache-2.0 INSTALL . SRC rust/netsim.cc
-    DEPS frontend-client grpc++ netsim-cli-proto-lib netsim-cli-rust-lib
-         protobuf::libprotobuf util-lib)
+  # android_add_executable(
+  #   TARGET netsim LICENSE Apache-2.0 INSTALL . SRC rust/netsim.cc
+  #   DEPS frontend-client grpc++ netsim-cli-proto-lib netsim-cli-rust-lib
+  #        protobuf::libprotobuf util-lib)
 
   android_add_executable(
     TARGET netsimd
@@ -83,7 +83,7 @@ if(TARGET Rust::Rustc)
 
   # Link NtDll to netsim executables.
   if(WIN32)
-    target_link_libraries(netsim PRIVATE ntdll)
+    # target_link_libraries(netsim PRIVATE ntdll)
     target_link_libraries(netsimd PRIVATE ntdll)
     target_link_libraries(netsim-test PRIVATE ntdll)
     android_license(TARGET "ntdll" LIBNAME None SPDX None LICENSE None
