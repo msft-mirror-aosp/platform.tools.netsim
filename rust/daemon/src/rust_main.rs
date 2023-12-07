@@ -223,9 +223,12 @@ fn run_netsimd_primary(args: NetsimdArgs) {
     echip::bluetooth::bluetooth_start(&config.bluetooth, instance_num, args.disable_address_reuse);
     echip::wifi::wifi_start(&config.wifi);
 
+    // Maybe create test beacons, default true for cuttlefish
+    // TODO: remove default for cuttlefish by adding flag to tests
     if match (args.test_beacons, args.no_test_beacons) {
-        (false, _) => false,
         (true, false) => true,
+        (false, true) => false,
+        (false, false) => cfg!(feature = "cuttlefish"),
         (true, true) => panic!("unexpected flag combination"),
     } {
         new_test_beacon(1, 1000);
