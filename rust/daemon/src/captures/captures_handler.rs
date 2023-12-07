@@ -250,11 +250,8 @@ fn handle_packet(
             let packet_buf = match int_to_chip_kind(kind) {
                 ChipKind::BLUETOOTH => wrap_bt_packet(direction, packet_type, packet),
                 ChipKind::WIFI => match radiotap::into_pcap(packet) {
-                    Ok(buffer) => buffer,
-                    Err(e) => {
-                        warn!("Invalid WiFi pcacket for capture {:?}", e);
-                        return;
-                    }
+                    Some(buffer) => buffer,
+                    None => return,
                 },
                 _ => {
                     warn!("Unknown capture type");
