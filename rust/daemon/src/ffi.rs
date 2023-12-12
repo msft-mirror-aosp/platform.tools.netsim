@@ -223,7 +223,7 @@ pub mod ffi_bluetooth {
 
         #[rust_name = bluetooth_start]
         #[namespace = "netsim::hci::facade"]
-        pub fn Start(proto_bytes: &[u8], instance_num: u16, disable_address_reuse: bool);
+        pub fn Start(proto_bytes: &[u8], instance_num: u16);
 
         #[rust_name = bluetooth_stop]
         #[namespace = "netsim::hci::facade"]
