@@ -17,7 +17,8 @@ use crate::echip::{EmulatedChip, SharedEmulatedChip};
 
 use netsim_proto::common::ChipKind as ProtoChipKind;
 use netsim_proto::model::Chip as ProtoChip;
-use netsim_proto::stats::NetsimRadioStats as ProtoRadioStats;
+use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
+use protobuf::EnumOrUnknown;
 
 use std::sync::{Arc, Mutex};
 
@@ -37,7 +38,9 @@ impl EmulatedChip for Mock {
     fn reset(&mut self) {}
 
     fn get(&self) -> ProtoChip {
-        ProtoChip::new()
+        let mut proto_chip = ProtoChip::new();
+        proto_chip.kind = EnumOrUnknown::new(self.chip_kind);
+        proto_chip
     }
 
     fn patch(&mut self, chip: &ProtoChip) {}
@@ -45,7 +48,15 @@ impl EmulatedChip for Mock {
     fn remove(&mut self) {}
 
     fn get_stats(&self, duration_secs: u64) -> Vec<ProtoRadioStats> {
-        vec![ProtoRadioStats::new()]
+        let mut stats = ProtoRadioStats::new();
+        stats.kind = Some(EnumOrUnknown::new(match self.chip_kind {
+            ProtoChipKind::UNSPECIFIED => netsim_radio_stats::Kind::UNSPECIFIED,
+            ProtoChipKind::BLUETOOTH => netsim_radio_stats::Kind::BLUETOOTH_LOW_ENERGY,
+            ProtoChipKind::WIFI => netsim_radio_stats::Kind::WIFI,
+            ProtoChipKind::UWB => netsim_radio_stats::Kind::UWB,
+            ProtoChipKind::BLUETOOTH_BEACON => netsim_radio_stats::Kind::BLE_BEACON,
+        }));
+        vec![stats]
     }
 
     fn get_kind(&self) -> ProtoChipKind {
