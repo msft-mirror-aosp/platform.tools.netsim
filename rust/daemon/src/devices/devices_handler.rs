@@ -144,7 +144,7 @@ pub fn add_chip(
     match result {
         // id_tuple = (DeviceIdentifier, ChipIdentifier)
         Ok((device_id, chip_id)) => {
-            let emulated_chip = echip::new(echip_create_params, device_id, chip_id);
+            let emulated_chip = echip::new(echip_create_params, chip_id);
             // Lock Device Resource
             {
                 let devices_arc = get_devices();
@@ -562,17 +562,23 @@ fn distance(a: &ProtoPosition, b: &ProtoPosition) -> f32 {
 }
 
 #[allow(dead_code)]
-fn get_distance(id: DeviceIdentifier, other_id: DeviceIdentifier) -> Result<f32, String> {
+fn get_distance(id: ChipIdentifier, other_id: ChipIdentifier) -> Result<f32, String> {
+    let device_id = crate::devices::chip::get(id)
+        .or(Err(format!("No such device with chip_id {id}")))?
+        .device_id;
+    let other_device_id = crate::devices::chip::get(other_id)
+        .or(Err(format!("No such device with chip_id {other_id}")))?
+        .device_id;
     let devices_arc = get_devices();
     let devices = devices_arc.read().unwrap();
     let a = devices
         .entries
-        .get(&id)
+        .get(&device_id)
         .map(|device_ref| device_ref.position.clone())
         .ok_or(format!("No such device with id {id}"))?;
     let b = devices
         .entries
-        .get(&other_id)
+        .get(&other_device_id)
         .map(|device_ref| device_ref.position.clone())
         .ok_or(format!("No such device with id {other_id}"))?;
     Ok(distance(&a, &b))
