@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::devices::device::DeviceIdentifier;
+use crate::devices::chip::ChipIdentifier;
 use crate::echip::{EmulatedChip, SharedEmulatedChip};
 
 use netsim_proto::common::ChipKind as ProtoChipKind;
@@ -54,6 +54,6 @@ impl EmulatedChip for Mock {
 }
 
 /// Create a new MockedChip
-pub fn new(create_params: &CreateParams, device_id: DeviceIdentifier) -> SharedEmulatedChip {
+pub fn new(create_params: &CreateParams, _chip_id: ChipIdentifier) -> SharedEmulatedChip {
     SharedEmulatedChip(Arc::new(Mutex::new(Box::new(Mock { chip_kind: create_params.chip_kind }))))
 }
