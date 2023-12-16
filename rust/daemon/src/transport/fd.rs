@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::dispatcher::{handle_request, register_transport, unregister_transport, Response};
 /// request packets flow into netsim
 /// response packets flow out of netsim
 /// packet transports read requests and write response packets over gRPC or Fds.
@@ -22,6 +21,7 @@ use super::uci;
 use crate::devices::chip;
 use crate::devices::devices_handler::{add_chip, remove_chip};
 use crate::echip;
+use crate::echip::packet::{register_transport, unregister_transport, Response};
 use crate::ffi::ffi_transport;
 use lazy_static::lazy_static;
 use log::{error, info, warn};
@@ -102,7 +102,6 @@ impl Response for FdTransport {
 unsafe fn fd_reader(
     fd_rx: i32,
     kind: ChipKindEnum,
-    facade_id: u32,
     device_id: u32,
     chip_id: u32,
 ) -> JoinHandle<()> {
@@ -112,7 +111,7 @@ unsafe fn fd_reader(
             // SAFETY: The caller promises that `fd_rx` is valid and open.
             let mut rx = unsafe { File::from_raw_fd(fd_rx) };
 
-            info!("Handling fd={} for kind: {:?} facade_id: {:?}", fd_rx, kind, facade_id);
+            info!("Handling fd={} for kind: {:?} chip_id: {:?}", fd_rx, kind, chip_id);
 
             loop {
                 match kind {
@@ -121,13 +120,13 @@ unsafe fn fd_reader(
                             error!("End reader connection with fd={}. Failed to reading uci control packet: {:?}", fd_rx, e);
                             break;
                         }
-                        Ok(uci::Packet { payload }) => {
-                            handle_request(kind as u32, facade_id, &payload, 0);
+                        Ok(uci::Packet { mut payload }) => {
+                            echip::handle_request(chip_id, &mut payload, 0);
                         }
                     },
                     ChipKindEnum::BLUETOOTH => match h4::read_h4_packet(&mut rx) {
-                        Ok(h4::Packet { h4_type, payload }) => {
-                            handle_request(kind as u32, facade_id, &payload, h4_type);
+                        Ok(h4::Packet { h4_type, mut payload }) => {
+                            echip::handle_request(chip_id, &mut payload, h4_type);
                         }
                         Err(PacketError::IoError(e))
                             if e.kind() == ErrorKind::UnexpectedEof =>
@@ -150,7 +149,7 @@ unsafe fn fd_reader(
             // unregister before remove_chip because facade may re-use facade_id
             // on an intertwining create_chip and the unregister here might remove
             // the recently added chip creating a disconnected transport.
-            unregister_transport(kind as u32, facade_id);
+            unregister_transport(chip_id);
 
             if let Err(err) = remove_chip(device_id, chip_id) {
                 warn!("{err}");
@@ -253,22 +252,12 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
                     // and open.
                     let file_in = unsafe { File::from_raw_fd(chip.fd_in as i32) };
 
-                    register_transport(
-                        chip.kind as u32,
-                        result.facade_id,
-                        Box::new(FdTransport { file: file_in }),
-                    );
+                    register_transport(result.chip_id, Box::new(FdTransport { file: file_in }));
                     // TODO: switch to runtime.spawn once FIFOs are available in Tokio
                     // SAFETY: Our caller promises that the file descriptors in the JSON are valid
                     // and open.
                     handles.push(unsafe {
-                        fd_reader(
-                            chip.fd_out as i32,
-                            chip.kind,
-                            result.facade_id,
-                            result.device_id,
-                            result.chip_id,
-                        )
+                        fd_reader(chip.fd_out as i32, chip.kind, result.device_id, result.chip_id)
                     });
                 }
             }
