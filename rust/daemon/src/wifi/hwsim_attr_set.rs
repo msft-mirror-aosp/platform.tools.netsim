@@ -279,8 +279,8 @@ mod tests {
     fn test_attr_set_parse() {
         let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
         let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
-        assert_eq!(hwsim_msg.hwsim_hdr.hwsim_cmd, HwsimCmd::Frame);
-        let attrs = HwsimAttrSet::parse(&hwsim_msg.attributes).unwrap();
+        assert_eq!(hwsim_msg.get_hwsim_hdr().hwsim_cmd, HwsimCmd::Frame);
+        let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).unwrap();
 
         // Validate each attribute parsed
         assert_eq!(attrs.transmitter, MacAddress::try_from(11670786u64).ok());
@@ -302,8 +302,8 @@ mod tests {
     fn test_attr_set_attributes() {
         let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
         let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
-        assert_eq!(hwsim_msg.hwsim_hdr.hwsim_cmd, HwsimCmd::Frame);
-        let attrs = HwsimAttrSet::parse(&hwsim_msg.attributes).unwrap();
-        assert_eq!(attrs.attributes, hwsim_msg.attributes);
+        assert_eq!(hwsim_msg.get_hwsim_hdr().hwsim_cmd, HwsimCmd::Frame);
+        let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).unwrap();
+        assert_eq!(&attrs.attributes, hwsim_msg.get_attributes());
     }
 }
