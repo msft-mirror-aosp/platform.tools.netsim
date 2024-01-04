@@ -45,7 +45,7 @@ pub enum HwsimCmdEnum {
 ///
 pub fn process(chip_id: ChipIdentifier, packet: &[u8]) -> anyhow::Result<()> {
     let hwsim_msg = HwsimMsg::parse(packet)?;
-    match (hwsim_msg.hwsim_hdr.hwsim_cmd) {
+    match (hwsim_msg.get_hwsim_hdr().hwsim_cmd) {
         HwsimCmd::Frame => {
             let frame = Frame::parse(&hwsim_msg)?;
             info!(
@@ -54,7 +54,7 @@ pub fn process(chip_id: ChipIdentifier, packet: &[u8]) -> anyhow::Result<()> {
             );
         }
         HwsimCmd::AddMacAddr => {
-            let attr_set = HwsimAttrSet::parse(&hwsim_msg.attributes)?;
+            let attr_set = HwsimAttrSet::parse(hwsim_msg.get_attributes())?;
             if let (Some(addr), Some(hwaddr)) = (attr_set.transmitter, attr_set.receiver) {
                 info!("ADD_MAC_ADDR transmitter {:?} receiver {:?}", hwaddr, addr);
             } else {
@@ -62,7 +62,7 @@ pub fn process(chip_id: ChipIdentifier, packet: &[u8]) -> anyhow::Result<()> {
             }
         }
         HwsimCmd::DelMacAddr => {
-            let attr_set = HwsimAttrSet::parse(&hwsim_msg.attributes)?;
+            let attr_set = HwsimAttrSet::parse(hwsim_msg.get_attributes())?;
             if let (Some(addr), Some(hwaddr)) = (attr_set.transmitter, attr_set.receiver) {
                 info!("DEL_MAC_ADDR transmitter {:?} receiver {:?}", hwaddr, addr);
             } else {
@@ -80,12 +80,12 @@ pub fn process(chip_id: ChipIdentifier, packet: &[u8]) -> anyhow::Result<()> {
 
 pub fn parse_hwsim_cmd(packet: &[u8]) -> anyhow::Result<HwsimCmdEnum> {
     let hwsim_msg = HwsimMsg::parse(packet)?;
-    match (hwsim_msg.hwsim_hdr.hwsim_cmd) {
+    match (hwsim_msg.get_hwsim_hdr().hwsim_cmd) {
         HwsimCmd::Frame => {
             let frame = Frame::parse(&hwsim_msg)?;
             Ok(HwsimCmdEnum::Frame(Box::new(frame)))
         }
-        _ => Err(anyhow!("Unknown HwsimMsg cmd={:?}", hwsim_msg.hwsim_hdr.hwsim_cmd)),
+        _ => Err(anyhow!("Unknown HwsimMsg cmd={:?}", hwsim_msg.get_hwsim_hdr().hwsim_cmd)),
     }
 }
 
