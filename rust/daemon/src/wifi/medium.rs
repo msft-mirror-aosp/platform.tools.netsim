@@ -90,16 +90,7 @@ pub fn parse_hwsim_cmd(packet: &[u8]) -> anyhow::Result<HwsimCmdEnum> {
 }
 
 pub fn test_parse_hwsim_cmd() {
-    let packet: Vec<u8> = vec![
-        188, 0, 0, 0, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 10, 0, 2, 0, 2, 21, 178, 0,
-        0, 0, 0, 0, 98, 0, 3, 0, 64, 0, 0, 0, 255, 255, 255, 255, 255, 255, 74, 129, 38, 251, 211,
-        154, 255, 255, 255, 255, 255, 255, 128, 12, 0, 0, 1, 8, 2, 4, 11, 22, 12, 18, 24, 36, 50,
-        4, 48, 72, 96, 108, 45, 26, 126, 16, 27, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 255, 22, 35, 1, 120, 200, 26, 64, 0, 0, 191, 206, 0, 0, 0, 0, 0, 0,
-        0, 0, 250, 255, 250, 255, 0, 0, 8, 0, 4, 0, 2, 0, 0, 0, 8, 0, 19, 0, 118, 9, 0, 0, 12, 0,
-        7, 0, 0, 1, 255, 0, 255, 0, 255, 0, 16, 0, 21, 0, 0, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0,
-        12, 0, 8, 0, 201, 0, 0, 0, 0, 0, 0, 0,
-    ];
+    let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
     assert!(parse_hwsim_cmd(&packet).is_ok());
 
     // missing transmitter attribute
@@ -150,5 +141,18 @@ mod tests {
     #[test]
     fn test_netlink_attr() {
         test_parse_hwsim_cmd();
+    }
+
+    #[test]
+    fn test_is_mdns_packet() {
+        let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame_mdns.csv");
+        let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
+        let mdns_frame = Frame::parse(&hwsim_msg).unwrap();
+        assert!(mdns_frame.ieee80211.get_destination().is_multicast());
+
+        let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
+        let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
+        let non_mdns_frame = Frame::parse(&hwsim_msg).unwrap();
+        assert!(!non_mdns_frame.ieee80211.get_destination().is_multicast());
     }
 }
