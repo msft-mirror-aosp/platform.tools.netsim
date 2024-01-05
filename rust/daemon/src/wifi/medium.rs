@@ -13,13 +13,15 @@
 // limitations under the License.
 
 use super::ieee80211::MacAddress;
-use super::packets::mac80211_hwsim::{HwsimAttr, HwsimCmd, HwsimMsg, HwsimMsgHdr};
-use super::packets::netlink::{NlAttrHdr, NlMsgHdr};
+use super::packets::mac80211_hwsim::{HwsimAttr, HwsimCmd, HwsimMsg, HwsimMsgHdr, NlMsgHdr};
+use super::packets::netlink::NlAttrHdr;
 use crate::devices::chip::ChipIdentifier;
 use crate::wifi::frame::Frame;
 use crate::wifi::hwsim_attr_set::HwsimAttrSet;
+use crate::wifi::packets::mac80211_hwsim::HwsimMsgBuilder;
 use anyhow::{anyhow, Context};
 use log::{debug, info, warn};
+use pdl_runtime::Packet;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
@@ -143,6 +145,43 @@ impl Medium {
     }
 }
 
+fn build_tx_info(hwsim_msg: &HwsimMsg) -> anyhow::Result<HwsimMsg> {
+    let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).context("HwsimAttrSet").unwrap();
+
+    let hwsim_hdr = hwsim_msg.get_hwsim_hdr();
+    let nl_hdr = hwsim_msg.get_nl_hdr();
+    let mut new_attr_builder = HwsimAttrSet::builder();
+    const SIGNAL: u32 = 4294967246;
+
+    new_attr_builder
+        .transmitter(&attrs.transmitter.context("transmitter")?.into())
+        .flags(attrs.flags.context("flags")?)
+        .cookie(attrs.cookie.context("cookie")?)
+        .signal(attrs.signal.unwrap_or(SIGNAL))
+        .tx_info(attrs.tx_info.context("tx_info")?.as_slice());
+
+    let new_attr = new_attr_builder.build().unwrap();
+    let nlmsg_len =
+        nl_hdr.nlmsg_len + new_attr.attributes.len() as u32 - attrs.attributes.len() as u32;
+    let new_hwsim_msg = HwsimMsgBuilder {
+        attributes: new_attr.attributes,
+        hwsim_hdr: HwsimMsgHdr {
+            hwsim_cmd: HwsimCmd::TxInfoFrame,
+            hwsim_version: hwsim_hdr.hwsim_version,
+            reserved: hwsim_hdr.reserved,
+        },
+        nl_hdr: NlMsgHdr {
+            nlmsg_len,
+            nlmsg_type: nl_hdr.nlmsg_type,
+            nlmsg_flags: nl_hdr.nlmsg_flags,
+            nlmsg_seq: 0,
+            nlmsg_pid: 0,
+        },
+    }
+    .build();
+    Ok(new_hwsim_msg)
+}
+
 // It's usd by radiotap.rs for packet capture.
 pub fn parse_hwsim_cmd(packet: &[u8]) -> anyhow::Result<HwsimCmdEnum> {
     let hwsim_msg = HwsimMsg::parse(packet)?;
@@ -188,5 +227,23 @@ mod tests {
         let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
         let non_mdns_frame = Frame::parse(&hwsim_msg).unwrap();
         assert!(!non_mdns_frame.ieee80211.get_destination().is_multicast());
+    }
+
+    #[test]
+    fn test_build_tx_info_reconstruct() {
+        let packet: Vec<u8> = include!("test_packets/hwsim_cmd_tx_info.csv");
+        let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
+        assert_eq!(hwsim_msg.get_hwsim_hdr().hwsim_cmd, HwsimCmd::TxInfoFrame);
+
+        let new_hwsim_msg = build_tx_info(&hwsim_msg).unwrap();
+        assert_eq!(hwsim_msg, new_hwsim_msg);
+    }
+
+    #[test]
+    fn test_build_tx_info() {
+        let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
+        let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
+        let hwsim_msg_tx_info = build_tx_info(&hwsim_msg).unwrap();
+        assert_eq!(hwsim_msg_tx_info.get_hwsim_hdr().hwsim_cmd, HwsimCmd::TxInfoFrame);
     }
 }
