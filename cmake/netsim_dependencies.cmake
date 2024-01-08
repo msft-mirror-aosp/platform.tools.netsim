@@ -1,5 +1,5 @@
 set(BLUETOOTH_EMULATION True)
-set(AOSP ${CMAKE_CURRENT_LIST_DIR}/../../..)
+get_filename_component(AOSP "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 set(EXTERNAL ${AOSP}/external)
 set(EXTERNAL_QEMU ${EXTERNAL}/qemu)
 set(ANDROID_QEMU2_TOP_DIR ${EXTERNAL_QEMU})
@@ -34,7 +34,6 @@ set(_gRPC_RE2_INCLUDE_DIR "${EXTERNAL_QEMU}/android/third_party/re2")
 set(_gRPC_RE2_LIBRARIES re2)
 set(NETSIM_EXT TRUE)
 
-
 # Let's bin place everything in the root, with the shared libs in the right
 # place
 set(DBG_INFO ${CMAKE_BINARY_DIR}/build/debug_info)
@@ -49,7 +48,6 @@ if(DARWIN_X86_64 OR DARWIN_AARCH64)
 else()
   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/distribution/emulator)
 endif()
-
 
 # First make the protobuf and dependencies available to gRPC
 add_subdirectory(${EXTERNAL}/qemu/android/third_party/protobuf protobuf)
