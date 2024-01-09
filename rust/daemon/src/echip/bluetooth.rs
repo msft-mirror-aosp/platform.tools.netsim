@@ -33,6 +33,8 @@ static ECHIP_BT_MUTEX: Mutex<()> = Mutex::new(());
 pub type RootcanalIdentifier = u32;
 
 /// Parameters for creating Bluetooth chips
+/// allow(dead_code) due to not being used in unit tests
+#[allow(dead_code)]
 pub struct CreateParams {
     pub address: String,
     pub bt_properties: Option<MessageField<RootcanalController>>,
@@ -100,6 +102,8 @@ impl EmulatedChip for Bluetooth {
 }
 
 /// Create a new Emulated Bluetooth Chip
+/// allow(dead_code) due to not being used in unit tests
+#[allow(dead_code)]
 pub fn new(create_params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmulatedChip {
     // Lock to protect id_to_chip_info_ table in C++
     let _unused = ECHIP_BT_MUTEX.lock().expect("Failed to acquire lock on ECHIP_BT_MUTEX");
@@ -120,7 +124,9 @@ pub fn bluetooth_start(config: &MessageField<BluetoothConfig>, instance_num: u16
     ffi_bluetooth::bluetooth_start(&proto_bytes, instance_num);
 }
 
+// TODO: Invoke bluetooth_stop at netsimd shutdown
 /// Stops the Bluetooth service.
+#[allow(dead_code)]
 pub fn bluetooth_stop() {
     ffi_bluetooth::bluetooth_stop();
 }
