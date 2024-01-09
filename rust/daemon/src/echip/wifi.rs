@@ -103,9 +103,7 @@ pub fn wifi_start(config: &MessageField<WiFiConfig>) {
     ffi_wifi::wifi_start(&proto_bytes);
 }
 
-// TODO: Invoke wifi_stop at netsimd shutdown
 /// Stops the WiFi service.
-#[allow(dead_code)]
 pub fn wifi_stop() {
     ffi_wifi::wifi_stop();
 }

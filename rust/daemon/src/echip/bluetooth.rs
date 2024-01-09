@@ -124,9 +124,7 @@ pub fn bluetooth_start(config: &MessageField<BluetoothConfig>, instance_num: u16
     ffi_bluetooth::bluetooth_start(&proto_bytes, instance_num);
 }
 
-// TODO: Invoke bluetooth_stop at netsimd shutdown
 /// Stops the Bluetooth service.
-#[allow(dead_code)]
 pub fn bluetooth_stop() {
     ffi_bluetooth::bluetooth_stop();
 }
