@@ -40,6 +40,7 @@ pub struct Frame {
     pub freq: Option<u32>,
     pub data: Vec<u8>,
     pub ieee80211: Ieee80211,
+    pub hwsim_msg: HwsimMsg,
 }
 
 impl Frame {
@@ -65,6 +66,7 @@ impl Frame {
             freq: attrs.freq,
             data: frame,
             ieee80211,
+            hwsim_msg: msg.clone(),
         })
     }
 }
