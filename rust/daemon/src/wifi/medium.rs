@@ -137,6 +137,8 @@ impl Medium {
             Ok(true)
         } else if destination.is_multicast() {
             info!("Frame multicast {}", frame.ieee80211);
+            let hwsim_msg_tx_info = build_tx_info(&frame.hwsim_msg).unwrap().to_vec();
+            (self.callback)(station.client_id, &hwsim_msg_tx_info);
             Ok(true)
         } else {
             // pass to libslirp
