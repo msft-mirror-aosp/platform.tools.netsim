@@ -32,10 +32,10 @@ use log::{info, warn};
 // parsed 802.11 frame in `data` and `ieee80211.`
 #[derive(Debug)]
 pub struct Frame {
-    pub transmitter: MacAddress,
-    pub flags: u32,
-    pub tx_info: Vec<TxRate>,
-    pub cookie: u64,
+    pub transmitter: Option<MacAddress>,
+    pub flags: Option<u32>,
+    pub tx_info: Option<Vec<TxRate>>,
+    pub cookie: Option<u64>,
     pub signal: Option<u32>,
     pub freq: Option<u32>,
     pub data: Vec<u8>,
@@ -58,10 +58,10 @@ impl Frame {
         // Required attributes are unwrapped and return an error if
         // they are not present.
         Ok(Frame {
-            transmitter: attrs.transmitter.context("transmitter")?,
-            flags: attrs.flags.context("flags")?,
-            tx_info: attrs.tx_info.clone().context("tx_info")?,
-            cookie: attrs.cookie.context("cookie")?,
+            transmitter: attrs.transmitter,
+            flags: attrs.flags,
+            tx_info: attrs.tx_info.clone(),
+            cookie: attrs.cookie,
             signal: attrs.signal,
             freq: attrs.freq,
             data: frame,
