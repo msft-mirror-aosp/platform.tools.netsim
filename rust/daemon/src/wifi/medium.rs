@@ -12,17 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::ieee80211::MacAddress;
-use super::packets::mac80211_hwsim::{HwsimAttr, HwsimCmd, HwsimMsg, HwsimMsgHdr, NlMsgHdr};
+use super::ieee80211::{Ieee80211, Ieee80211Child, Ieee80211FromApBuilder, MacAddress};
+use super::packets::mac80211_hwsim::{
+    HwsimAttr, HwsimCmd, HwsimMsg, HwsimMsgBuilder, HwsimMsgHdr, NlMsgHdr,
+};
 use super::packets::netlink::NlAttrHdr;
 use crate::devices::chip::ChipIdentifier;
 use crate::wifi::frame::Frame;
 use crate::wifi::hwsim_attr_set::HwsimAttrSet;
-use crate::wifi::packets::mac80211_hwsim::HwsimMsgBuilder;
 use anyhow::{anyhow, Context};
 use log::{debug, info, warn};
 use pdl_runtime::Packet;
 use std::collections::{HashMap, HashSet};
+
+const NLMSG_MIN_TYPE: u16 = 0x10;
+// Default values for mac80211_hwsim.
+const RX_RATE: u32 = 0;
+const SIGNAL: u32 = 4294967246; // -50
 
 #[derive(Debug)]
 pub enum HwsimCmdEnum {
@@ -94,11 +100,17 @@ impl Medium {
         match (hwsim_msg.get_hwsim_hdr().hwsim_cmd) {
             HwsimCmd::Frame => {
                 let frame = Frame::parse(&hwsim_msg)?;
+                // Incoming packet must contain transmitter, flag, cookie, and tx_info fields.
+                if frame.tx_info.is_none() {
+                    return Err(anyhow!("Missing tx_info for incoming packet"));
+                }
+                let addr = frame.transmitter.context("transmitter")?;
+                let flags = frame.flags.context("flags")?;
+                let cookie = frame.cookie.context("cookie")?;
                 info!(
-                    "Frame chip {}, addr {}, flags {}, cookie {:?}, ieee80211 {}",
-                    client_id, frame.transmitter, frame.flags, frame.cookie, frame.ieee80211
+                    "Frame chip {}, addr {}, flags {}, cookie {}, ieee80211 {}",
+                    client_id, addr, flags, cookie, frame.ieee80211
                 );
-                let addr = frame.transmitter;
                 // Creates Stations on the fly when there is no config file
                 let _ = self.stations.entry(addr).or_insert_with(|| Station::new(client_id, addr));
                 let sender = self.stations.get(&addr).unwrap();
@@ -139,12 +151,37 @@ impl Medium {
             info!("Frame multicast {}", frame.ieee80211);
             let hwsim_msg_tx_info = build_tx_info(&frame.hwsim_msg).unwrap().to_vec();
             (self.callback)(station.client_id, &hwsim_msg_tx_info);
+
+            // Create mdns from_ap packet and forward it to other stations.
+            for (mac_address, dest_station) in &self.stations {
+                if station.client_id != dest_station.client_id {
+                    if let Some(mdns_from_ap) =
+                        create_mdns_from_ap_packet(&frame, &dest_station.addr)
+                    {
+                        (self.callback)(dest_station.client_id, &mdns_from_ap);
+                        log_mdns_from_ap_packet(&mdns_from_ap, station, dest_station);
+                    }
+                }
+            }
             Ok(true)
         } else {
             // pass to libslirp
             Ok(false)
         }
     }
+}
+
+fn log_mdns_from_ap_packet(
+    hwsim_msg_from_ap_bytes: &[u8],
+    source: &Station,
+    destination: &Station,
+) {
+    let hwsim_msg = HwsimMsg::parse(hwsim_msg_from_ap_bytes).unwrap();
+    let frame = Frame::parse(&hwsim_msg).unwrap();
+    info!(
+        "Sent mdns from_ap packet from client {} to client {}. flags {:?}, ieee80211 {}",
+        source.client_id, destination.client_id, frame.flags, frame.ieee80211,
+    );
 }
 
 /// Build TxInfoFrame HwsimMsg from CmdFrame HwsimMsg.
@@ -156,9 +193,7 @@ fn build_tx_info(hwsim_msg: &HwsimMsg) -> anyhow::Result<HwsimMsg> {
     let hwsim_hdr = hwsim_msg.get_hwsim_hdr();
     let nl_hdr = hwsim_msg.get_nl_hdr();
     let mut new_attr_builder = HwsimAttrSet::builder();
-    const SIGNAL: u32 = 4294967246;
     const HWSIM_TX_STAT_ACK: u32 = 1 << 2;
-    const NLMSG_MIN_TYPE: u16 = 0x10;
 
     new_attr_builder
         .transmitter(&attrs.transmitter.context("transmitter")?.into())
@@ -189,7 +224,62 @@ fn build_tx_info(hwsim_msg: &HwsimMsg) -> anyhow::Result<HwsimMsg> {
     Ok(new_hwsim_msg)
 }
 
-// It's usd by radiotap.rs for packet capture.
+fn create_mdns_from_ap_attributes(
+    attributes: &[u8],
+    receiver: &MacAddress,
+) -> anyhow::Result<Vec<u8>> {
+    let attr_set = HwsimAttrSet::parse(attributes)?;
+
+    let ieee80211_frame = Ieee80211::parse(&attr_set.frame.clone().context("frame")?)?;
+    let new_frame = ieee80211_frame.into_from_ap().to_vec();
+
+    let mut builder = HwsimAttrSet::builder();
+
+    // Attributes required by mac80211_hwsim.
+    builder.receiver(&receiver.to_vec());
+    builder.frame(&new_frame);
+    // NOTE: Incoming mdns packets don't have rx_rate and signal.
+    builder.rx_rate(attr_set.rx_rate_idx.unwrap_or(RX_RATE));
+    builder.signal(attr_set.signal.unwrap_or(SIGNAL));
+
+    attr_set.flags.map(|v| builder.flags(v));
+    attr_set.freq.map(|v| builder.freq(v));
+    attr_set.tx_info.map(|v| builder.tx_info(&v));
+    attr_set.tx_info_flags.map(|v| builder.tx_info_flags(&v));
+
+    Ok(builder.build()?.attributes)
+}
+
+fn create_mdns_from_ap_packet(frame: &Frame, receiver: &MacAddress) -> Option<Vec<u8>> {
+    let hwsim_msg = &frame.hwsim_msg;
+    assert_eq!(hwsim_msg.get_hwsim_hdr().hwsim_cmd, HwsimCmd::Frame);
+    let attributes_result = create_mdns_from_ap_attributes(hwsim_msg.get_attributes(), receiver);
+    let attributes = match attributes_result {
+        Ok(attributes) => attributes,
+        Err(e) => {
+            warn!("Failed to create mdns from_ap attributes. E: {}", e);
+            return None;
+        }
+    };
+
+    let nlmsg_len = hwsim_msg.get_nl_hdr().nlmsg_len + attributes.len() as u32
+        - hwsim_msg.get_attributes().len() as u32;
+    let new_hwsim_msg = HwsimMsgBuilder {
+        nl_hdr: NlMsgHdr {
+            nlmsg_len,
+            nlmsg_type: NLMSG_MIN_TYPE,
+            nlmsg_flags: hwsim_msg.get_nl_hdr().nlmsg_flags,
+            nlmsg_seq: 0,
+            nlmsg_pid: 0,
+        },
+        hwsim_hdr: hwsim_msg.get_hwsim_hdr().clone(),
+        attributes,
+    }
+    .build();
+    Some(new_hwsim_msg.to_vec())
+}
+
+// It's used by radiotap.rs for packet capture.
 pub fn parse_hwsim_cmd(packet: &[u8]) -> anyhow::Result<HwsimCmdEnum> {
     let hwsim_msg = HwsimMsg::parse(packet)?;
     match (hwsim_msg.get_hwsim_hdr().hwsim_cmd) {
@@ -197,6 +287,7 @@ pub fn parse_hwsim_cmd(packet: &[u8]) -> anyhow::Result<HwsimCmdEnum> {
             let frame = Frame::parse(&hwsim_msg)?;
             Ok(HwsimCmdEnum::Frame(Box::new(frame)))
         }
+        HwsimCmd::TxInfoFrame => Ok(HwsimCmdEnum::TxInfoFrame),
         _ => Err(anyhow!("Unknown HwsimMsg cmd={:?}", hwsim_msg.get_hwsim_hdr().hwsim_cmd)),
     }
 }
@@ -210,17 +301,20 @@ mod tests {
         let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
         assert!(parse_hwsim_cmd(&packet).is_ok());
 
-        // missing transmitter attribute
-        let packet2: Vec<u8> = include!("test_packets/hwsim_cmd_frame2.csv");
-        assert!(parse_hwsim_cmd(&packet2).is_err());
+        let tx_info_packet: Vec<u8> = include!("test_packets/hwsim_cmd_tx_info.csv");
+        assert!(parse_hwsim_cmd(&tx_info_packet).is_ok());
+    }
 
-        // missing cookie attribute
-        let packet3: Vec<u8> = include!("test_packets/hwsim_cmd_frame_no_cookie.csv");
-        assert!(parse_hwsim_cmd(&packet3).is_err());
+    #[test]
+    fn test_netlink_attr_response_packet() {
+        // Response packet may not contain transmitter, flags, tx_info, or cookie fields.
+        let response_packet: Vec<u8> =
+            include!("test_packets/hwsim_cmd_frame_response_no_transmitter_flags_tx_info.csv");
+        assert!(parse_hwsim_cmd(&response_packet).is_ok());
 
-        // HwsimkMsg cmd=TxInfoFrame packet
-        let packet3: Vec<u8> = include!("test_packets/hwsim_cmd_tx_info.csv");
-        assert!(parse_hwsim_cmd(&packet3).is_err());
+        let response_packet2: Vec<u8> =
+            include!("test_packets/hwsim_cmd_frame_response_no_cookie.csv");
+        assert!(parse_hwsim_cmd(&response_packet2).is_ok());
     }
 
     #[test]
