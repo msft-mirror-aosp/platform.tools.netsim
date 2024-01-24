@@ -236,10 +236,12 @@ fn build_tx_info(hwsim_msg: &HwsimMsg) -> anyhow::Result<HwsimMsg> {
     Ok(new_hwsim_msg)
 }
 
-fn create_from_ap_attributes(attributes: &[u8], receiver: &MacAddress) -> anyhow::Result<Vec<u8>> {
-    let attr_set = HwsimAttrSet::parse(attributes)?;
-
-    let ieee80211_frame = Ieee80211::parse(&attr_set.frame.clone().context("frame")?)?;
+fn create_from_ap_attributes(
+    attributes: &[u8],
+    receiver: &MacAddress,
+    attrs: &HwsimAttrSet,
+) -> anyhow::Result<Vec<u8>> {
+    let ieee80211_frame = Ieee80211::parse(&attrs.frame.clone().context("frame")?)?;
     let new_frame = ieee80211_frame.into_from_ap()?.to_vec();
 
     let mut builder = HwsimAttrSet::builder();
@@ -248,13 +250,13 @@ fn create_from_ap_attributes(attributes: &[u8], receiver: &MacAddress) -> anyhow
     builder.receiver(&receiver.to_vec());
     builder.frame(&new_frame);
     // NOTE: Incoming mdns packets don't have rx_rate and signal.
-    builder.rx_rate(attr_set.rx_rate_idx.unwrap_or(RX_RATE));
-    builder.signal(attr_set.signal.unwrap_or(SIGNAL));
+    builder.rx_rate(attrs.rx_rate_idx.unwrap_or(RX_RATE));
+    builder.signal(attrs.signal.unwrap_or(SIGNAL));
 
-    attr_set.flags.map(|v| builder.flags(v));
-    attr_set.freq.map(|v| builder.freq(v));
-    attr_set.tx_info.map(|v| builder.tx_info(&v));
-    attr_set.tx_info_flags.map(|v| builder.tx_info_flags(&v));
+    attrs.flags.map(|v| builder.flags(v));
+    attrs.freq.map(|v| builder.freq(v));
+    attrs.tx_info.as_ref().map(|v| builder.tx_info(v));
+    attrs.tx_info_flags.as_ref().map(|v| builder.tx_info_flags(v));
 
     Ok(builder.build()?.attributes)
 }
@@ -262,7 +264,8 @@ fn create_from_ap_attributes(attributes: &[u8], receiver: &MacAddress) -> anyhow
 fn create_from_ap_packet(frame: &Frame, receiver: &MacAddress) -> Option<Vec<u8>> {
     let hwsim_msg = &frame.hwsim_msg;
     assert_eq!(hwsim_msg.get_hwsim_hdr().hwsim_cmd, HwsimCmd::Frame);
-    let attributes_result = create_from_ap_attributes(hwsim_msg.get_attributes(), receiver);
+    let attributes_result =
+        create_from_ap_attributes(hwsim_msg.get_attributes(), receiver, &frame.attrs);
     let attributes = match attributes_result {
         Ok(attributes) => attributes,
         Err(e) => {
