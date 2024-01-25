@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright 2023 - The Android Open Source Project
+# Copyright 2024 - The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the',  help="License");
 # you may not use this file except in compliance with the License.
@@ -16,14 +16,11 @@
 from __future__ import absolute_import, division, print_function
 
 import argparse
-import logging
 import shutil
 import os
 import platform
-import sys
-import zipfile
-from server_config import ServerConfig
 from pathlib import Path
+from environment import get_default_environment
 
 from utils import (
     AOSP_ROOT,
@@ -31,8 +28,6 @@ from utils import (
     run,
     log_system_info,
     config_logging,
-    is_presubmit,
-    platform_to_cmake_target,
 )
 
 
@@ -44,19 +39,9 @@ def main():
         description="Configures the android netsim cmake project so it can be build"
     )
     parser.add_argument(
-        "--out_dir", type=str, required=True, help="The output directory"
+        "--out_dir", type=str, default=Path("objs").absolute(), help="The output directory"
     )
-    parser.add_argument(
-        "--dist_dir", type=str, required=True, help="The destination directory"
-    )
-    parser.add_argument(
-        "--build-id",
-        type=str,
-        default=[],
-        required=True,
-        dest="build_id",
-        help="The netsim build number",
-    )
+
     parser.add_argument(
         "--target",
         type=str,
@@ -75,6 +60,7 @@ def main():
     args = parser.parse_args()
 
     os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"] = "1"
+    os.environ["CMAKE_EXPORT_COMPILE_COMMANDS"] = "1"
 
     target = platform.system().lower()
 
@@ -108,45 +94,8 @@ def main():
         AOSP_ROOT / "tools" / "netsim",
     ]
 
-    presubmit = is_presubmit(args.build_id)
-
-    # Make sure the dist directory exists.
-    dist = Path(args.dist_dir).absolute()
-    dist.mkdir(exist_ok=True, parents=True)
-
-    with ServerConfig(presubmit, args) as cfg:
-        # Turn on sccache?
-        #if cfg.sccache:
-        #    launcher.append(f"-DOPTION_CCACHE=${cfg.sccache}")
-
-        # Configure
-        run(launcher, cfg.get_env(), "bld")
-
-        # Build
-        run(
-            [cmake, "--build", out, "--target", "install"],
-            cfg.get_env(),
-            "bld",
-        )
-
-        # Run tests?
-
-        # Zip results..
-        zip_fname = (
-            dist / f"netsim-{platform_to_cmake_target(target)}-{args.build_id}.zip"
-        )
-        search_dir = out / "distribution" / "emulator"
-        logging.info("Creating zip file: %s", zip_fname)
-        with zipfile.ZipFile(
-            zip_fname, "w", zipfile.ZIP_DEFLATED, allowZip64=True
-        ) as zipf:
-            logging.info("Searching %s", search_dir)
-            for fname in search_dir.glob("**/*"):
-                arcname = fname.relative_to(search_dir)
-                logging.info("Adding %s as %s", fname, arcname)
-                zipf.write(fname, arcname)
-
-    logging.info("Build completed!")
+    # Configure
+    run(launcher, get_default_environment(AOSP_ROOT), "bld")
 
 
 if __name__ == "__main__":

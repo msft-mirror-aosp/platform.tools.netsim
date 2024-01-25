@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt;
+
 use super::ieee80211::MacAddress;
 use super::packets::mac80211_hwsim::{
     self, HwsimAttr, HwsimAttrChild::*, HwsimCmd, HwsimMsg, HwsimMsgHdr, TxRate, TxRateFlag,
@@ -100,7 +102,7 @@ impl HwsimAttrSetBuilder {
         self.attributes.extend(vec);
     }
 
-    fn transmitter(&mut self, transmitter: &[u8; 6]) -> &mut Self {
+    pub fn transmitter(&mut self, transmitter: &[u8; 6]) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrAddrTransmitterBuilder {
                 address: *transmitter,
@@ -113,7 +115,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn receiver(&mut self, receiver: &[u8; 6]) -> &mut Self {
+    pub fn receiver(&mut self, receiver: &[u8; 6]) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrAddrReceiverBuilder { address: *receiver, nla_m: 0, nla_o: 0 }
                 .build(),
@@ -122,7 +124,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn frame(&mut self, frame: &[u8]) -> &mut Self {
+    pub fn frame(&mut self, frame: &[u8]) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrFrameBuilder { data: (*frame).to_vec(), nla_m: 0, nla_o: 0 }
                 .build(),
@@ -131,7 +133,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn flags(&mut self, flags: u32) -> &mut Self {
+    pub fn flags(&mut self, flags: u32) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrFlagsBuilder { flags, nla_m: 0, nla_o: 0 }.build(),
         );
@@ -139,7 +141,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn rx_rate(&mut self, rx_rate_idx: u32) -> &mut Self {
+    pub fn rx_rate(&mut self, rx_rate_idx: u32) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrRxRateBuilder { rx_rate_idx, nla_m: 0, nla_o: 0 }.build(),
         );
@@ -147,7 +149,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn signal(&mut self, signal: u32) -> &mut Self {
+    pub fn signal(&mut self, signal: u32) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrSignalBuilder { signal, nla_m: 0, nla_o: 0 }.build(),
         );
@@ -155,7 +157,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn cookie(&mut self, cookie: u64) -> &mut Self {
+    pub fn cookie(&mut self, cookie: u64) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrCookieBuilder { cookie, nla_m: 0, nla_o: 0 }.build(),
         );
@@ -163,7 +165,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn freq(&mut self, freq: u32) -> &mut Self {
+    pub fn freq(&mut self, freq: u32) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrFreqBuilder { freq, nla_m: 0, nla_o: 0 }.build(),
         );
@@ -171,7 +173,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn tx_info(&mut self, tx_info: &[TxRate]) -> &mut Self {
+    pub fn tx_info(&mut self, tx_info: &[TxRate]) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrTxInfoBuilder {
                 tx_rates: (*tx_info).to_vec(),
@@ -184,7 +186,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn tx_info_flags(&mut self, tx_rate_flags: &[TxRateFlag]) -> &mut Self {
+    pub fn tx_info_flags(&mut self, tx_rate_flags: &[TxRateFlag]) -> &mut Self {
         self.extend_attributes(
             mac80211_hwsim::HwsimAttrTxInfoFlagsBuilder {
                 tx_rate_flags: (*tx_rate_flags).to_vec(),
@@ -197,7 +199,7 @@ impl HwsimAttrSetBuilder {
         self
     }
 
-    fn build(mut self) -> anyhow::Result<HwsimAttrSet> {
+    pub fn build(mut self) -> anyhow::Result<HwsimAttrSet> {
         Ok(HwsimAttrSet {
             transmitter: self.transmitter,
             receiver: self.receiver,
@@ -211,6 +213,24 @@ impl HwsimAttrSetBuilder {
             tx_info_flags: self.tx_info_flags,
             attributes: self.attributes,
         })
+    }
+}
+
+impl fmt::Display for HwsimAttrSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ ");
+        self.transmitter.map(|v| write!(f, "transmitter: {}, ", v));
+        self.receiver.map(|v| write!(f, "receiver: {}, ", v));
+        self.cookie.map(|v| write!(f, "cookie: {}, ", v));
+        self.flags.map(|v| write!(f, "flags: {}, ", v));
+        self.rx_rate_idx.map(|v| write!(f, "rx_rate_idx: {}, ", v));
+        self.signal.map(|v| write!(f, "signal: {}, ", v));
+        self.frame.as_ref().map(|v| write!(f, "frame: {:?}, ", &v));
+        self.freq.map(|v| write!(f, "freq: {}, ", v));
+        self.tx_info.as_ref().map(|v| write!(f, "tx_info: {:?}, ", &v));
+        self.tx_info_flags.as_ref().map(|v| write!(f, "tx_info_flags: {:?}, ", &v));
+        write!(f, "}}");
+        Ok(())
     }
 }
 
@@ -305,5 +325,16 @@ mod tests {
         assert_eq!(hwsim_msg.get_hwsim_hdr().hwsim_cmd, HwsimCmd::Frame);
         let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).unwrap();
         assert_eq!(&attrs.attributes, hwsim_msg.get_attributes());
+    }
+
+    #[test]
+    fn test_hwsim_attr_set_display() {
+        let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
+        let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
+        let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).unwrap();
+
+        let fmt_attrs = format!("{}", attrs);
+        assert!(fmt_attrs.contains("transmitter: 02:15:b2:00:00:00"));
+        assert!(fmt_attrs.contains("cookie: 201"));
     }
 }

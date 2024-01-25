@@ -38,11 +38,14 @@ PYTHON_EXE = sys.executable or "python3"
 TARGET_MAP = {
     "windows": "windows_msvc-x86_64",
     "windows_x64": "windows_msvc-x86_64",
+    "windows_x86_64": "windows_msvc-x86_64",
     "linux": "linux-x86_64",
     "linux_x64": "linux-x86_64",
+    "linux_x86_64": "linux-x86_64",
+    "linux_aarch64": "linux-aarch64",
     "darwin": "darwin-x86_64",
     "darwin_x64": "darwin-x86_64",
-    "linux_aarch64": "linux-aarch64",
+    "darwin_x86_64" : "darwin-x86_64",
     "darwin_aarch64": "darwin-aarch64",
 }
 
@@ -57,7 +60,7 @@ AVAILABLE = {
 
 def platform_to_cmake_target(target):
     """Translates platform to cmake target"""
-    return TARGET_MAP[target]
+    return TARGET_MAP[target.replace("-","_")]
 
 
 def cmake_toolchain(target) -> str:
@@ -69,7 +72,7 @@ def cmake_toolchain(target) -> str:
         / "android"
         / "build"
         / "cmake"
-        / AVAILABLE[TARGET_MAP[target]]
+        / AVAILABLE[TARGET_MAP[target.replace("-", "_")]]
     )
 
 
