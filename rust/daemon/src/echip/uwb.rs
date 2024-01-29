@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use netsim_proto::common::ChipKind as ProtoChipKind;
 use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::NetsimRadioStats as ProtoRadioStats;
 
@@ -59,10 +58,6 @@ impl EmulatedChip for Uwb {
     fn get_stats(&self, duration_secs: u64) -> Vec<ProtoRadioStats> {
         todo!()
     }
-
-    fn get_kind(&self) -> ProtoChipKind {
-        ProtoChipKind::UWB
-    }
 }
 
 pub fn new(create_params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmulatedChip {
@@ -71,8 +66,6 @@ pub fn new(create_params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmula
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[ignore = "TODO: Perform new and check SharedEmulatedChip"]
     #[test]
     fn test_new() {
@@ -95,11 +88,5 @@ mod tests {
     #[test]
     fn test_get_stats() {
         todo!()
-    }
-
-    #[test]
-    fn test_get_kind() {
-        let uwb_echip = Uwb { pica_id: 0 };
-        assert_eq!(uwb_echip.get_kind(), ProtoChipKind::UWB);
     }
 }
