@@ -20,9 +20,6 @@ use crate::devices::chip::ChipIdentifier;
 
 use super::{EmulatedChip, SharedEmulatedChip};
 
-#[allow(unused_imports)]
-use pica::Pica;
-
 type PicaIdentifier = u32;
 
 /// Parameters for creating UWB chips
