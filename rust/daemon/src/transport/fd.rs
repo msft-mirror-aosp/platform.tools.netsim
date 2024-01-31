@@ -199,7 +199,9 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
                             })
                         }
                         ChipKind::WIFI => echip::CreateParam::Wifi(echip::wifi::CreateParams {}),
-                        ChipKind::UWB => echip::CreateParam::Uwb,
+                        ChipKind::UWB => echip::CreateParam::Uwb(echip::uwb::CreateParams {
+                            address: chip.address.clone().unwrap_or_default(),
+                        }),
                         _ => {
                             warn!("The provided chip kind is unsupported: {:?}", chip.kind);
                             return;
