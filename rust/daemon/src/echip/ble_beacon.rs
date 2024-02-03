@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::bluetooth::{ble_beacon_add, ble_beacon_get, ble_beacon_patch};
+use crate::bluetooth::{ble_beacon_add, ble_beacon_get, ble_beacon_patch, ble_beacon_remove};
 use crate::devices::chip::{ChipIdentifier, FacadeIdentifier};
-use crate::devices::device::DeviceIdentifier;
 use crate::echip::{EmulatedChip, SharedEmulatedChip};
 
-use log::error;
-use netsim_proto::common::ChipKind as ProtoChipKind;
+use log::{error, info};
 use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::model::ChipCreate as ChipCreateProto;
+use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[cfg(not(test))]
 use crate::ffi::ffi_bluetooth;
@@ -47,7 +46,7 @@ impl EmulatedChip for BleBeacon {
         log::info!("BleBeacon::handle_request({packet:?})");
     }
 
-    fn reset(&self) {
+    fn reset(&mut self) {
         #[cfg(not(test))]
         ffi_bluetooth::bluetooth_reset(self.facade_id);
         #[cfg(test)]
@@ -63,32 +62,44 @@ impl EmulatedChip for BleBeacon {
         chip_proto
     }
 
-    fn patch(&self, chip: &ProtoChip) {
+    fn patch(&mut self, chip: &ProtoChip) {
         if let Err(err) = ble_beacon_patch(self.facade_id, self.chip_id, chip.ble_beacon()) {
             error!("{err:?}");
         }
     }
 
-    fn get_kind(&self) -> ProtoChipKind {
-        ProtoChipKind::BLUETOOTH_BEACON
+    fn remove(&mut self) {
+        if let Err(err) = ble_beacon_remove(self.chip_id, self.facade_id) {
+            error!("{err:?}");
+        }
     }
 
-    fn get_facade_id(&self) -> FacadeIdentifier {
-        self.facade_id
+    fn get_stats(&self, duration_secs: u64) -> Vec<ProtoRadioStats> {
+        let mut stats_proto = ProtoRadioStats::new();
+        stats_proto.set_duration_secs(duration_secs);
+        stats_proto.set_kind(netsim_radio_stats::Kind::BLE_BEACON);
+        let chip_proto = self.get();
+        if chip_proto.has_ble_beacon() {
+            stats_proto.set_tx_count(chip_proto.ble_beacon().bt.low_energy.tx_count);
+            stats_proto.set_rx_count(chip_proto.ble_beacon().bt.low_energy.rx_count);
+        }
+        vec![stats_proto]
     }
 }
 
 /// Create a new Emulated BleBeacon Chip
-pub fn new(
-    params: &CreateParams,
-    device_id: DeviceIdentifier,
-    chip_id: ChipIdentifier,
-) -> SharedEmulatedChip {
-    match ble_beacon_add(device_id, params.device_name.clone(), chip_id, &params.chip_proto) {
-        Ok(facade_id) => Arc::new(Box::new(BleBeacon { facade_id, chip_id })),
+pub fn new(params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmulatedChip {
+    match ble_beacon_add(params.device_name.clone(), chip_id, &params.chip_proto) {
+        Ok(facade_id) => {
+            info!("BleBeacon EmulatedChip created with facade_id: {facade_id} chip_id: {chip_id}");
+            SharedEmulatedChip(Arc::new(Mutex::new(Box::new(BleBeacon { facade_id, chip_id }))))
+        }
         Err(err) => {
             error!("{err:?}");
-            Arc::new(Box::new(BleBeacon { facade_id: u32::MAX, chip_id: u32::MAX }))
+            SharedEmulatedChip(Arc::new(Mutex::new(Box::new(BleBeacon {
+                facade_id: u32::MAX,
+                chip_id: u32::MAX,
+            }))))
         }
     }
 }

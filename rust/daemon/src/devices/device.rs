@@ -20,7 +20,6 @@ use protobuf::Message;
 use crate::devices::chip;
 use crate::devices::chip::Chip;
 use crate::devices::chip::ChipIdentifier;
-use crate::devices::chip::FacadeIdentifier;
 use netsim_proto::common::ChipKind as ProtoChipKind;
 use netsim_proto::model::Device as ProtoDevice;
 use netsim_proto::model::Orientation as ProtoOrientation;
@@ -59,7 +58,6 @@ impl Device {
 pub struct AddChipResult {
     pub device_id: DeviceIdentifier,
     pub chip_id: ChipIdentifier,
-    pub facade_id: FacadeIdentifier,
 }
 
 impl Device {
@@ -164,25 +162,14 @@ impl Device {
     }
 
     /// Remove a chip from a device.
-    pub fn remove_chip(
-        &mut self,
-        chip_id: ChipIdentifier,
-    ) -> Result<(Option<FacadeIdentifier>, String, ProtoChipKind, Vec<ProtoRadioStats>), String>
-    {
-        let (facade_id, device_name, kind, radio_stats) = {
-            if let Some(chip) = self.chips.get_mut(&chip_id) {
-                (
-                    chip.emulated_chip.as_ref().map(|c| c.get_facade_id()),
-                    self.name.clone(),
-                    chip.kind,
-                    chip.get_stats(),
-                )
-            } else {
-                return Err(format!("RemoveChip chip id {chip_id} not found"));
-            }
-        };
+    pub fn remove_chip(&mut self, chip_id: ChipIdentifier) -> Result<Vec<ProtoRadioStats>, String> {
+        let radio_stats = self
+            .chips
+            .get_mut(&chip_id)
+            .ok_or(format!("RemoveChip chip id {chip_id} not found"))
+            .map(|c| c.get_stats())?;
         match self.chips.remove(&chip_id) {
-            Some(_) => Ok((facade_id, device_name, kind, radio_stats)),
+            Some(_) => Ok(radio_stats),
             None => Err(format!("Key {chip_id} not found in Hashmap")),
         }
     }
@@ -199,7 +186,7 @@ impl Device {
             }
         }
 
-        let chip = chip::chip_new(&self.name, chip_create_params)?;
+        let chip = chip::new(self.id, &self.name, chip_create_params)?;
         let chip_id = chip.id;
         self.chips.insert(chip_id, chip);
 

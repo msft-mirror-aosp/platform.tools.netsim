@@ -16,11 +16,17 @@ pub mod ble_beacon;
 pub mod bluetooth;
 pub mod emulated_chip;
 pub mod mocked;
+pub mod packet;
 pub mod wifi;
 
-pub use crate::echip::emulated_chip::new;
+// TODO: Remove the allow block once it's stitched with pica library
+#[allow(dead_code, unused_variables)]
+mod uwb;
+
 pub use crate::echip::emulated_chip::CreateParam;
 pub use crate::echip::emulated_chip::EmulatedChip;
-use std::sync::Arc;
-
-pub type SharedEmulatedChip = Arc<Box<dyn EmulatedChip + Send + Sync>>;
+pub use crate::echip::emulated_chip::SharedEmulatedChip;
+pub use crate::echip::emulated_chip::{get, new, remove};
+pub use crate::echip::packet::{
+    handle_request, handle_request_cxx, handle_response, hwsim_cmd_response,
+};

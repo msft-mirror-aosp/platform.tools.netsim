@@ -20,6 +20,7 @@ pub mod captures;
 mod config;
 mod config_file;
 mod devices;
+mod echip;
 mod events;
 mod ffi;
 mod http_server;
@@ -29,14 +30,8 @@ mod rust_main;
 mod service;
 mod session;
 mod transport;
-mod util;
-mod uwb;
 mod version;
 mod wifi;
-
-// TODO(b/307145892): EmulatedChip Trait is actively being implemented.
-#[allow(dead_code, unused_variables)]
-mod echip;
 
 // This feature is enabled only for CMake builds
 #[cfg(feature = "local_ssl")]

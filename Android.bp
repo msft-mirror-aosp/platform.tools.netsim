@@ -53,10 +53,6 @@ cc_defaults {
     generated_sources: [
         "FrontendStub_cc",
     ],
-    include_dirs: [
-        "bionic/libc/kernel/uapi/",
-        "bionic/libc/kernel/android/uapi/",
-    ],
 }
 
 rust_defaults {
@@ -72,6 +68,7 @@ rust_defaults {
         "libhttp",
         "libnetsim_common",
         "libpdl_runtime",
+        "libpica",
         "libprotobuf",
         "libprotobuf_json_mapping",
         "libregex",
@@ -306,10 +303,12 @@ cc_test_host {
 
 rust_library_host {
     name: "libnetsim_proto",
+    features: ["cuttlefish"],
     crate_name: "netsim_proto",
     srcs: ["rust/proto/src/lib.rs"],
     rustlibs: [
         "libprotobuf",
+        "libgrpcio",
     ],
 }
 
@@ -406,5 +405,28 @@ rust_binary_host {
     srcs: ["rust/cli/bin/netsim.rs"],
     rustlibs: [
         "libnetsim_cli",
+    ],
+}
+
+rust_binary_host {
+    name: "netsim_test_client",
+    srcs: ["rust/frontend/src/netsim_test_client.rs"],
+    rustlibs: [
+        "libgrpcio",
+        "libnetsim_proto",
+        "libprotobuf",
+        "libnetsim_common",
+    ],
+}
+
+rust_binary_host {
+    name: "netsim_test_server",
+    srcs: ["rust/frontend/src/netsim_test_server.rs"],
+    rustlibs: [
+        "libgrpcio",
+        "libnetsim_proto",
+        "libprotobuf",
+        "libnetsim_common",
+        "libfutures",
     ],
 }

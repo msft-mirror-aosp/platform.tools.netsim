@@ -43,12 +43,10 @@ use crate::ffi::ffi_response_writable::CxxServerResponseWriter;
 use crate::ffi::CxxServerResponseWriterWrapper;
 use crate::http_server::server_response::ResponseWritable;
 use crate::resource::clone_captures;
-use crate::util::int_to_chip_kind;
 use crate::wifi::radiotap;
 
 use anyhow::anyhow;
 
-use super::capture::CaptureInfo;
 use super::pcap_util::{append_record, wrap_bt_packet, PacketDirection};
 use super::PCAP_MIME_TYPE;
 
@@ -64,7 +62,7 @@ const JSON_PRINT_OPTION: PrintOptions = PrintOptions {
 fn get_file(id: ChipIdentifier, device_name: String, chip_kind: ChipKind) -> Result<File> {
     let mut filename = netsim_common::system::netsimd_temp_dir();
     filename.push("pcaps");
-    filename.push(format!("{:?}-{:}-{:?}.pcap", id, device_name, chip_kind));
+    filename.push(format!("netsim-{:?}-{:}-{:?}.pcap", id, device_name, chip_kind));
     File::open(filename)
 }
 
@@ -94,7 +92,7 @@ fn handle_capture_get(writer: ResponseWritable, id: ChipIdentifier) -> anyhow::R
     let mut buffer = [0u8; CHUNK_LEN];
     let time_display = TimeDisplay::new(capture.seconds, capture.nanos as u32);
     let header_value = format!(
-        "attachment; filename=\"{:?}-{:}-{:?}-{}.pcap\"",
+        "attachment; filename=\"netsim-{:?}-{:}-{:?}-{}.pcap\"",
         id,
         capture.device_name.clone(),
         capture.chip_kind,
@@ -122,7 +120,9 @@ fn handle_capture_list(writer: ResponseWritable) -> anyhow::Result<()> {
     // Instantiate ListCaptureResponse and add Captures
     let mut response = ListCaptureResponse::new();
     for capture in captures.values() {
-        response.captures.push(capture.lock().unwrap().get_capture_proto());
+        response.captures.push(
+            capture.lock().expect("Failed to acquire lock on CaptureInfo").get_capture_proto(),
+        );
     }
 
     // Perform protobuf-json-mapping with the given protobuf
@@ -141,7 +141,10 @@ fn handle_capture_patch(
 ) -> anyhow::Result<()> {
     let captures_arc = clone_captures();
     let mut captures = captures_arc.write().unwrap();
-    if let Some(mut capture) = captures.get(id).map(|arc_capture| arc_capture.lock().unwrap()) {
+    if let Some(mut capture) = captures
+        .get(id)
+        .map(|arc_capture| arc_capture.lock().expect("Failed to acquire lock on CaptureInfo"))
+    {
         if state {
             capture.start_capture()?;
         } else {
@@ -225,31 +228,27 @@ pub fn handle_capture_cxx(
 
 /// A common code for handle_request and handle_response methods.
 fn handle_packet(
-    kind: u32,
-    facade_id: u32,
+    chip_id: ChipIdentifier,
     packet: &[u8],
     packet_type: u32,
     direction: PacketDirection,
 ) {
     let captures_arc = clone_captures();
     let captures = captures_arc.write().unwrap();
-    let facade_key = CaptureInfo::new_facade_key(int_to_chip_kind(kind), facade_id);
     if let Some(mut capture) = captures
-        .facade_key_to_capture
-        .get(&facade_key)
-        .map(|arc_capture| arc_capture.lock().unwrap())
+        .chip_id_to_capture
+        .get(&chip_id)
+        .map(|arc_capture| arc_capture.lock().expect("Failed to acquire lock on CaptureInfo"))
     {
+        let chip_kind = capture.chip_kind;
         if let Some(ref mut file) = capture.file {
             let timestamp =
                 SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
-            let packet_buf = match int_to_chip_kind(kind) {
+            let packet_buf = match chip_kind {
                 ChipKind::BLUETOOTH => wrap_bt_packet(direction, packet_type, packet),
                 ChipKind::WIFI => match radiotap::into_pcap(packet) {
-                    Ok(buffer) => buffer,
-                    Err(e) => {
-                        warn!("Invalid WiFi pcacket for capture {:?}", e);
-                        return;
-                    }
+                    Some(buffer) => buffer,
+                    None => return,
                 },
                 _ => {
                     warn!("Unknown capture type");
@@ -270,13 +269,13 @@ fn handle_packet(
 }
 
 /// Method for dispatcher to invoke (Host to Controller Packet Flow)
-pub fn handle_packet_request(kind: u32, facade_id: u32, packet: &[u8], packet_type: u32) {
-    handle_packet(kind, facade_id, packet, packet_type, PacketDirection::HostToController)
+pub fn handle_packet_request(chip_id: u32, packet: &[u8], packet_type: u32) {
+    handle_packet(chip_id, packet, packet_type, PacketDirection::HostToController)
 }
 
 /// Method for dispatcher to invoke (Controller to Host Packet Flow)
-pub fn handle_packet_response(kind: u32, facade_id: u32, packet: &[u8], packet_type: u32) {
-    handle_packet(kind, facade_id, packet, packet_type, PacketDirection::ControllerToHost)
+pub fn handle_packet_response(chip_id: u32, packet: &[u8], packet_type: u32) {
+    handle_packet(chip_id, packet, packet_type, PacketDirection::ControllerToHost)
 }
 
 /// Method for clearing pcap files in temp directory
