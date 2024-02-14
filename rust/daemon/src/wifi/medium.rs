@@ -45,12 +45,12 @@ pub enum HwsimCmdEnum {
 
 struct Station {
     client_id: u32,
-    addr: MacAddress, // virtual interface mac address
+    addr: MacAddress, // virtual interface mac address in HWSIM_ATTR_ADDR_TRANSMITTER
 }
 
 pub struct Medium {
     callback: HwsimCmdCallback,
-    stations: HashMap<MacAddress, Station>,
+    stations: HashMap<MacAddress, Station>, // Ieee80211 source address
 }
 
 type HwsimCmdCallback = fn(u32, &[u8]);
@@ -111,9 +111,20 @@ impl Medium {
                     "Frame chip {}, addr {}, flags {}, cookie {}, ieee80211 {}",
                     client_id, addr, flags, cookie, frame.ieee80211
                 );
-                // Creates Stations on the fly when there is no config file
-                let _ = self.stations.entry(addr).or_insert_with(|| Station::new(client_id, addr));
-                let sender = self.stations.get(&addr).unwrap();
+                let source_addr = frame.ieee80211.get_source();
+                // Creates Stations on the fly when there is no config file.
+                // WiFi Direct will use a randomized mac address for probing
+                // new networks. This block associates the new mac with the station.
+                // TODO: Why isn't the Mac send with HwsimCmd::AddMacAddr?
+                let _ = self.stations.entry(source_addr).or_insert_with(|| {
+                    info!(
+                        "Insert station with client id {}, HWSIM_ATTR_ADDR_TRANSMITTER {}, \
+                        Ieee80211 source: {}",
+                        client_id, addr, source_addr
+                    );
+                    Station::new(client_id, addr)
+                });
+                let sender = self.stations.get(&source_addr).unwrap();
                 self.queue_frame(sender, frame)
             }
             HwsimCmd::AddMacAddr => {
@@ -156,9 +167,12 @@ impl Medium {
     }
 
     /// Create from_ap packet and forward it to other stations.
+    /// TODO: Compare with the implementations in mac80211_hwsim.c and wmediumd.c.
     fn send_from_ap_packet_to_stations(&self, station: &Station, frame: &Frame) {
-        for (mac_address, dest_station) in &self.stations {
-            if station.client_id != dest_station.client_id {
+        let mut sent_addrs: HashSet<MacAddress> = HashSet::new();
+        for dest_station in self.stations.values() {
+            if station.addr != dest_station.addr && !sent_addrs.contains(&dest_station.addr) {
+                sent_addrs.insert(dest_station.addr);
                 self.send_from_ap_packet(station, dest_station, frame);
             }
         }
