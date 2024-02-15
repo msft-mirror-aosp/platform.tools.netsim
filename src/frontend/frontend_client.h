@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-// Frontend command line interface.
+// Frontend client
 #pragma once
 
+#include <cstdint>
 #include <memory>
-#include <string_view>
 #include <vector>
 
-#include "frontend.grpc.pb.h"
 #include "rust/cxx.h"
 
 namespace netsim {
@@ -53,7 +52,7 @@ class FrontendClient {
       frontend::GrpcMethod const &grpc_method,
       rust::Vec<rust::u8> const &request_byte_vec) const = 0;
   virtual std::unique_ptr<ClientResult> GetVersion() const = 0;
-  virtual std::unique_ptr<ClientResult> GetDevices() const = 0;
+  virtual std::unique_ptr<ClientResult> ListDevice() const = 0;
   virtual std::unique_ptr<ClientResult> PatchDevice(
       rust::Vec<rust::u8> const &request_byte_vec) const = 0;
   virtual std::unique_ptr<ClientResult> Reset() const = 0;
@@ -65,7 +64,7 @@ class FrontendClient {
       ClientResponseReader const &client_reader) const = 0;
 };
 
-std::unique_ptr<FrontendClient> NewFrontendClient();
+std::unique_ptr<FrontendClient> NewFrontendClient(const std::string &server);
 
 }  // namespace frontend
 }  // namespace netsim

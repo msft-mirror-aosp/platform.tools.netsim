@@ -19,14 +19,18 @@ REPO=$(dirname "$0")/../../..
 OS=$(uname | tr '[:upper:]' '[:lower:]') # The possible values are "linux" and "darwin".
 
 # Run clang-format.
-find $REPO/tools/netsim/src \( -name '*.cc' -o -name '*.h' -o -name '*.proto' \) \
+find $REPO/tools/netsim/src \( -name '*.cc' -o -name '*.h' \) \
+  -exec clang-format -i {} \;
+
+find $REPO/tools/netsim/proto \( -name '*.proto' \) \
   -exec clang-format -i {} \;
 
 # Format rust.
+RUSTFMT=$REPO/prebuilts/rust/$OS-x86/stable/rustfmt
 find $REPO/tools/netsim/rust \( \
   -path $REPO/tools/netsim/rust/target -prune -false \
   -o -name '*.rs' \) \
-  -exec $REPO/prebuilts/rust/$OS-x86/stable/rustfmt -v {} \;
+  -exec $RUSTFMT --files-with-diff {} \;
 
 # Format TypeScript.
 find $REPO/tools/netsim/ui/ts \( -name '*.ts' \) \
@@ -43,5 +47,5 @@ BPFMT=$REPO/prebuilts/build-tools/$OS-x86/bin/bpfmt
 if [ -f "$BPFMT" ]; then
     $BPFMT -w $REPO/tools/netsim/Android.bp
     $BPFMT -w $REPO/tools/netsim/ui/Android.bp
-    $BPFMT -w $REPO/tools/netsim/src/proto/Android.bp
+    $BPFMT -w $REPO/tools/netsim/proto/Android.bp
 fi

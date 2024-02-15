@@ -17,13 +17,16 @@
 #pragma once
 
 #include "grpcpp/channel.h"
-#include "packet_streamer.pb.h"
+#include "netsim/packet_streamer.pb.h"
 
 namespace netsim::packet {
 /*
 
 // Example:
-auto channel = PacketStreamerClientHelper.CreateChannel();
+
+auto channel = CreateChannel({.no_cli_ui = false,
+                              .no_web_ui = true,
+                              .netsim_args = "--dev --hci-port 12345"});
 std::unique_ptr<PacketStreamer::Stub> stub = PacketStreamer::NewStub(channel);
 
 ::grpc::ClientContext context;
@@ -43,11 +46,19 @@ wifi_stream.write(initial_request);
 using Stream = std::unique_ptr<
     ::grpc::ClientReaderWriter<packet::PacketRequest, packet::PacketResponse>>;
 
+struct NetsimdOptions {
+  bool no_cli_ui;
+  bool no_web_ui;
+  std::string netsim_args;
+};
+
 // Configure the endpoint for a server other than the local netsimd server.
 void SetPacketStreamEndpoint(const std::string &endpoint);
 
+std::shared_ptr<grpc::Channel> CreateChannel(NetsimdOptions);
+
+// Deprecated.
 std::shared_ptr<grpc::Channel> CreateChannel(
-    std::string rootcanal_default_commands_file = "",
     std::string rootcanal_controller_properties_file = "");
 
 }  // namespace netsim::packet
