@@ -64,6 +64,7 @@ rust_defaults {
         "libcxx",
         "libanyhow",
         "libdata_encoding",
+        "libglam",
         "libnetsim_proto",
         "libhttp",
         "libnetsim_common",
