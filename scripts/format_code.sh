@@ -36,6 +36,13 @@ find $REPO/tools/netsim/rust \( \
 find $REPO/tools/netsim/ui/ts \( -name '*.ts' \) \
   -exec clang-format -i {} \;
 
+# Format Java (go/google-java-format).
+find $REPO/tools/netsim \( -name '*.java' \) \
+  -exec google-java-format -i {} \;
+
+# Format Python (go/pyformat).
+pyformat --in_place --recursive $REPO/tools/netsim
+
 # Run cmake-format.
 find $REPO/tools/netsim \( -name 'CMakeLists.txt' \) \
   -exec cmake-format -i {} \;
@@ -45,7 +52,6 @@ find $REPO/tools/netsim/cmake \( -name "*.cmake" \) \
 # Run bpfmt to format Android.bp if in aosp_master repo.
 BPFMT=$REPO/prebuilts/build-tools/$OS-x86/bin/bpfmt
 if [ -f "$BPFMT" ]; then
-    $BPFMT -w $REPO/tools/netsim/Android.bp
-    $BPFMT -w $REPO/tools/netsim/ui/Android.bp
-    $BPFMT -w $REPO/tools/netsim/proto/Android.bp
+  find $find \( -name "Android.bp" \) \
+    -exec $BPFMT -w {} \;
 fi
