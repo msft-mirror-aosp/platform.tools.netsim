@@ -132,7 +132,7 @@ def main():
 
     # TODO: install_emulator with the provided emulator prebuilt
     # Here is a temporary check on whether build_chaining has successfully worked.
-    if target == "linux":
+    if platform.system().lower() == "linux":
       run(
           ["find", "/buildbot", "-name", "sdk-repo-linux-emulator*.zip"],
           cfg.get_env(),
