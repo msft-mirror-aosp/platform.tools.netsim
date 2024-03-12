@@ -16,6 +16,7 @@
 from __future__ import absolute_import, division, print_function
 
 import argparse
+import glob
 import logging
 import os
 from pathlib import Path
@@ -24,11 +25,14 @@ import shutil
 import sys
 import zipfile
 
+from install_emulator import InstallEmulatorManager
 from server_config import ServerConfig
 from utils import (
     AOSP_ROOT,
+    EMULATOR_ARTIFACT_PATH,
     cmake_toolchain,
     config_logging,
+    create_emulator_artifact_path,
     is_presubmit,
     log_system_info,
     platform_to_cmake_target,
@@ -39,6 +43,7 @@ from utils import (
 def main():
   config_logging()
   log_system_info()
+  create_emulator_artifact_path()
 
   parser = argparse.ArgumentParser(
       description=(
@@ -91,15 +96,12 @@ def main():
 
   out = Path(args.out_dir)
   if out.exists():
-    # Here is a temporary check on whether build_chaining has successfully worked.
-    if platform.system().lower() == "linux":
-      run(
-          ["ls", "-R"],
-          [],
-          "build_chaining_check",
-          throw_on_failure=False,
-          cwd=out,
-      )
+    # Fetch the Emulator prebuilts for build_bots (go/build_chaining)
+    prebuilt_path = out / "prebuilt_cached" / "artifacts"
+    files = glob.glob(str(prebuilt_path / f"*.zip"))
+    for file in files:
+      shutil.copyfile(prebuilt_path / file, EMULATOR_ARTIFACT_PATH / file)
+    # Clear out_dir
     shutil.rmtree(out)
   out.mkdir(exist_ok=True, parents=True)
 
@@ -142,8 +144,6 @@ def main():
         "bld",
     )
 
-    # TODO: install_emulator with the provided emulator prebuilt
-
     # Zip results..
     zip_fname = (
         dist / f"netsim-{platform_to_cmake_target(target)}-{args.build_id}.zip"
@@ -159,7 +159,14 @@ def main():
         logging.info("Adding %s as %s", fname, arcname)
         zipf.write(fname, arcname)
 
-  logging.info("Build completed!")
+    logging.info("Build completed!")
+
+    # Install Emulator artifacts
+    install_emulator_manager = InstallEmulatorManager(True, args.out_dir)
+    install_emulator_manager.process()
+
+    # TODO(b/328281760): Run E2E integration tests in external/adt-infra
+    logging.info("TODO(b/328281760): Enable E2E PyTests")
 
 
 if __name__ == "__main__":
