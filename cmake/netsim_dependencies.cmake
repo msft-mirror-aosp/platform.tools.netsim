@@ -75,6 +75,13 @@ else()
   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/distribution/emulator)
 endif()
 
+# We need the auto generated header for some components, so let's set the
+# ANDROID_HW_CONFIG_H variable to point to the generated header. Those that need
+# it can add it to their sources list, and it will be there.
+set(HW_PROPERTIES_INI
+    ${EXTERNAL_QEMU}/android/emu/avd/src/android/avd/hardware-properties.ini)
+android_generate_hw_config()
+
 # First make the protobuf and dependencies available to gRPC
 add_subdirectory(${EXTERNAL}/qemu/android/third_party/protobuf protobuf)
 
@@ -90,6 +97,9 @@ add_subdirectory(${EXTERNAL_QEMU}/android/third_party/libslirp libslirp)
 add_subdirectory(${EXTERNAL_QEMU}/android/third_party/googletest/ gtest)
 add_subdirectory(${EXTERNAL_QEMU}/android/third_party/lz4 lz4)
 add_subdirectory(${EXTERNAL_QEMU}/android/third_party/re2 re2)
+add_subdirectory(${EXTERNAL_QEMU}/android/third_party/libselinux libselinux)
+add_subdirectory(${EXTERNAL_QEMU}/android/third_party/libsparse libsparse)
+add_subdirectory(${EXTERNAL_QEMU}/android/third_party/ext4_utils ext4_utils)
 add_subdirectory(${EXTERNAL}/cares cares)
 add_subdirectory(${EXTERNAL}/glib/glib glib2)
 add_subdirectory(${EXTERNAL}/grpc/emulator grpc)
@@ -99,6 +109,9 @@ add_subdirectory(${EXTERNAL}/qemu/android-qemu2-glue/netsim
                  android-wifi-service)
 add_subdirectory(${EXTERNAL}/qemu/android/emu/base emu-base)
 add_subdirectory(${EXTERNAL}/qemu/android/emu/utils android-emu-utils)
+add_subdirectory(${EXTERNAL}/qemu/android/emu/files android-emu-files)
+add_subdirectory(${EXTERNAL}/qemu/android/emu/agents android-emu-agents)
+add_subdirectory(${EXTERNAL}/qemu/android/emu/proxy android-emu-proxy)
 add_subdirectory(${EXTERNAL}/webrtc/third_party/jsoncpp jsoncpp)
 
 if(NOT TARGET gfxstream-snapshot.headers)
