@@ -316,11 +316,6 @@ impl Medium {
             self.send_tx_info_frame(&frame);
             self.send_frame(&frame, &destination)?;
             Ok(true)
-        } else if destination.is_multicast() {
-            info!("Frame multicast {}", frame.ieee80211);
-            self.send_tx_info_frame(&frame);
-            self.broadcast_frame(&frame)?;
-            Ok(true)
         } else if destination.is_broadcast() {
             info!("Frame broadcast {}", frame.ieee80211);
             self.broadcast_frame(&frame)?;
@@ -328,6 +323,11 @@ impl Medium {
             // Pass to WiFiService so hostapd will send Probe Response for AndroidWiFi.
             // TODO: Only pass necessary packets to hostapd.
             Ok(false)
+        } else if destination.is_multicast() {
+            info!("Frame multicast {}", frame.ieee80211);
+            self.send_tx_info_frame(&frame);
+            self.broadcast_frame(&frame)?;
+            Ok(true)
         } else {
             // pass to libslirp
             Ok(false)
@@ -518,12 +518,8 @@ mod tests {
         let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame_mdns.csv");
         let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
         let mdns_frame = Frame::parse(&hwsim_msg).unwrap();
+        assert!(!mdns_frame.ieee80211.get_source().is_multicast());
         assert!(mdns_frame.ieee80211.get_destination().is_multicast());
-
-        let packet: Vec<u8> = include!("test_packets/hwsim_cmd_frame.csv");
-        let hwsim_msg = HwsimMsg::parse(&packet).unwrap();
-        let non_mdns_frame = Frame::parse(&hwsim_msg).unwrap();
-        assert!(!non_mdns_frame.ieee80211.get_destination().is_multicast());
     }
 
     #[test]
