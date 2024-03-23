@@ -59,6 +59,17 @@ AVAILABLE = {
     "darwin-aarch64": "toolchain-darwin-aarch64.cmake",
 }
 
+CMAKE = shutil.which(
+    "cmake",
+    path=str(
+        AOSP_ROOT
+        / "prebuilts"
+        / "cmake"
+        / f"{platform.system().lower()}-x86"
+        / "bin"
+    ),
+)
+
 
 def create_emulator_artifact_path():
   """Refresh or construct EMULATOR_ARTIFACT_PATH"""
