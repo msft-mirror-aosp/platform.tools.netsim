@@ -49,6 +49,8 @@ use std::sync::mpsc::Receiver;
 /// long as the program runs.
 #[no_mangle]
 pub unsafe extern "C" fn rust_main(argc: c_int, argv: *const *const c_char) {
+    // enable Rust backtrace by setting env RUST_BACKTRACE=full
+    env::set_var("RUST_BACKTRACE", "full");
     ffi_util::set_up_crash_report();
     netsim_logger::init("netsimd");
     let netsimd_args = get_netsimd_args(argc, argv);
@@ -278,6 +280,9 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
     // Start radio facades
     echip::bluetooth::bluetooth_start(&config.bluetooth, instance_num);
     echip::wifi::wifi_start(&config.wifi);
+    // TODO(b/278268690): Add Pica Library to goldfish build
+    #[cfg(feature = "cuttlefish")]
+    echip::uwb::uwb_start();
 
     // Create test beacons if required
     if config.bluetooth.test_beacons == Some(true) {
