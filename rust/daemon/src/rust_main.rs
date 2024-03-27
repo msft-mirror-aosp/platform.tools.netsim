@@ -280,6 +280,9 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
     // Start radio facades
     echip::bluetooth::bluetooth_start(&config.bluetooth, instance_num);
     echip::wifi::wifi_start(&config.wifi);
+    // TODO(b/278268690): Add Pica Library to goldfish build
+    #[cfg(feature = "cuttlefish")]
+    echip::uwb::uwb_start();
 
     // Create test beacons if required
     if config.bluetooth.test_beacons == Some(true) {
