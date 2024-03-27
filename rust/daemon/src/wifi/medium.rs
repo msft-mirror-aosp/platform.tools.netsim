@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::packets::ieee80211::{Ieee80211, Ieee80211Child, Ieee80211FromApBuilder, MacAddress};
-use super::packets::mac80211_hwsim::{
-    HwsimAttr, HwsimCmd, HwsimMsg, HwsimMsgBuilder, HwsimMsgHdr, NlMsgHdr,
-};
-use super::packets::netlink::NlAttrHdr;
-use crate::devices::chip::ChipIdentifier;
+use super::packets::ieee80211::MacAddress;
+use super::packets::mac80211_hwsim::{HwsimCmd, HwsimMsg, HwsimMsgBuilder, HwsimMsgHdr, NlMsgHdr};
 use crate::wifi::frame::Frame;
 use crate::wifi::hwsim_attr_set::HwsimAttrSet;
 use anyhow::{anyhow, Context};
 use lazy_static::lazy_static;
-use log::{debug, info, warn};
+use log::{info, warn};
 use pdl_runtime::Packet;
 use std::collections::{HashMap, HashSet};
 
@@ -38,6 +34,7 @@ lazy_static! {
     static ref HOSTAPD_BSSID: MacAddress = MacAddress::from(&HOSTAPD_BSSID_VEC);
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum HwsimCmdEnum {
     Unspec,
@@ -123,10 +120,6 @@ impl Medium {
         self.clients.get(&client_id).map(|c| c.to_owned())
     }
 
-    fn get_station_by_addr(&self, addr: MacAddress) -> Option<&Station> {
-        self.stations.get(&addr)
-    }
-
     /// Process commands from the kernel's mac80211_hwsim subsystem.
     ///
     /// This is the processing that will be implemented:
@@ -152,7 +145,7 @@ impl Medium {
 
     fn process_internal(&mut self, client_id: u32, packet: &[u8]) -> anyhow::Result<bool> {
         let hwsim_msg = HwsimMsg::parse(packet)?;
-        match (hwsim_msg.get_hwsim_hdr().hwsim_cmd) {
+        match hwsim_msg.get_hwsim_hdr().hwsim_cmd {
             HwsimCmd::Frame => {
                 let frame = Frame::parse(&hwsim_msg)?;
                 // Incoming frame must contain transmitter, flag, cookie, and tx_info fields.
@@ -229,7 +222,7 @@ impl Medium {
         let hwsim_msg = HwsimMsg::parse(packet)?;
         let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).context("HwsimAttrSet")?;
         let hwsim_cmd = hwsim_msg.get_hwsim_hdr().hwsim_cmd;
-        let hwsim_addr = match (hwsim_cmd) {
+        let hwsim_addr = match hwsim_cmd {
             HwsimCmd::Frame => attrs.receiver.context("missing receiver")?,
             HwsimCmd::TxInfoFrame => attrs.transmitter.context("missing transmitter")?,
             _ => return Err(anyhow!("Invalid HwsimMsg cmd={:?}", hwsim_cmd)),
@@ -299,7 +292,6 @@ impl Medium {
     // Delivers to each station once using Hwsim's TRANSMITTER address
     /// TODO: Compare with the implementations in mac80211_hwsim.c and wmediumd.c.
     fn broadcast_frame(&mut self, frame: &Frame) -> anyhow::Result<()> {
-        let source = frame.ieee80211.get_source();
         let destinations: HashSet<MacAddress> =
             self.stations.keys().map(|s| s.to_owned()).collect();
         for destination in destinations {
@@ -338,9 +330,9 @@ impl Medium {
     // and HOSTAPD_BSSID to frames with FromDS set.
     fn create_hwsim_attr(&self, frame: &Frame, receiver: &MacAddress) -> anyhow::Result<Vec<u8>> {
         let attrs = &frame.attrs;
-        let frame = match (self.ap_simulation
+        let frame = match self.ap_simulation
             && frame.ieee80211.is_to_ap()
-            && frame.ieee80211.get_bssid() == Some(*HOSTAPD_BSSID))
+            && frame.ieee80211.get_bssid() == Some(*HOSTAPD_BSSID)
         {
             true => frame.ieee80211.into_from_ap()?.to_vec(),
             false => attrs.frame.clone().unwrap(),
@@ -445,7 +437,7 @@ fn build_tx_info(hwsim_msg: &HwsimMsg) -> anyhow::Result<HwsimMsg> {
 // It's used by radiotap.rs for packet capture.
 pub fn parse_hwsim_cmd(packet: &[u8]) -> anyhow::Result<HwsimCmdEnum> {
     let hwsim_msg = HwsimMsg::parse(packet)?;
-    match (hwsim_msg.get_hwsim_hdr().hwsim_cmd) {
+    match hwsim_msg.get_hwsim_hdr().hwsim_cmd {
         HwsimCmd::Frame => {
             let frame = Frame::parse(&hwsim_msg)?;
             Ok(HwsimCmdEnum::Frame(Box::new(frame)))
