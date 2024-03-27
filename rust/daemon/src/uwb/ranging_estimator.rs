@@ -74,7 +74,6 @@ impl RangingEstimator for UwbRangingEstimator {
         let a_pose = Pose::new(a_p.x, a_p.y, a_p.z, a_o.yaw, a_o.pitch, a_o.roll);
         let b_pose = Pose::new(b_p.x, b_p.y, b_p.z, b_o.yaw, b_o.pitch, b_o.roll);
         let (range, azimuth, elevation) = compute_range_azimuth_elevation(&a_pose, &b_pose)?;
-        // Pica's RangingMeasurement range takes in centimeters
-        Ok(RangingMeasurement { range: range * 100, azimuth, elevation })
+        Ok(RangingMeasurement { range, azimuth, elevation })
     }
 }
