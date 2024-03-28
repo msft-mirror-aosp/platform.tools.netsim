@@ -335,11 +335,12 @@ impl Medium {
     }
 
     // Broadcast an 802.11 frame to all stations.
-    // Delivers to each station once using Hwsim's TRANSMITTER address
     /// TODO: Compare with the implementations in mac80211_hwsim.c and wmediumd.c.
     fn broadcast_from_sta_frame(&mut self, frame: &Frame, source: &Station) -> anyhow::Result<()> {
         for destination in self.stations.clone().values() {
-            self.send_from_sta_frame(frame, source, destination)?;
+            if source.addr != destination.addr {
+                self.send_from_sta_frame(frame, source, destination)?;
+            }
         }
         Ok(())
     }
