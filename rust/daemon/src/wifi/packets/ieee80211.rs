@@ -14,8 +14,10 @@
 
 //! ieee80211 frames
 
+// TODO: only allow the warnings for the included code
 #![allow(clippy::all)]
 #![allow(missing_docs)]
+#![allow(unused)]
 include!(concat!(env!("OUT_DIR"), "/ieee80211_packets.rs"));
 
 use anyhow::anyhow;
