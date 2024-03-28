@@ -37,10 +37,7 @@ impl SharedState {
     }
 
     pub fn get_chip_id(&self, pica_id: &Handle) -> anyhow::Result<ChipIdentifier> {
-        self.lock()
-            .get(pica_id)
-            .ok_or(anyhow::anyhow!("pica_id: {pica_id} not in State"))
-            .map(|id| *id)
+        self.lock().get(pica_id).ok_or(anyhow::anyhow!("pica_id: {pica_id} not in State")).copied()
     }
 
     pub fn insert(&self, pica_id: Handle, chip_id: ChipIdentifier) {
