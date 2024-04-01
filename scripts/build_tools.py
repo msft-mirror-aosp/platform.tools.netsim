@@ -26,6 +26,7 @@ import shutil
 from environment import get_default_environment
 from server_config import ServerConfig
 from tasks import (
+    TASK_LIST,
     get_tasks,
     log_enabled_tasks,
 )
@@ -102,6 +103,8 @@ def main():
   parser.add_argument(
       "--task",
       nargs="+",
+      type=str.lower,
+      choices=[choice.lower() for choice in TASK_LIST],
       help=(
           "Tasks to perform (Configure, Compile, CompileInstall,"
           " InstallEmulator, RunPyTest, LocalRunAll)"
