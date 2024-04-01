@@ -25,6 +25,15 @@ from tasks.run_pytest_task import RunPyTestTask
 from tasks.task import Task
 from tasks.zip_artifact_task import ZipArtifactTask
 
+TASK_LIST = [
+    "Configure",
+    "Compile",
+    "CompileInstall",
+    "InstallEmulator",
+    "RunPyTest",
+    "LocalRunAll",
+]
+
 
 def log_enabled_tasks(tasks):
   enabled_tasks = [
