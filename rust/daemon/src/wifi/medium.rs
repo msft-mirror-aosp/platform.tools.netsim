@@ -17,7 +17,6 @@ use super::packets::mac80211_hwsim::{HwsimCmd, HwsimMsg, HwsimMsgBuilder, HwsimM
 use crate::wifi::frame::Frame;
 use crate::wifi::hwsim_attr_set::HwsimAttrSet;
 use anyhow::{anyhow, Context};
-use lazy_static::lazy_static;
 use log::{info, warn};
 use pdl_runtime::Packet;
 use std::collections::{HashMap, HashSet};
@@ -26,13 +25,6 @@ const NLMSG_MIN_TYPE: u16 = 0x10;
 // Default values for mac80211_hwsim.
 const RX_RATE: u32 = 0;
 const SIGNAL: u32 = 4294967246; // -50
-
-// BSSID. MAC address of the access point in WiFi Service.
-// TODO: Use HOSTAPD_BSSID to initialize hostapd.
-const HOSTAPD_BSSID_VEC: [u8; 6] = [0x00, 0x13, 0x10, 0x85, 0xfe, 0x01];
-lazy_static! {
-    static ref HOSTAPD_BSSID: MacAddress = MacAddress::from(&HOSTAPD_BSSID_VEC);
-}
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -77,18 +69,33 @@ impl Client {
     }
 }
 
+// TODO: use interior mutability pattern where this class manages the locks.
+// 1. Callers hold Arc<Medium>
+// 2. clients: Mutex<HashMap<u32, Client>> and is modified under get_mut
+// 3. stations: Mutex<HashMap<MacAddress, Arc<Station>> and the result of
+//    get can be passed as an Arc since it is read-only
 pub struct Medium {
     callback: HwsimCmdCallback,
     stations: HashMap<MacAddress, Station>, // Ieee80211 source address
     clients: HashMap<u32, Client>,
+    // BSSID. MAC address of the access point in WiFi Service.
+    hostapd_bssid: MacAddress,
     ap_simulation: bool, // Simulate the re-transmission of frames sent to hostapd
 }
 
 type HwsimCmdCallback = fn(u32, &[u8]);
-
 impl Medium {
     pub fn new(callback: HwsimCmdCallback) -> Medium {
-        Self { callback, stations: HashMap::new(), clients: HashMap::new(), ap_simulation: true }
+        // Defined in external/qemu/android-qemu2-glue/emulation/WifiService.cpp
+        // TODO: Use hostapd_bssid to initialize hostapd.
+        let bssid_bytes: [u8; 6] = [0x00, 0x13, 0x10, 0x85, 0xfe, 0x01];
+        Self {
+            callback,
+            stations: HashMap::new(),
+            clients: HashMap::new(),
+            hostapd_bssid: MacAddress::from(&bssid_bytes),
+            ap_simulation: true,
+        }
     }
 
     pub fn add(&mut self, client_id: u32) {
@@ -142,6 +149,9 @@ impl Medium {
 
     fn process_internal(&mut self, client_id: u32, packet: &[u8]) -> anyhow::Result<bool> {
         let hwsim_msg = HwsimMsg::parse(packet)?;
+
+        // The virtio handler only accepts HWSIM_CMD_FRAME, HWSIM_CMD_TX_INFO_FRAME and HWSIM_CMD_REPORT_PMSR
+        // in https://source.corp.google.com/h/kernel/pub/scm/linux/kernel/git/torvalds/linux/+/master:drivers/net/wireless/virtual/mac80211_hwsim.c
         match hwsim_msg.get_hwsim_hdr().hwsim_cmd {
             HwsimCmd::Frame => {
                 let frame = Frame::parse(&hwsim_msg)?;
@@ -165,7 +175,6 @@ impl Medium {
                 // Creates Stations on the fly when there is no config file.
                 // WiFi Direct will use a randomized mac address for probing
                 // new networks. This block associates the new mac with the station.
-                // TODO: Why isn't the Mac send with HwsimCmd::AddMacAddr?
                 let source = self
                     .stations
                     .entry(src_addr)
@@ -183,24 +192,6 @@ impl Medium {
                     self.add(client_id);
                 }
                 self.queue_frame(frame, source)
-            }
-            HwsimCmd::AddMacAddr => {
-                let attr_set = HwsimAttrSet::parse(hwsim_msg.get_attributes())?;
-                if let (Some(addr), Some(hwaddr)) = (attr_set.transmitter, attr_set.receiver) {
-                    info!("ADD_MAC_ADDR transmitter {:?} receiver {:?}", hwaddr, addr);
-                } else {
-                    warn!("ADD_MAC_ADDR missing transmitter or receiver");
-                }
-                Ok(false)
-            }
-            HwsimCmd::DelMacAddr => {
-                let attr_set = HwsimAttrSet::parse(hwsim_msg.get_attributes())?;
-                if let (Some(addr), Some(hwaddr)) = (attr_set.transmitter, attr_set.receiver) {
-                    info!("DEL_MAC_ADDR transmitter {:?} receiver {:?}", hwaddr, addr);
-                } else {
-                    warn!("DEL_MAC_ADDR missing transmitter or receiver");
-                }
-                Ok(false)
             }
             _ => {
                 info!("Another command found {:?}", hwsim_msg);
@@ -372,7 +363,7 @@ impl Medium {
     }
 
     // Simulate transmission through hostapd by rewriting frames with 802.11 ToDS
-    // and HOSTAPD_BSSID to frames with FromDS set.
+    // and hostapd_bssid to frames with FromDS set.
     fn create_hwsim_attr(
         &self,
         frame: &Frame,
@@ -381,7 +372,7 @@ impl Medium {
         let attrs = &frame.attrs;
         let frame = match self.ap_simulation
             && frame.ieee80211.is_to_ap()
-            && frame.ieee80211.get_bssid() == Some(*HOSTAPD_BSSID)
+            && frame.ieee80211.get_bssid() == Some(self.hostapd_bssid)
         {
             true => frame.ieee80211.into_from_ap()?.to_vec(),
             false => attrs.frame.clone().unwrap(),
@@ -502,6 +493,8 @@ mod tests {
     use crate::wifi::packets::ieee80211::parse_mac_address;
     #[test]
     fn test_remove() {
+        let hostapd_bssid: MacAddress = parse_mac_address("00:13:10:85:fe:01").unwrap();
+
         let test_client_id: u32 = 1234;
         let other_client_id: u32 = 5678;
         let addr: MacAddress = parse_mac_address("00:0b:85:71:20:00").unwrap();
@@ -528,6 +521,7 @@ mod tests {
                 (test_client_id, Client::new()),
                 (other_client_id, Client::new()),
             ]),
+            hostapd_bssid,
             ap_simulation: true,
         };
 
