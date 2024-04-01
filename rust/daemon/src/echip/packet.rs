@@ -118,6 +118,7 @@ pub fn handle_response(chip_id: ChipIdentifier, packet: &cxx::CxxVector<u8>, pac
 }
 
 // Handle response from rust libraries
+#[cfg(feature = "cuttlefish")]
 pub fn handle_response_rust(chip_id: ChipIdentifier, packet: Bytes) {
     let packet_type = PacketType::HCI_PACKET_UNSPECIFIED.value() as u8;
     captures_handler::handle_packet_response(chip_id, &packet, packet_type.into());
