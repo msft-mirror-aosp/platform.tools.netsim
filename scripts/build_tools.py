@@ -16,12 +16,8 @@
 from __future__ import absolute_import, division, print_function
 
 import argparse
-import glob
 import logging
 import os
-from pathlib import Path
-import platform
-import shutil
 
 from environment import get_default_environment
 from server_config import ServerConfig
@@ -31,29 +27,13 @@ from tasks import (
 )
 from utils import (
     AOSP_ROOT,
-    EMULATOR_ARTIFACT_PATH,
     config_logging,
     create_emulator_artifact_path,
+    default_target,
+    fetch_build_chaining_artifacts,
     is_presubmit,
     log_system_info,
 )
-
-
-def fetch_build_chaining_artifacts(out_dir, presubmit):
-  """Fetch the Emulator prebuilts for build_bots (go/build_chaining)"""
-  try:
-    out = Path(out_dir)
-    prebuilt_path = out / "prebuilt_cached" / "artifacts"
-    files = glob.glob(str(prebuilt_path / f"*.zip"))
-    for file in files:
-      shutil.copy2(prebuilt_path / file, EMULATOR_ARTIFACT_PATH)
-  except Exception as e:
-    if presubmit:
-      raise e
-    else:
-      logging.warn(
-          f"An error ocurred during fetch_build_chaining_artifacts: {e}"
-      )
 
 
 def main():
@@ -85,7 +65,7 @@ def main():
   parser.add_argument(
       "--target",
       type=str,
-      default=platform.system(),
+      default=default_target(),
       help="The build target, defaults to current os",
   )
   parser.add_argument(
