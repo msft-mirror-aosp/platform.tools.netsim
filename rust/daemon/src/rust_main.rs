@@ -244,6 +244,11 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
     // Print config file settings
     info!("{:#?}", config);
 
+    if let Some(host_dns) = args.host_dns {
+        config.wifi.mut_or_insert_default().slirp_options.mut_or_insert_default().host_dns =
+            host_dns;
+    }
+
     let service_params = ServiceParams::new(
         fd_startup_str,
         args.no_cli_ui,
