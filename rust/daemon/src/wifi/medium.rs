@@ -20,6 +20,7 @@ use anyhow::{anyhow, Context};
 use log::{info, warn};
 use pdl_runtime::Packet;
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 const NLMSG_MIN_TYPE: u16 = 0x10;
 // Default values for mac80211_hwsim.
@@ -69,18 +70,15 @@ impl Client {
     }
 }
 
-// TODO: use interior mutability pattern where this class manages the locks.
-// 1. Callers hold Arc<Medium>
-// 2. clients: Mutex<HashMap<u32, Client>> and is modified under get_mut
-// 3. stations: Mutex<HashMap<MacAddress, Arc<Station>> and the result of
-//    get can be passed as an Arc since it is read-only
 pub struct Medium {
     callback: HwsimCmdCallback,
-    stations: HashMap<MacAddress, Station>, // Ieee80211 source address
-    clients: HashMap<u32, Client>,
+    // Ieee80211 source address
+    stations: Mutex<HashMap<MacAddress, Arc<Station>>>,
+    clients: Mutex<HashMap<u32, Client>>,
     // BSSID. MAC address of the access point in WiFi Service.
     hostapd_bssid: MacAddress,
-    ap_simulation: bool, // Simulate the re-transmission of frames sent to hostapd
+    // Simulate the re-transmission of frames sent to hostapd
+    ap_simulation: bool,
 }
 
 type HwsimCmdCallback = fn(u32, &[u8]);
@@ -91,40 +89,51 @@ impl Medium {
         let bssid_bytes: [u8; 6] = [0x00, 0x13, 0x10, 0x85, 0xfe, 0x01];
         Self {
             callback,
-            stations: HashMap::new(),
-            clients: HashMap::new(),
+            stations: Mutex::new(HashMap::new()),
+            clients: Mutex::new(HashMap::new()),
             hostapd_bssid: MacAddress::from(&bssid_bytes),
             ap_simulation: true,
         }
     }
 
-    pub fn add(&mut self, client_id: u32) {
-        let _ = self.clients.entry(client_id).or_insert_with(|| {
+    pub fn add(&self, client_id: u32) {
+        let _ = self.clients.lock().unwrap().entry(client_id).or_insert_with(|| {
             info!("Insert client {}", client_id);
             Client::new()
         });
     }
 
-    pub fn remove(&mut self, client_id: u32) {
-        self.stations.retain(|_, s| s.client_id != client_id);
-        self.clients.remove(&client_id);
+    pub fn remove(&self, client_id: u32) {
+        self.stations.lock().unwrap().retain(|_, s| s.client_id != client_id);
+        self.clients.lock().unwrap().remove(&client_id);
     }
 
-    pub fn reset(&mut self, client_id: u32) {
-        self.clients.get_mut(&client_id).map(|s| {
-            s.enabled = true;
-            s.tx_count = 0;
-            s.rx_count = 0;
-            s
-        });
+    pub fn reset(&self, client_id: u32) {
+        if let Some(client) = self.clients.lock().unwrap().get_mut(&client_id) {
+            client.enabled = true;
+            client.tx_count = 0;
+            client.rx_count = 0;
+        }
     }
 
     pub fn get(&self, client_id: u32) -> Option<Client> {
-        self.clients.get(&client_id).map(|c| c.to_owned())
+        self.clients.lock().unwrap().get(&client_id).map(|c| c.to_owned())
     }
 
-    fn get_station(&self, addr: &MacAddress) -> anyhow::Result<Station> {
-        self.stations.get(addr).cloned().context("get station")
+    fn contains_client(&self, client_id: u32) -> bool {
+        self.clients.lock().unwrap().contains_key(&client_id)
+    }
+
+    fn stations(&self) -> impl Iterator<Item = Arc<Station>> {
+        self.stations.lock().unwrap().clone().into_values()
+    }
+
+    fn contains_station(&self, addr: &MacAddress) -> bool {
+        self.stations.lock().unwrap().contains_key(addr)
+    }
+
+    fn get_station(&self, addr: &MacAddress) -> anyhow::Result<Arc<Station>> {
+        self.stations.lock().unwrap().get(addr).context("get station").cloned()
     }
 
     /// Process commands from the kernel's mac80211_hwsim subsystem.
@@ -139,7 +148,7 @@ impl Medium {
     ///
     /// * 802.11 multicast frames are re-broadcast to connected stations.
     ///
-    pub fn process(&mut self, client_id: u32, packet: &[u8]) -> bool {
+    pub fn process(&self, client_id: u32, packet: &[u8]) -> bool {
         self.process_internal(client_id, packet).unwrap_or_else(move |e| {
             // TODO: add this error to the netsim_session_stats
             warn!("error processing wifi {e}");
@@ -147,7 +156,7 @@ impl Medium {
         })
     }
 
-    fn process_internal(&mut self, client_id: u32, packet: &[u8]) -> anyhow::Result<bool> {
+    fn process_internal(&self, client_id: u32, packet: &[u8]) -> anyhow::Result<bool> {
         let hwsim_msg = HwsimMsg::parse(packet)?;
 
         // The virtio handler only accepts HWSIM_CMD_FRAME, HWSIM_CMD_TX_INFO_FRAME and HWSIM_CMD_REPORT_PMSR
@@ -177,6 +186,8 @@ impl Medium {
                 // new networks. This block associates the new mac with the station.
                 let source = self
                     .stations
+                    .lock()
+                    .unwrap()
                     .entry(src_addr)
                     .or_insert_with(|| {
                         info!(
@@ -184,14 +195,14 @@ impl Medium {
                         Ieee80211 addr: {}",
                             client_id, hwsim_addr, src_addr
                         );
-                        Station::new(client_id, src_addr, hwsim_addr)
+                        Arc::new(Station::new(client_id, src_addr, hwsim_addr))
                     })
                     .clone();
-                if !self.clients.contains_key(&client_id) {
+                if !self.contains_client(client_id) {
                     warn!("Client {} is missing", client_id);
                     self.add(client_id);
                 }
-                self.queue_frame(frame, source)
+                self.queue_frame(frame, &source)
             }
             _ => {
                 info!("Another command found {:?}", hwsim_msg);
@@ -202,14 +213,14 @@ impl Medium {
 
     /// Handle Wi-Fi MwsimMsg from libslirp and hostapd.
     /// Send it to clients.
-    pub fn process_response(&mut self, packet: &[u8]) {
+    pub fn process_response(&self, packet: &[u8]) {
         if let Err(e) = self.send_response(packet) {
             warn!("{}", e);
         }
     }
 
     /// Determine the client id based on Ieee80211 destination and send to client.
-    fn send_response(&mut self, packet: &[u8]) -> anyhow::Result<()> {
+    fn send_response(&self, packet: &[u8]) -> anyhow::Result<()> {
         let hwsim_msg = HwsimMsg::parse(packet)?;
         let hwsim_cmd = hwsim_msg.get_hwsim_hdr().hwsim_cmd;
         match hwsim_cmd {
@@ -222,14 +233,14 @@ impl Medium {
         Ok(())
     }
 
-    fn send_frame_response(&mut self, packet: &[u8], hwsim_msg: &HwsimMsg) -> anyhow::Result<()> {
+    fn send_frame_response(&self, packet: &[u8], hwsim_msg: &HwsimMsg) -> anyhow::Result<()> {
         let frame = Frame::parse(hwsim_msg)?;
         let dest_addr = frame.ieee80211.get_destination();
-        if let Some(destination) = self.stations.get(&dest_addr).cloned() {
+        if let Ok(destination) = self.get_station(&dest_addr) {
             self.send_from_ds_frame(packet, &frame, &destination)?;
         } else if dest_addr.is_multicast() {
-            for destination in self.stations.clone().values() {
-                self.send_from_ds_frame(packet, &frame, destination)?;
+            for destination in self.stations() {
+                self.send_from_ds_frame(packet, &frame, &destination)?;
             }
         } else {
             warn!("Send frame response to unknown destination: {}", dest_addr);
@@ -239,7 +250,7 @@ impl Medium {
 
     /// Send frame from DS to STA.
     fn send_from_ds_frame(
-        &mut self,
+        &self,
         packet: &[u8],
         frame: &Frame,
         destination: &Station,
@@ -261,9 +272,8 @@ impl Medium {
         let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).context("HwsimAttrSet")?;
         let hwsim_addr = attrs.transmitter.context("missing transmitter")?;
         let client_ids = self
-            .stations
-            .values()
-            .filter(|&v| v.hwsim_addr == hwsim_addr)
+            .stations()
+            .filter(|v| v.hwsim_addr == hwsim_addr)
             .map(|v| v.client_id)
             .collect::<HashSet<_>>();
         if client_ids.len() > 1 {
@@ -277,30 +287,37 @@ impl Medium {
         Ok(())
     }
 
-    pub fn set_enabled(&mut self, client_id: u32, enabled: bool) {
-        if let Some(client) = self.clients.get_mut(&client_id) {
+    pub fn set_enabled(&self, client_id: u32, enabled: bool) {
+        if let Some(client) = self.clients.lock().unwrap().get_mut(&client_id) {
             client.enabled = enabled;
         }
     }
 
     fn enabled(&self, client_id: u32) -> anyhow::Result<bool> {
-        Ok(self.clients.get(&client_id).context(format!("client {client_id} is missing"))?.enabled)
+        Ok(self
+            .clients
+            .lock()
+            .unwrap()
+            .get(&client_id)
+            .context(format!("client {client_id} is missing"))?
+            .enabled)
     }
 
     /// Create tx info frame to station to ack HwsimMsg.
-    fn send_tx_info_frame(&self, frame: &Frame) {
-        let client_id = self.stations.get(&frame.ieee80211.get_source()).unwrap().client_id;
+    fn send_tx_info_frame(&self, frame: &Frame) -> anyhow::Result<()> {
+        let client_id = self.get_station(&frame.ieee80211.get_source())?.client_id;
         let hwsim_msg_tx_info = build_tx_info(&frame.hwsim_msg).unwrap().to_vec();
         (self.callback)(client_id, &hwsim_msg_tx_info);
-    }
-
-    fn incr_tx(&mut self, client_id: u32) -> anyhow::Result<()> {
-        self.clients.get_mut(&client_id).context("incr_tx")?.tx_count += 1;
         Ok(())
     }
 
-    fn incr_rx(&mut self, client_id: u32) -> anyhow::Result<()> {
-        self.clients.get_mut(&client_id).context("incr_rx")?.rx_count += 1;
+    fn incr_tx(&self, client_id: u32) -> anyhow::Result<()> {
+        self.clients.lock().unwrap().get_mut(&client_id).context("incr_tx")?.tx_count += 1;
+        Ok(())
+    }
+
+    fn incr_rx(&self, client_id: u32) -> anyhow::Result<()> {
+        self.clients.lock().unwrap().get_mut(&client_id).context("incr_rx")?.rx_count += 1;
         Ok(())
     }
 
@@ -309,7 +326,7 @@ impl Medium {
     //
     // Simulates transmission through hostapd.
     fn send_from_sta_frame(
-        &mut self,
+        &self,
         frame: &Frame,
         source: &Station,
         destination: &Station,
@@ -327,34 +344,34 @@ impl Medium {
 
     // Broadcast an 802.11 frame to all stations.
     /// TODO: Compare with the implementations in mac80211_hwsim.c and wmediumd.c.
-    fn broadcast_from_sta_frame(&mut self, frame: &Frame, source: &Station) -> anyhow::Result<()> {
-        for destination in self.stations.clone().values() {
+    fn broadcast_from_sta_frame(&self, frame: &Frame, source: &Station) -> anyhow::Result<()> {
+        for destination in self.stations() {
             if source.addr != destination.addr {
-                self.send_from_sta_frame(frame, source, destination)?;
+                self.send_from_sta_frame(frame, source, &destination)?;
             }
         }
         Ok(())
     }
 
-    fn queue_frame(&mut self, frame: Frame, source: Station) -> anyhow::Result<bool> {
+    fn queue_frame(&self, frame: Frame, source: &Station) -> anyhow::Result<bool> {
         let dest_addr = frame.ieee80211.get_destination();
-        if self.stations.contains_key(&dest_addr) {
+        if self.contains_station(&dest_addr) {
             info!("Frame deliver from {} to {}", source.addr, dest_addr);
-            self.send_tx_info_frame(&frame);
+            self.send_tx_info_frame(&frame)?;
             let destination = self.get_station(&dest_addr)?;
-            self.send_from_sta_frame(&frame, &source, &destination)?;
+            self.send_from_sta_frame(&frame, source, &destination)?;
             Ok(true)
         } else if dest_addr.is_broadcast() {
             info!("Frame broadcast {}", frame.ieee80211);
-            self.broadcast_from_sta_frame(&frame, &source)?;
+            self.broadcast_from_sta_frame(&frame, source)?;
             // Stations send Probe Request management frame to the broadcast address to scan network actively.
             // Pass to WiFiService so hostapd will send Probe Response for AndroidWiFi.
             // TODO: Only pass necessary packets to hostapd.
             Ok(false)
         } else if dest_addr.is_multicast() {
             info!("Frame multicast {}", frame.ieee80211);
-            self.send_tx_info_frame(&frame);
-            self.broadcast_from_sta_frame(&frame, &source)?;
+            self.send_tx_info_frame(&frame)?;
+            self.broadcast_from_sta_frame(&frame, source)?;
             Ok(true)
         } else {
             // pass to libslirp
@@ -504,33 +521,33 @@ mod tests {
 
         // Create a test Medium object
         let callback: HwsimCmdCallback = |_, _| {};
-        let mut medium = Medium {
+        let medium = Medium {
             callback,
-            stations: HashMap::from([
-                (addr, Station { client_id: test_client_id, addr, hwsim_addr }),
+            stations: Mutex::new(HashMap::from([
+                (addr, Arc::new(Station { client_id: test_client_id, addr, hwsim_addr })),
                 (
                     other_addr,
-                    Station {
+                    Arc::new(Station {
                         client_id: other_client_id,
                         addr: other_addr,
                         hwsim_addr: other_hwsim_addr,
-                    },
+                    }),
                 ),
-            ]),
-            clients: HashMap::from([
+            ])),
+            clients: Mutex::new(HashMap::from([
                 (test_client_id, Client::new()),
                 (other_client_id, Client::new()),
-            ]),
+            ])),
             hostapd_bssid,
             ap_simulation: true,
         };
 
         medium.remove(test_client_id);
 
-        assert!(!medium.stations.contains_key(&addr));
-        assert!(medium.stations.contains_key(&other_addr));
-        assert!(!medium.clients.contains_key(&test_client_id));
-        assert!(medium.clients.contains_key(&other_client_id));
+        assert!(!medium.contains_station(&addr));
+        assert!(medium.contains_station(&other_addr));
+        assert!(!medium.contains_client(test_client_id));
+        assert!(medium.contains_client(other_client_id));
     }
 
     #[test]
