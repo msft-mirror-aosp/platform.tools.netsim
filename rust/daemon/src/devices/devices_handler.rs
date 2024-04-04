@@ -602,6 +602,7 @@ pub fn get_distance_cxx(a: u32, b: u32) -> f32 {
 }
 
 /// Function to obtain ProtoDevice given a ChipIdentifier
+#[cfg(feature = "cuttlefish")]
 pub fn get_device(chip_id: ChipIdentifier) -> anyhow::Result<ProtoDevice> {
     let device_id = chip::get(chip_id).map_err(|e| anyhow::anyhow!("{e:?}"))?.device_id;
     let device = {
