@@ -337,13 +337,9 @@ lazy_static! {
 fn connector_grpc_read_callback(stream_id: u32, proto_bytes: &[u8]) {
     let request = PacketRequest::parse_from_bytes(proto_bytes).unwrap();
 
-    let mut buffer = Vec::<u8>::new();
-    if request.has_hci_packet() {
-        buffer.push(request.hci_packet().packet_type.enum_value_or_default().value() as u8);
-        buffer.extend(&request.hci_packet().packet);
-    } else if request.has_packet() {
-        buffer.extend(request.packet());
-    }
+    let mut buffer = Vec::<u8>::with_capacity(request.hci_packet().packet.len() + 1);
+    buffer.push(request.hci_packet().packet_type.enum_value_or_default().value() as u8);
+    buffer.extend(&request.hci_packet().packet);
 
     if let Some(mut file_in) = CONNECTOR_FILES.read().unwrap().get(&stream_id) {
         if let Err(e) = file_in.write_all(&buffer[..]) {
@@ -370,9 +366,7 @@ fn connector_grpc_reader(chip_kind: u32, stream_id: u32, file_in: File) -> JoinH
                 }
                 binding.insert(stream_id, file_in);
             }
-            if (chip_kind != ChipKindEnum::BLUETOOTH as u32)
-                && (chip_kind != ChipKindEnum::UWB as u32)
-            {
+            if chip_kind != ChipKindEnum::BLUETOOTH as u32 {
                 warn!("Unable to register connector for chip type {}", chip_kind);
             }
             // Read packet from grpc and send to file_in.
