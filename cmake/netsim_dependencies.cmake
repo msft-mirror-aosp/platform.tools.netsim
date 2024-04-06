@@ -14,6 +14,55 @@ endif()
 
 message(STATUS "Using Python: ${Python_EXECUTABLE}")
 
+# Append the given flags to the existing CMAKE_C_FLAGS. Be careful as these
+# flags are global and used for every target! Note this will not do anything
+# under vs for now
+function(add_c_flag FLGS)
+  foreach(FLAG ${FLGS})
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FLAG}" PARENT_SCOPE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAG}" PARENT_SCOPE)
+  endforeach()
+endfunction()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_definitions("-DANDROID_DEBUG")
+  if(NOT WINDOWS_MSVC_X86_64)
+    add_c_flag("-O0 -g3")
+  else()
+    add_c_flag("-Zi -Od")
+  endif()
+
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT CROSSCOMPILE)
+    if(NOT OPTION_ASAN AND OPTION_ASAN_IN_DEBUG)
+      set(OPTION_ASAN address)
+    endif()
+
+    if(OPTION_ASAN STREQUAL "thread" AND OPTION_COVERAGE_IN_DEBUG)
+      message(FATAL_ERROR "You cannot run tsan with code coverage enabled.")
+    endif()
+    if(NOT WINDOWS_MSVC_X86_64 AND OPTION_COVERAGE_IN_DEBUG)
+      message("Enabling code coverage")
+      # Build an instrumented version of the code  that generates coverage
+      # mapping to enable code coverage analysis
+      set(ANDROID_CODE_COVERAGE TRUE)
+      add_c_flag("-fcoverage-mapping")
+      add_c_flag("-fprofile-instr-generate")
+      add_c_flag("-fprofile-arcs")
+      add_c_flag("-ftest-coverage")
+      add_c_flag("--coverage")
+    endif()
+  endif()
+else()
+  set(CMAKE_INSTALL_DO_STRIP TRUE)
+  add_definitions("-DNDEBUG=1")
+  if(WINDOWS_MSVC_X86_64)
+    # clang-cl takes msvc based parameters, so -O3 is a nop
+    add_c_flag("-O2")
+  else()
+    add_c_flag("-O3 -g3")
+  endif()
+endif()
+
 if(NOT DEFINED ANDROID_TARGET_TAG)
   message(
     WARNING
@@ -145,3 +194,8 @@ endif()
 # Testing
 enable_testing()
 include(GoogleTest)
+
+# Stripping flags for non-debug builds
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s")
+endif()
