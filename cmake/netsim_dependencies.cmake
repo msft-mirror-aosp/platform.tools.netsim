@@ -13,6 +13,19 @@ if(NOT Python_EXECUTABLE)
 endif()
 
 message(STATUS "Using Python: ${Python_EXECUTABLE}")
+if(NOT DEFINED ANDROID_TARGET_TAG)
+  message(
+    WARNING
+      "You should invoke the cmake generator with a proper toolchain from ${EXTERNAL_QEMU}/android/build/cmake, "
+      "Trying to infer toolchain, this might not work.")
+  list(APPEND CMAKE_MODULE_PATH "${EXTERNAL_QEMU}/android/build/cmake/")
+  include(toolchain)
+  _get_host_tag(TAG)
+  toolchain_configure_tags(${TAG})
+endif()
+
+include(android)
+include(prebuilts)
 
 # Append the given flags to the existing CMAKE_C_FLAGS. Be careful as these
 # flags are global and used for every target! Note this will not do anything
@@ -23,6 +36,20 @@ function(add_c_flag FLGS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAG}" PARENT_SCOPE)
   endforeach()
 endfunction()
+
+function(add_cxx_flag FLGS)
+  foreach(FLAG ${FLGS})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAG}" PARENT_SCOPE)
+  endforeach()
+endfunction()
+
+if(WINDOWS_MSVC_X86_64)
+  add_cxx_flag("-std:c++17")
+else()
+  add_cxx_flag("-std=c++17")
+endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions("-DANDROID_DEBUG")
@@ -63,19 +90,35 @@ else()
   endif()
 endif()
 
-if(NOT DEFINED ANDROID_TARGET_TAG)
-  message(
-    WARNING
-      "You should invoke the cmake generator with a proper toolchain from ${EXTERNAL_QEMU}/android/build/cmake, "
-      "Trying to infer toolchain, this might not work.")
-  list(APPEND CMAKE_MODULE_PATH "${EXTERNAL_QEMU}/android/build/cmake/")
-  include(toolchain)
-  _get_host_tag(TAG)
-  toolchain_configure_tags(${TAG})
+# Target specific configurations that we do not want to do in the
+# toolchain.cmake Toolchain variables seem to be overwritten pending your cmake
+# version.
+if(LINUX_X86_64)
+  add_c_flag("-Werror")
+  add_c_flag("-Wno-deprecated-declarations") # Protobuf generates deprecation
+                                             # warnings for deprecated enums
+  # And the asm type if we are compiling with yasm
+  set(ANDROID_NASM_TYPE elf64)
+  # This should make sure we have sufficient information left to properly print
+  # std::string etc. see b/156534499 for details.
+  add_c_flag("-fno-limit-debug-info")
+elseif(LINUX_AARCH64)
+  set(ANDROID_NASM_TYPE elf64)
+  add_c_flag("-fpermissive")
+elseif(WINDOWS_MSVC_X86_64)
+  # And the asm type if we are compiling with yasm
+  set(ANDROID_NASM_TYPE win64)
+  set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
+elseif(DARWIN_X86_64 OR DARWIN_AARCH64)
+  # And the asm type if we are compiling with yasm
+  set(ANDROID_NASM_TYPE macho64)
+  # Always consider the source to be darwin.
+  add_definitions(-D_DARWIN_C_SOURCE=1)
+  add_c_flag("-Wno-everything")
+else()
+  message(FATAL_ERROR "Unknown target!")
 endif()
 
-include(android)
-include(prebuilts)
 prebuilt(Threads)
 
 # We need the auto generated header for some components, so let's set the
@@ -172,6 +215,12 @@ add_subdirectory(${EXTERNAL}/qemu/android/emu/files android-emu-files)
 add_subdirectory(${EXTERNAL}/qemu/android/emu/agents android-emu-agents)
 add_subdirectory(${EXTERNAL}/qemu/android/emu/proxy android-emu-proxy)
 add_subdirectory(${EXTERNAL}/webrtc/third_party/jsoncpp jsoncpp)
+
+# Short term fix for missing glib2 dll for Windows build
+if(WINDOWS_MSVC_X86_64)
+  install(TARGETS glib2_${ANDROID_TARGET_TAG} RUNTIME DESTINATION .
+          LIBRARY DESTINATION .)
+endif()
 
 if(NOT TARGET gfxstream-snapshot.headers)
   # Fake dependency to satisfy linker
