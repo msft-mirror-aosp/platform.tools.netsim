@@ -53,6 +53,7 @@ std::unordered_map<uint32_t, grpc::ClientContext> contexts_;
 // Single connection to a server with multiple StreamPackets calls
 std::string server_;
 std::shared_ptr<grpc::Channel> channel_;
+grpc::ClientContext context_;
 std::unique_ptr<netsim::packet::PacketStreamer::Stub> stub_;
 
 // Call the StreamPackets RPC on server.

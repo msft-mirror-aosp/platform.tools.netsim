@@ -17,7 +17,7 @@ use super::packets::mac80211_hwsim::{HwsimCmd, HwsimMsg, HwsimMsgBuilder, HwsimM
 use crate::wifi::frame::Frame;
 use crate::wifi::hwsim_attr_set::HwsimAttrSet;
 use anyhow::{anyhow, Context};
-use log::{info, warn};
+use log::{debug, info, warn};
 use pdl_runtime::Packet;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -176,7 +176,7 @@ impl Medium {
                 let hwsim_addr = frame.transmitter.context("transmitter")?;
                 let flags = frame.flags.context("flags")?;
                 let cookie = frame.cookie.context("cookie")?;
-                info!(
+                debug!(
                     "Frame chip {}, transmitter {}, flags {}, cookie {}, ieee80211 {}",
                     client_id, hwsim_addr, flags, cookie, frame.ieee80211
                 );
@@ -221,6 +221,13 @@ impl Medium {
 
     /// Determine the client id based on Ieee80211 destination and send to client.
     fn send_response(&self, packet: &[u8]) -> anyhow::Result<()> {
+        // When Wi-Fi P2P is disabled, send all packets from WifiService to all clients.
+        if crate::config::get_disable_wifi_p2p() {
+            for client_id in self.clients.lock().unwrap().keys() {
+                (self.callback)(*client_id, packet);
+            }
+            return Ok(());
+        }
         let hwsim_msg = HwsimMsg::parse(packet)?;
         let hwsim_cmd = hwsim_msg.get_hwsim_hdr().hwsim_cmd;
         match hwsim_cmd {
@@ -336,7 +343,7 @@ impl Medium {
                 self.incr_tx(source.client_id)?;
                 self.incr_rx(destination.client_id)?;
                 (self.callback)(destination.client_id, &packet.clone().to_vec());
-                log_hwsim_msg(&packet, source.client_id, destination.client_id);
+                log_hwsim_msg(frame, source.client_id, destination.client_id);
             }
         }
         Ok(())
@@ -356,20 +363,20 @@ impl Medium {
     fn queue_frame(&self, frame: Frame, source: &Station) -> anyhow::Result<bool> {
         let dest_addr = frame.ieee80211.get_destination();
         if self.contains_station(&dest_addr) {
-            info!("Frame deliver from {} to {}", source.addr, dest_addr);
+            debug!("Frame deliver from {} to {}", source.addr, dest_addr);
             self.send_tx_info_frame(&frame)?;
             let destination = self.get_station(&dest_addr)?;
             self.send_from_sta_frame(&frame, source, &destination)?;
             Ok(true)
         } else if dest_addr.is_broadcast() {
-            info!("Frame broadcast {}", frame.ieee80211);
+            debug!("Frame broadcast {}", frame.ieee80211);
             self.broadcast_from_sta_frame(&frame, source)?;
             // Stations send Probe Request management frame to the broadcast address to scan network actively.
             // Pass to WiFiService so hostapd will send Probe Response for AndroidWiFi.
             // TODO: Only pass necessary packets to hostapd.
             Ok(false)
         } else if dest_addr.is_multicast() {
-            info!("Frame multicast {}", frame.ieee80211);
+            debug!("Frame multicast {}", frame.ieee80211);
             self.send_tx_info_frame(&frame)?;
             self.broadcast_from_sta_frame(&frame, source)?;
             Ok(true)
@@ -443,9 +450,8 @@ impl Medium {
     }
 }
 
-fn log_hwsim_msg(hwsim_msg: &HwsimMsg, client_id: u32, dest_client_id: u32) {
-    let frame = Frame::parse(hwsim_msg).unwrap();
-    info!(
+fn log_hwsim_msg(frame: &Frame, client_id: u32, dest_client_id: u32) {
+    debug!(
         "Sent hwsim_msg from client {} to {}. flags {:?}, ieee80211 {}",
         client_id, dest_client_id, frame.flags, frame.ieee80211,
     );
