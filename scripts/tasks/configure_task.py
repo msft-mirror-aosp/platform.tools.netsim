@@ -18,11 +18,7 @@ from pathlib import Path
 import platform
 import shutil
 from tasks.task import Task
-from utils import (
-    AOSP_ROOT,
-    cmake_toolchain,
-    run,
-)
+from utils import (AOSP_ROOT, cmake_toolchain, run, selective_rmtree)
 
 
 class ConfigureTask(Task):
@@ -38,8 +34,11 @@ class ConfigureTask(Task):
 
   def do_run(self):
     if self.out.exists():
-      # Clear out_dir
-      shutil.rmtree(self.out)
+      if platform.system() == "Windows":
+        # Clear out_dir except for "out/caches"
+        selective_rmtree(self.out, self.out / "caches")
+      else:
+        shutil.rmtree(self.out)
     self.out.mkdir(exist_ok=True, parents=True)
     cmake = shutil.which(
         "cmake",
