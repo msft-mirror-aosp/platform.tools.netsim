@@ -21,11 +21,11 @@ pub struct NetsimdArgs {
     pub fd_startup_str: Option<String>,
 
     /// Disable grpc server for CLI
-    #[arg(long, alias = "no_cli_ui")]
+    #[arg(long, alias = "no_cli_ui", default_value = "true")]
     pub no_cli_ui: bool,
 
     /// Disable web server
-    #[arg(long, alias = "no_web_ui")]
+    #[arg(long, alias = "no_web_ui", default_value = "true")]
     pub no_web_ui: bool,
 
     /// Enable packet capture
