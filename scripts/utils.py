@@ -72,16 +72,6 @@ CMAKE = shutil.which(
 )
 
 
-def selective_rmtree(root_dir: Path, preserve_dir: Path):
-  """Removes all fields and directories within root_dir except for preserve_dir"""
-  for item in root_dir.iterdir():
-    if item != preserve_dir:
-      if item.is_dir():
-        shutil.rmtree(item)
-      else:
-        item.unlink()
-
-
 def default_target() -> str:
   """Returns default value for target"""
   # If Mac M1, the default target should be 'darwin-aarch64'
