@@ -117,7 +117,7 @@ impl Chip {
     // stats for BLE and CLASSIC.
     pub fn get_stats(&self) -> Vec<ProtoRadioStats> {
         match &self.emulated_chip {
-            Some(emulated_chip) => emulated_chip.lock().get_stats(self.start.elapsed().as_secs()),
+            Some(emulated_chip) => emulated_chip.get_stats(self.start.elapsed().as_secs()),
             None => {
                 warn!("EmulatedChip hasn't been instantiated yet for chip_id {}", self.id);
                 Vec::<ProtoRadioStats>::new()
@@ -130,7 +130,7 @@ impl Chip {
         let mut proto_chip = self
             .emulated_chip
             .as_ref()
-            .map(|c| c.lock().get())
+            .map(|c| c.get())
             .ok_or(format!("EmulatedChip hasn't been instantiated yet for chip_id {}", self.id))?;
         proto_chip.kind = EnumOrUnknown::new(self.kind);
         proto_chip.id = self.id;
@@ -151,14 +151,14 @@ impl Chip {
         }
         self.emulated_chip
             .as_ref()
-            .map(|c| c.lock().patch(patch))
+            .map(|c| c.patch(patch))
             .ok_or(format!("EmulatedChip hasn't been instantiated yet for chip_id {}", self.id))
     }
 
     pub fn reset(&mut self) -> Result<(), String> {
         self.emulated_chip
             .as_ref()
-            .map(|c| c.lock().reset())
+            .map(|c| c.reset())
             .ok_or(format!("EmulatedChip hasn't been instantiated yet for chip_id {}", self.id))
     }
 }
@@ -299,7 +299,7 @@ mod tests {
         let actual = chip.get().unwrap();
 
         // Construct expected ProtoChip
-        let mut expected = mocked_echip.lock().get();
+        let mut expected = mocked_echip.get();
         expected.kind = EnumOrUnknown::new(chip.kind);
         expected.id = chip.id;
         expected.name = chip.name.clone();
