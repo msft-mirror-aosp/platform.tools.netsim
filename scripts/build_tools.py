@@ -18,10 +18,12 @@ from __future__ import absolute_import, division, print_function
 import argparse
 import logging
 import os
+from pathlib import Path
 
 from environment import get_default_environment
 from server_config import ServerConfig
 from tasks import (
+    TASK_LIST,
     get_tasks,
     log_enabled_tasks,
 )
@@ -82,6 +84,8 @@ def main():
   parser.add_argument(
       "--task",
       nargs="+",
+      type=str.lower,
+      choices=[choice.lower() for choice in TASK_LIST],
       help=(
           "Tasks to perform (Configure, Compile, CompileInstall,"
           " InstallEmulator, RunPyTest, LocalRunAll)"
@@ -108,10 +112,12 @@ def main():
   if not os.path.isabs(args.out_dir):
     args.out_dir = os.path.join(AOSP_ROOT, args.out_dir)
 
-  # Fetch Emulator Artifacts if buildbot
+  # Build preparation work for buildbot
   if args.buildbot:
     # Fetch Emulator Artifacts
     fetch_build_chaining_artifacts(args.out_dir, presubmit)
+    # Set the out_dir to "out/objs"
+    args.out_dir = Path(args.out_dir) / "objs"
 
   # Obtain tasks
   tasks = get_tasks(args, env)
