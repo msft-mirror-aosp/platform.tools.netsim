@@ -91,6 +91,12 @@ def main():
           " InstallEmulator, RunPyTest, LocalRunAll)"
       ),
   )
+  parser.add_argument(
+      "--config",
+      default="release",
+      choices=["debug", "release"],
+      help="Whether we are building a release or debug configuration.",
+  )
 
   args = parser.parse_args()
 
