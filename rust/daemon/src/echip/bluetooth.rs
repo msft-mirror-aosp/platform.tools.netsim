@@ -16,6 +16,7 @@ use crate::devices::chip::ChipIdentifier;
 use crate::echip::{EmulatedChip, SharedEmulatedChip};
 use crate::ffi::ffi_bluetooth;
 
+use bytes::Bytes;
 use cxx::{let_cxx_string, CxxString, CxxVector};
 use lazy_static::lazy_static;
 use log::{error, info};
@@ -79,7 +80,7 @@ fn patch_state(
 }
 
 impl EmulatedChip for Bluetooth {
-    fn handle_request(&self, packet: &[u8]) {
+    fn handle_request(&self, packet: Bytes) {
         // Lock to protect device_to_transport_ table in C++
         let _guard = ECHIP_BT_MUTEX.lock().expect("Failed to acquire lock on ECHIP_BT_MUTEX");
         ffi_bluetooth::handle_bt_request(self.rootcanal_id, packet[0], &packet[1..].to_vec())
