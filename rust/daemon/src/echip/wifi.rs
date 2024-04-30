@@ -93,9 +93,8 @@ lazy_static! {
 }
 
 impl EmulatedChip for Wifi {
-    fn handle_request(&self, packet: &[u8]) {
-        let bytes = Bytes::copy_from_slice(packet);
-        WIFI_MANAGER.request_sender.send((self.chip_id, bytes)).unwrap();
+    fn handle_request(&self, packet: Bytes) {
+        WIFI_MANAGER.request_sender.send((self.chip_id, packet)).unwrap();
     }
 
     fn reset(&self) {
