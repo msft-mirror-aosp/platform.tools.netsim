@@ -39,14 +39,14 @@ use protobuf::Enum;
 // When a connection arrives, the transport registers a responder
 // implementing Response trait for the packet stream.
 pub trait Response {
-    fn response(&mut self, packet: Vec<u8>, packet_type: u8);
+    fn response(&mut self, packet: Bytes, packet_type: u8);
 }
 
 // When a responder is registered a responder thread is created to
 // decouple the chip controller from the network. The thread reads
 // ResponsePacket from a queue and sends to responder.
 struct ResponsePacket {
-    packet: Vec<u8>,
+    packet: Bytes,
     packet_type: u8,
 }
 
@@ -103,12 +103,12 @@ pub fn handle_response(chip_id: ChipIdentifier, packet: &cxx::CxxVector<u8>, pac
     // 1. Per EChip Struct should contain private field of channel & facade_id
     // 2. Lookup from ECHIPS with given chip_id
     // 3. Call echips.handle_response
-    let packet_vec = packet.as_slice().to_vec();
-    captures_handler::handle_packet_response(chip_id, &packet_vec, packet_type.into());
+    let packet_bytes = Bytes::from(packet.as_slice().to_vec());
+    captures_handler::handle_packet_response(chip_id, &packet_bytes, packet_type.into());
 
     let mut binding = SENDERS.lock();
     if let Some(responder) = binding.get(&chip_id) {
-        if responder.send(ResponsePacket { packet: packet_vec, packet_type }).is_err() {
+        if responder.send(ResponsePacket { packet: packet_bytes, packet_type }).is_err() {
             warn!("handle_response: send failed for chip_id: {chip_id}");
             binding.remove(&chip_id);
         }
@@ -125,7 +125,7 @@ pub fn handle_response_rust(chip_id: ChipIdentifier, packet: Bytes) {
 
     let mut binding = SENDERS.lock();
     if let Some(responder) = binding.get(&chip_id) {
-        if responder.send(ResponsePacket { packet: packet.to_vec(), packet_type }).is_err() {
+        if responder.send(ResponsePacket { packet, packet_type }).is_err() {
             warn!("handle_response_rust: send failed for chip_id: {chip_id}");
             binding.remove(&chip_id);
         }
@@ -141,7 +141,10 @@ pub fn hwsim_cmd_response(client_id: u32, packet: &[u8]) {
 
     let mut senders = SENDERS.lock();
     if let Some(responder) = senders.get(&client_id) {
-        if responder.send(ResponsePacket { packet: packet.to_owned(), packet_type }).is_err() {
+        if responder
+            .send(ResponsePacket { packet: Bytes::from(packet.to_vec()), packet_type })
+            .is_err()
+        {
             warn!("send failed for client: {client_id}");
             senders.remove(&client_id); // Remove from the map using the value itself
         }
@@ -151,27 +154,28 @@ pub fn hwsim_cmd_response(client_id: u32, packet: &[u8]) {
 }
 
 /// Handle requests from transports.
-pub fn handle_request(chip_id: ChipIdentifier, packet: &mut Vec<u8>, packet_type: u8) {
+pub fn handle_request(chip_id: ChipIdentifier, packet: &Bytes, packet_type: u8) {
     captures_handler::handle_packet_request(chip_id, packet, packet_type.into());
 
+    let mut packet_vec = packet.to_vec();
     // Prepend packet_type to packet if specified
     if PacketType::HCI_PACKET_UNSPECIFIED.value()
         != <u8 as std::convert::Into<i32>>::into(packet_type)
     {
-        packet.insert(0, packet_type);
+        packet_vec.insert(0, packet_type);
     }
 
     // Perform handle_request
     match get(chip_id) {
-        Some(emulated_chip) => emulated_chip.handle_request(packet),
+        Some(emulated_chip) => emulated_chip.handle_request(Bytes::from(packet_vec)),
         None => warn!("SharedEmulatedChip doesn't exist for {chip_id}"),
     };
 }
 
 /// Handle requests from transports in C++.
 pub fn handle_request_cxx(chip_id: u32, packet: &cxx::CxxVector<u8>, packet_type: u8) {
-    let mut packet_vec = packet.as_slice().to_vec();
-    handle_request(chip_id, &mut packet_vec, packet_type);
+    let packet_bytes = Bytes::from(packet.as_slice().to_vec());
+    handle_request(chip_id, &packet_bytes, packet_type);
 }
 
 #[cfg(test)]
@@ -180,7 +184,7 @@ mod tests {
 
     struct TestTransport {}
     impl Response for TestTransport {
-        fn response(&mut self, _packet: Vec<u8>, _packet_type: u8) {}
+        fn response(&mut self, _packet: Bytes, _packet_type: u8) {}
     }
 
     #[test]
