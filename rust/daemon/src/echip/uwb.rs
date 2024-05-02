@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use futures::{channel::mpsc::UnboundedSender, sink::SinkExt};
+use futures::{channel::mpsc::UnboundedSender, sink::SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use pica::{Handle, Pica};
 
@@ -133,13 +133,13 @@ pub fn new(_create_params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmul
         rx_count: 0,
     };
 
-    // Thread for obtaining packet from pica and invoking handle_response_rust
-    let _ =
-        thread::Builder::new().name(format!("uwb_packet_response_{chip_id}")).spawn(move || {
-            for packet in futures::executor::block_on_stream(uci_sink_receiver) {
-                handle_response_rust(chip_id, packet.into());
-            }
-        });
+    // Spawn a future for obtaining packet from pica and invoking handle_response_rust
+    PICA_RUNTIME.spawn(async move {
+        let mut uci_sink_receiver = uci_sink_receiver;
+        while let Some(packet) = uci_sink_receiver.next().await {
+            handle_response_rust(chip_id, packet.into());
+        }
+    });
     Arc::new(Box::new(echip))
 }
 
