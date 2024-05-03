@@ -17,6 +17,7 @@ use super::packets::mac80211_hwsim::{HwsimCmd, HwsimMsg, HwsimMsgBuilder, HwsimM
 use crate::wifi::frame::Frame;
 use crate::wifi::hwsim_attr_set::HwsimAttrSet;
 use anyhow::{anyhow, Context};
+use bytes::Bytes;
 use log::{debug, info, warn};
 use pdl_runtime::Packet;
 use std::collections::{HashMap, HashSet};
@@ -81,7 +82,7 @@ pub struct Medium {
     ap_simulation: bool,
 }
 
-type HwsimCmdCallback = fn(u32, &[u8]);
+type HwsimCmdCallback = fn(u32, &Bytes);
 impl Medium {
     pub fn new(callback: HwsimCmdCallback) -> Medium {
         // Defined in external/qemu/android-qemu2-glue/emulation/WifiService.cpp
@@ -148,7 +149,7 @@ impl Medium {
     ///
     /// * 802.11 multicast frames are re-broadcast to connected stations.
     ///
-    pub fn process(&self, client_id: u32, packet: &[u8]) -> bool {
+    pub fn process(&self, client_id: u32, packet: &Bytes) -> bool {
         self.process_internal(client_id, packet).unwrap_or_else(move |e| {
             // TODO: add this error to the netsim_session_stats
             warn!("error processing wifi {e}");
@@ -156,7 +157,7 @@ impl Medium {
         })
     }
 
-    fn process_internal(&self, client_id: u32, packet: &[u8]) -> anyhow::Result<bool> {
+    fn process_internal(&self, client_id: u32, packet: &Bytes) -> anyhow::Result<bool> {
         let hwsim_msg = HwsimMsg::parse(packet)?;
 
         // The virtio handler only accepts HWSIM_CMD_FRAME, HWSIM_CMD_TX_INFO_FRAME and HWSIM_CMD_REPORT_PMSR
@@ -213,14 +214,14 @@ impl Medium {
 
     /// Handle Wi-Fi MwsimMsg from libslirp and hostapd.
     /// Send it to clients.
-    pub fn process_response(&self, packet: &[u8]) {
+    pub fn process_response(&self, packet: &Bytes) {
         if let Err(e) = self.send_response(packet) {
             warn!("{}", e);
         }
     }
 
     /// Determine the client id based on Ieee80211 destination and send to client.
-    fn send_response(&self, packet: &[u8]) -> anyhow::Result<()> {
+    fn send_response(&self, packet: &Bytes) -> anyhow::Result<()> {
         // When Wi-Fi P2P is disabled, send all packets from WifiService to all clients.
         if crate::config::get_disable_wifi_p2p() {
             for client_id in self.clients.lock().unwrap().keys() {
@@ -240,7 +241,7 @@ impl Medium {
         Ok(())
     }
 
-    fn send_frame_response(&self, packet: &[u8], hwsim_msg: &HwsimMsg) -> anyhow::Result<()> {
+    fn send_frame_response(&self, packet: &Bytes, hwsim_msg: &HwsimMsg) -> anyhow::Result<()> {
         let frame = Frame::parse(hwsim_msg)?;
         let dest_addr = frame.ieee80211.get_destination();
         if let Ok(destination) = self.get_station(&dest_addr) {
@@ -258,7 +259,7 @@ impl Medium {
     /// Send frame from DS to STA.
     fn send_from_ds_frame(
         &self,
-        packet: &[u8],
+        packet: &Bytes,
         frame: &Frame,
         destination: &Station,
     ) -> anyhow::Result<()> {
@@ -269,13 +270,13 @@ impl Medium {
             let hwsim_msg = self
                 .create_hwsim_msg(frame, &destination.hwsim_addr)
                 .context("Create HwsimMsg from WifiService")?;
-            (self.callback)(destination.client_id, &hwsim_msg.to_vec());
+            (self.callback)(destination.client_id, &hwsim_msg.to_vec().into());
         }
         self.incr_rx(destination.client_id)?;
         Ok(())
     }
 
-    fn send_tx_info_response(&self, packet: &[u8], hwsim_msg: &HwsimMsg) -> anyhow::Result<()> {
+    fn send_tx_info_response(&self, packet: &Bytes, hwsim_msg: &HwsimMsg) -> anyhow::Result<()> {
         let attrs = HwsimAttrSet::parse(hwsim_msg.get_attributes()).context("HwsimAttrSet")?;
         let hwsim_addr = attrs.transmitter.context("missing transmitter")?;
         let client_ids = self
@@ -314,7 +315,7 @@ impl Medium {
     fn send_tx_info_frame(&self, frame: &Frame) -> anyhow::Result<()> {
         let client_id = self.get_station(&frame.ieee80211.get_source())?.client_id;
         let hwsim_msg_tx_info = build_tx_info(&frame.hwsim_msg).unwrap().to_vec();
-        (self.callback)(client_id, &hwsim_msg_tx_info);
+        (self.callback)(client_id, &hwsim_msg_tx_info.into());
         Ok(())
     }
 
@@ -342,7 +343,7 @@ impl Medium {
             if let Some(packet) = self.create_hwsim_msg(frame, &destination.hwsim_addr) {
                 self.incr_tx(source.client_id)?;
                 self.incr_rx(destination.client_id)?;
-                (self.callback)(destination.client_id, &packet.clone().to_vec());
+                (self.callback)(destination.client_id, &packet.into());
                 log_hwsim_msg(frame, source.client_id, destination.client_id);
             }
         }
@@ -604,7 +605,7 @@ mod tests {
         assert_eq!(hwsim_msg_tx_info.get_hwsim_hdr().hwsim_cmd, HwsimCmd::TxInfoFrame);
     }
 
-    fn build_tx_info_and_compare(frame_bytes: &[u8], tx_info_expected_bytes: &[u8]) {
+    fn build_tx_info_and_compare(frame_bytes: &Bytes, tx_info_expected_bytes: &Bytes) {
         let frame = HwsimMsg::parse(frame_bytes).unwrap();
         let tx_info = build_tx_info(&frame).unwrap();
 
@@ -627,17 +628,17 @@ mod tests {
 
     #[test]
     fn test_build_tx_info_and_compare() {
-        let frame_bytes: Vec<u8> = include!("test_packets/hwsim_cmd_frame_request.csv");
-        let tx_info_expected_bytes: Vec<u8> =
-            include!("test_packets/hwsim_cmd_tx_info_response.csv");
+        let frame_bytes = Bytes::from(include!("test_packets/hwsim_cmd_frame_request.csv"));
+        let tx_info_expected_bytes =
+            Bytes::from(include!("test_packets/hwsim_cmd_tx_info_response.csv"));
         build_tx_info_and_compare(&frame_bytes, &tx_info_expected_bytes);
     }
 
     #[test]
     fn test_build_tx_info_and_compare_mdns() {
-        let frame_bytes: Vec<u8> = include!("test_packets/hwsim_cmd_frame_request_mdns.csv");
-        let tx_info_expected_bytes: Vec<u8> =
-            include!("test_packets/hwsim_cmd_tx_info_response_mdns.csv");
+        let frame_bytes = Bytes::from(include!("test_packets/hwsim_cmd_frame_request_mdns.csv"));
+        let tx_info_expected_bytes =
+            Bytes::from(include!("test_packets/hwsim_cmd_tx_info_response_mdns.csv"));
         build_tx_info_and_compare(&frame_bytes, &tx_info_expected_bytes);
     }
 }

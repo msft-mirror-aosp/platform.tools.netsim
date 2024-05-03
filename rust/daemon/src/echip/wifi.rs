@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::devices::chip::ChipIdentifier;
-use crate::echip::{packet::hwsim_cmd_response, EmulatedChip, SharedEmulatedChip};
+use crate::echip::{packet::handle_response, EmulatedChip, SharedEmulatedChip};
 use crate::ffi::ffi_wifi;
 use crate::wifi::medium::Medium;
 use bytes::Bytes;
@@ -83,7 +83,7 @@ impl WifiManager {
                 WIFI_MANAGER.medium.process_response(&packet);
             }
         });
-        WifiManager { medium: Medium::new(hwsim_cmd_response), request_sender, response_sender }
+        WifiManager { medium: Medium::new(handle_response), request_sender, response_sender }
     }
 }
 
