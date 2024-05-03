@@ -22,7 +22,7 @@ use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 
 use crate::devices::chip::ChipIdentifier;
-use crate::echip::packet::handle_response_rust;
+use crate::echip::packet::handle_response;
 use crate::uwb::ranging_estimator::{SharedState, UwbRangingEstimator};
 
 use std::sync::{Arc, Mutex};
@@ -53,7 +53,7 @@ pub struct Uwb {
     uci_stream_writer: UnboundedSender<Vec<u8>>,
     state: bool,
     tx_count: i32,
-    rx_count: i32, // TODO(b/330788870): Increment rx_count after handle_response_rust
+    rx_count: i32, // TODO(b/330788870): Increment rx_count after handle_response
 }
 
 impl EmulatedChip for Uwb {
@@ -137,7 +137,7 @@ pub fn new(_create_params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmul
     PICA_RUNTIME.spawn(async move {
         let mut uci_sink_receiver = uci_sink_receiver;
         while let Some(packet) = uci_sink_receiver.next().await {
-            handle_response_rust(chip_id, packet.into());
+            handle_response(chip_id, &Bytes::from(packet));
         }
     });
     Arc::new(Box::new(echip))
