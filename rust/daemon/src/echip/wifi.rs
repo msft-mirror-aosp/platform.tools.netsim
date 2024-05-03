@@ -23,6 +23,7 @@ use netsim_proto::config::WiFi as WiFiConfig;
 use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 use protobuf::{Message, MessageField};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -104,9 +105,9 @@ impl EmulatedChip for Wifi {
     fn get(&self) -> ProtoChip {
         let mut chip_proto = ProtoChip::new();
         if let Some(client) = WIFI_MANAGER.medium.get(self.chip_id) {
-            chip_proto.mut_wifi().state = Some(client.enabled);
-            chip_proto.mut_wifi().tx_count = client.tx_count as i32;
-            chip_proto.mut_wifi().rx_count = client.rx_count as i32;
+            chip_proto.mut_wifi().state = Some(client.enabled.load(Ordering::Relaxed));
+            chip_proto.mut_wifi().tx_count = client.tx_count.load(Ordering::Relaxed) as i32;
+            chip_proto.mut_wifi().rx_count = client.rx_count.load(Ordering::Relaxed) as i32;
         }
         chip_proto
     }
