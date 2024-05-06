@@ -392,6 +392,7 @@ impl Medium {
             // Stations send Probe Request management frame to the broadcast address to scan network actively.
             // Pass to WiFiService so hostapd will send Probe Response for AndroidWiFi.
             // TODO: Only pass necessary packets to hostapd.
+            self.incr_tx(source.client_id)?;
             Ok(false)
         } else if dest_addr.is_multicast() {
             debug!("Frame multicast {}", frame.ieee80211);
@@ -400,6 +401,7 @@ impl Medium {
             Ok(true)
         } else {
             // pass to libslirp
+            self.incr_tx(source.client_id)?;
             Ok(false)
         }
     }
