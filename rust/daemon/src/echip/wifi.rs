@@ -49,7 +49,7 @@ impl WifiManager {
         let (request_sender, rx) = std::sync::mpsc::channel::<(u32, Bytes)>();
 
         thread::spawn(move || {
-            const POLL_INTERVAL: Duration = Duration::from_micros(10);
+            const POLL_INTERVAL: Duration = Duration::from_millis(1);
             let mut next_instant = Instant::now() + POLL_INTERVAL;
 
             loop {
@@ -66,6 +66,7 @@ impl WifiManager {
                             || !WIFI_MANAGER.medium.process(chip_id, &packet)
                         {
                             ffi_wifi::handle_wifi_request(chip_id, &packet.to_vec());
+                            ffi_wifi::libslirp_main_loop_wait();
                         }
                     }
                     _ => {
@@ -77,12 +78,9 @@ impl WifiManager {
         });
 
         let (response_sender, rx) = std::sync::mpsc::channel::<Bytes>();
-        thread::spawn(move || {
-            loop {
-                // rx.recv() should either returns packets or timeout after 1 second.
-                let packet = rx.recv().unwrap();
-                WIFI_MANAGER.medium.process_response(&packet);
-            }
+        thread::spawn(move || loop {
+            let packet = rx.recv().unwrap();
+            WIFI_MANAGER.medium.process_response(&packet);
         });
         WifiManager { medium: Medium::new(handle_response), request_sender, response_sender }
     }
