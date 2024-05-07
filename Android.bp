@@ -73,6 +73,7 @@ rust_defaults {
         "libpica",
         "libprotobuf",
         "libprotobuf_json_mapping",
+        "librand",
         "libregex",
         "libserde",
         "libserde_json",
