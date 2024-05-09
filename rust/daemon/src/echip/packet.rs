@@ -101,7 +101,7 @@ impl PacketManager {
 }
 
 /// Handle requests from gRPC transport in C++.
-pub fn handle_response(chip_id: ChipIdentifier, packet: &cxx::CxxVector<u8>, packet_type: u8) {
+pub fn handle_response_cxx(chip_id: ChipIdentifier, packet: &cxx::CxxVector<u8>, packet_type: u8) {
     // TODO(b/314840701):
     // 1. Per EChip Struct should contain private field of channel & facade_id
     // 2. Lookup from ECHIPS with given chip_id
@@ -123,34 +123,12 @@ pub fn handle_response(chip_id: ChipIdentifier, packet: &cxx::CxxVector<u8>, pac
 }
 
 // Handle response from rust libraries
-#[cfg(feature = "cuttlefish")]
-pub fn handle_response_rust(chip_id: ChipIdentifier, packet: Bytes) {
+pub fn handle_response(chip_id: ChipIdentifier, packet: &Bytes) {
     let packet_type = PacketType::HCI_PACKET_UNSPECIFIED.value() as u8;
-    captures_handler::handle_packet_response(chip_id, &packet, packet_type.into());
+    captures_handler::handle_packet_response(chip_id, packet, packet_type.into());
 
     let result = if let Some(transport) = MANAGER.transports.read().unwrap().get(&chip_id) {
-        transport.send(ResponsePacket { packet, packet_type })
-    } else {
-        warn!("handle_response: chip {chip_id} not found");
-        Ok(())
-    };
-    // transports lock is now released
-    if let Err(e) = result {
-        warn!("handle_response: error {:?}", e);
-        unregister_transport(chip_id);
-    }
-}
-
-// Send HwsimCmd packets to guest OS.
-pub fn hwsim_cmd_response(chip_id: u32, packet: &[u8]) {
-    let packet_type = PacketType::HCI_PACKET_UNSPECIFIED;
-    captures_handler::handle_packet_response(chip_id, packet, packet_type as u32);
-
-    let result = if let Some(transport) = MANAGER.transports.read().unwrap().get(&chip_id) {
-        transport.send(ResponsePacket {
-            packet: Bytes::from(packet.to_vec()),
-            packet_type: packet_type as u8,
-        })
+        transport.send(ResponsePacket { packet: packet.clone(), packet_type })
     } else {
         warn!("handle_response: chip {chip_id} not found");
         Ok(())
