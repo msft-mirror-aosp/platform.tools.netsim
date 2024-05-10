@@ -12,52 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Frontend command line interface.
+// Frontend client
 #include "frontend/frontend_client.h"
 
 #include <google/protobuf/util/json_util.h>
 #include <grpcpp/support/status.h>
-#include <stdlib.h>
 
 #include <chrono>
 #include <cstdint>
-#include <iomanip>
-#include <iostream>
-#include <iterator>
 #include <memory>
-#include <optional>
-#include <sstream>
 #include <string>
-#include <string_view>
 
-#include "../../rust/frontend-client-cxx/cxx/frontend_client_cxx_generated.h"
-#include "frontend.grpc.pb.h"
-#include "frontend.pb.h"
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
 #include "grpcpp/support/status_code_enum.h"
-#include "model.pb.h"
-#include "util/ini_file.h"
+#include "netsim-cli/src/ffi.rs.h"
+#include "netsim/frontend.grpc.pb.h"
+#include "netsim/frontend.pb.h"
+#include "netsim/model.pb.h"
+#include "util/log.h"
 #include "util/os_utils.h"
-#include "util/string_utils.h"
 
 namespace netsim {
 namespace frontend {
 namespace {
 const std::chrono::duration kConnectionDeadline = std::chrono::seconds(1);
 
-std::unique_ptr<frontend::FrontendService::Stub> NewFrontendStub() {
-  auto port = netsim::osutils::GetServerAddress();
-  if (!port.has_value()) {
+std::unique_ptr<frontend::FrontendService::Stub> NewFrontendStub(
+    std::string server) {
+  if (server == "") {
     return {};
   }
-  auto server = "localhost:" + port.value();
   std::shared_ptr<grpc::Channel> channel =
       grpc::CreateChannel(server, grpc::InsecureChannelCredentials());
 
   auto deadline = std::chrono::system_clock::now() + kConnectionDeadline;
   if (!channel->WaitForConnected(deadline)) {
+    BtsLogWarn("Frontend gRPC channel not connected");
     return nullptr;
   }
 
@@ -91,10 +83,10 @@ class FrontendClientImpl : public FrontendClient {
   }
 
   // Gets the list of device information
-  std::unique_ptr<ClientResult> GetDevices() const override {
-    frontend::GetDevicesResponse response;
+  std::unique_ptr<ClientResult> ListDevice() const override {
+    frontend::ListDeviceResponse response;
     grpc::ClientContext context_;
-    auto status = stub_->GetDevices(&context_, {}, &response);
+    auto status = stub_->ListDevice(&context_, {}, &response);
     return make_result(status, response);
   }
 
@@ -102,6 +94,24 @@ class FrontendClientImpl : public FrontendClient {
     grpc::ClientContext context_;
     google::protobuf::Empty response;
     auto status = stub_->Reset(&context_, {}, &response);
+    return make_result(status, response);
+  }
+
+  std::unique_ptr<ClientResult> CreateDevice(
+      rust::Vec<::rust::u8> const &request_byte_vec) const {
+    frontend::CreateDeviceResponse response;
+    grpc::ClientContext context_;
+    frontend::CreateDeviceRequest request;
+    if (!request.ParseFromArray(request_byte_vec.data(),
+                                request_byte_vec.size())) {
+      return make_result(
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing CreateDevice request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
+          response);
+    }
+    auto status = stub_->CreateDevice(&context_, request, &response);
     return make_result(status, response);
   }
 
@@ -124,49 +134,69 @@ class FrontendClientImpl : public FrontendClient {
     return make_result(status, response);
   }
 
-  // Get the list of Pcap information
-  std::unique_ptr<ClientResult> ListPcap() const override {
-    frontend::ListPcapResponse response;
-    grpc::ClientContext context_;
-    auto status = stub_->ListPcap(&context_, {}, &response);
-    return make_result(status, response);
-  }
-
-  // Patch the Pcap
-  std::unique_ptr<ClientResult> PatchPcap(
-      rust::Vec<::rust::u8> const &request_byte_vec) const override {
+  std::unique_ptr<ClientResult> DeleteChip(
+      rust::Vec<::rust::u8> const &request_byte_vec) const {
     google::protobuf::Empty response;
     grpc::ClientContext context_;
-    frontend::PatchPcapRequest request;
+    frontend::DeleteChipRequest request;
     if (!request.ParseFromArray(request_byte_vec.data(),
                                 request_byte_vec.size())) {
       return make_result(
           grpc::Status(
               grpc::StatusCode::INVALID_ARGUMENT,
-              "Error parsing PatchPcap request protobuf. request size:" +
+              "Error parsing DeleteChip request protobuf. request size:" +
                   std::to_string(request_byte_vec.size())),
           response);
-    };
-    auto status = stub_->PatchPcap(&context_, request, &response);
+    }
+    auto status = stub_->DeleteChip(&context_, request, &response);
     return make_result(status, response);
   }
 
-  // Download pcap file by using ClientResponseReader to handle streaming grpc
-  std::unique_ptr<ClientResult> GetPcap(
-      rust::Vec<::rust::u8> const &request_byte_vec,
-      ClientResponseReader const &client_reader) const override {
+  // Get the list of Capture information
+  std::unique_ptr<ClientResult> ListCapture() const override {
+    frontend::ListCaptureResponse response;
     grpc::ClientContext context_;
-    frontend::GetPcapRequest request;
+    auto status = stub_->ListCapture(&context_, {}, &response);
+    return make_result(status, response);
+  }
+
+  // Patch the Capture
+  std::unique_ptr<ClientResult> PatchCapture(
+      rust::Vec<::rust::u8> const &request_byte_vec) const override {
+    google::protobuf::Empty response;
+    grpc::ClientContext context_;
+    frontend::PatchCaptureRequest request;
     if (!request.ParseFromArray(request_byte_vec.data(),
                                 request_byte_vec.size())) {
       return make_result(
-          grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
-                       "Error parsing GetPcap request protobuf. request size:" +
-                           std::to_string(request_byte_vec.size())),
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing PatchCapture request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
+          response);
+    };
+    auto status = stub_->PatchCapture(&context_, request, &response);
+    return make_result(status, response);
+  }
+
+  // Download capture file by using ClientResponseReader to handle streaming
+  // grpc
+  std::unique_ptr<ClientResult> GetCapture(
+      rust::Vec<::rust::u8> const &request_byte_vec,
+      ClientResponseReader const &client_reader) const override {
+    grpc::ClientContext context_;
+    frontend::GetCaptureRequest request;
+    if (!request.ParseFromArray(request_byte_vec.data(),
+                                request_byte_vec.size())) {
+      return make_result(
+          grpc::Status(
+              grpc::StatusCode::INVALID_ARGUMENT,
+              "Error parsing GetCapture request protobuf. request size:" +
+                  std::to_string(request_byte_vec.size())),
           google::protobuf::Empty());
     };
-    auto reader = stub_->GetPcap(&context_, request);
-    frontend::GetPcapResponse chunk;
+    auto reader = stub_->GetCapture(&context_, request);
+    frontend::GetCaptureResponse chunk;
     // Read every available chunks from grpc reader
     while (reader->Read(&chunk)) {
       // Using a mutable protobuf here so the move iterator can move
@@ -178,15 +208,8 @@ class FrontendClientImpl : public FrontendClient {
       client_reader.handle_chunk(
           rust::Slice<const uint8_t>{bytes.data(), bytes.size()});
     }
-    // Temporary tests calling handle_chunk and handle_error
-    std::cout << "GetPcap in frontend_client.cc calling handle_chunk..."
-              << std::endl;
-    client_reader.handle_chunk(rust::Slice<const uint8_t>());
-    std::cout << "GetPcap in frontend_client.cc calling handle_error..."
-              << std::endl;
-    client_reader.handle_error(1, "placeholder error response");
-    // TOOD: update to reflect actual status
-    return make_result(grpc::Status::OK, google::protobuf::Empty());
+    auto status = reader->Finish();
+    return make_result(status, google::protobuf::Empty());
   }
 
   // Helper function to redirect to the correct Grpc call
@@ -196,16 +219,20 @@ class FrontendClientImpl : public FrontendClient {
     switch (grpc_method) {
       case frontend::GrpcMethod::GetVersion:
         return GetVersion();
+      case frontend::GrpcMethod::CreateDevice:
+        return CreateDevice(request_byte_vec);
+      case frontend::GrpcMethod::DeleteChip:
+        return DeleteChip(request_byte_vec);
       case frontend::GrpcMethod::PatchDevice:
         return PatchDevice(request_byte_vec);
-      case frontend::GrpcMethod::GetDevices:
-        return GetDevices();
+      case frontend::GrpcMethod::ListDevice:
+        return ListDevice();
       case frontend::GrpcMethod::Reset:
         return Reset();
-      case frontend::GrpcMethod::ListPcap:
-        return ListPcap();
-      case frontend::GrpcMethod::PatchPcap:
-        return PatchPcap(request_byte_vec);
+      case frontend::GrpcMethod::ListCapture:
+        return ListCapture();
+      case frontend::GrpcMethod::PatchCapture:
+        return PatchCapture(request_byte_vec);
       default:
         return make_result(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
                                         "Unknown GrpcMethod found."),
@@ -220,20 +247,20 @@ class FrontendClientImpl : public FrontendClient {
                           const std::string &message) {
     if (status.ok()) return true;
     if (status.error_code() == grpc::StatusCode::UNAVAILABLE)
-      std::cerr << "error: netsim frontend service is unavailable, "
-                   "please restart."
-                << std::endl;
+      BtsLogError(
+          "netsim frontend service is unavailable, "
+          "please restart.");
     else
-      std::cerr << "error: request to service failed (" << status.error_code()
-                << ") - " << status.error_message() << std::endl;
+      BtsLogError("request to frontend service failed (%d) - %s",
+                  status.error_code(), status.error_message().c_str());
     return false;
   }
 };
 
 }  // namespace
 
-std::unique_ptr<FrontendClient> NewFrontendClient() {
-  auto stub = NewFrontendStub();
+std::unique_ptr<FrontendClient> NewFrontendClient(const std::string &server) {
+  auto stub = NewFrontendStub(server);
   return (stub == nullptr
               ? nullptr
               : std::make_unique<FrontendClientImpl>(std::move(stub)));

@@ -1,6 +1,8 @@
-import {State, Chip, Device as ProtoDevice} from './model.js';
+import {Capture, Chip, Chip_Radio, Device as ProtoDevice,} from './netsim/model.js';
+
 // URL for netsim
-const DEVICES_URL = 'http://localhost:7681/v1/devices';
+const DEVICES_URL = './v1/devices';
+const CAPTURES_URL = './v1/captures';
 
 /**
  * Interface for a method in notifying the subscribed observers.
@@ -21,7 +23,7 @@ export class Device {
     this.device = device;
   }
 
-  get name() : string {
+  get name(): string {
     return this.device.name;
   }
 
@@ -29,16 +31,20 @@ export class Device {
     this.device.name = value;
   }
 
-  get position() : {x: number; y: number; z: number} {
+  get position(): {x: number; y: number; z: number} {
     const result = {x: 0, y: 0, z: 0};
-    if ("position" in this.device && this.device.position && typeof this.device.position === 'object') {
-      if ("x" in this.device.position && typeof this.device.position.x === 'number') {
+    if ('position' in this.device && this.device.position &&
+        typeof this.device.position === 'object') {
+      if ('x' in this.device.position &&
+          typeof this.device.position.x === 'number') {
         result.x = this.device.position.x;
       }
-      if ("y" in this.device.position && typeof this.device.position.y === 'number') {
+      if ('y' in this.device.position &&
+          typeof this.device.position.y === 'number') {
         result.y = this.device.position.y;
       }
-      if ("z" in this.device.position && typeof this.device.position.z === 'number') {
+      if ('z' in this.device.position &&
+          typeof this.device.position.z === 'number') {
         result.z = this.device.position.z;
       }
     }
@@ -49,16 +55,20 @@ export class Device {
     this.device.position = pos;
   }
 
-  get orientation() : {yaw: number; pitch: number; roll: number} {
+  get orientation(): {yaw: number; pitch: number; roll: number} {
     const result = {yaw: 0, pitch: 0, roll: 0};
-    if ("orientation" in this.device && this.device.orientation && typeof this.device.orientation === 'object') {
-      if ("yaw" in this.device.orientation && typeof this.device.orientation.yaw === 'number') {
+    if ('orientation' in this.device && this.device.orientation &&
+        typeof this.device.orientation === 'object') {
+      if ('yaw' in this.device.orientation &&
+          typeof this.device.orientation.yaw === 'number') {
         result.yaw = this.device.orientation.yaw;
       }
-      if ("pitch" in this.device.orientation && typeof this.device.orientation.pitch === 'number') {
+      if ('pitch' in this.device.orientation &&
+          typeof this.device.orientation.pitch === 'number') {
         result.pitch = this.device.orientation.pitch;
       }
-      if ("roll" in this.device.orientation && typeof this.device.orientation.roll === 'number') {
+      if ('roll' in this.device.orientation &&
+          typeof this.device.orientation.roll === 'number') {
         result.roll = this.device.orientation.roll;
       }
     }
@@ -70,7 +80,7 @@ export class Device {
   }
 
   // TODO modularize getters and setters for Chip Interface
-  get chips() : Chip[] {
+  get chips(): Chip[] {
     return this.device.chips ?? [];
   }
 
@@ -79,52 +89,27 @@ export class Device {
     this.device.chips = value;
   }
 
-  get visible() : boolean {
-    return this.device.visible ?? true;
+  get visible(): boolean {
+    return Boolean(this.device.visible);
   }
 
   set visible(value: boolean) {
     this.device.visible = value;
   }
 
-  toggleChipState(chip: Chip, btType?: string) {
-    if ("bt" in chip && chip.bt) {
-      if (typeof(btType) === 'undefined') {
-        // eslint-disable-next-line
-        console.log("netsim-ui: must specify lowEnergy or classic for Bluetooth");
-        return;
-      }
-      if (btType === "lowEnergy" && "lowEnergy" in chip.bt && chip.bt.lowEnergy) {
-        if ("state" in chip.bt.lowEnergy) {
-          chip.bt.lowEnergy.state = chip.bt.lowEnergy.state === State.ON ? State.OFF : State.ON;
-        }
-      }
-      if (btType === "classic" && "classic" in chip.bt && chip.bt.classic) {
-        if ("state" in chip.bt.classic) {
-          chip.bt.classic.state = chip.bt.classic.state === State.ON ? State.OFF : State.ON;
-        }
-      }
-    }
-    if ("wifi" in chip && chip.wifi) {
-      if ("state" in chip.wifi) {
-        chip.wifi.state = chip.wifi.state === State.ON ? State.OFF : State.ON;
-      }
-    }
-    if ("uwb" in chip && chip.uwb) {
-      if ("state" in chip.uwb) {
-        chip.uwb.state = chip.uwb.state ===  State.ON ? State.OFF : State.ON;
-      }
-    }
-
+  toggleChipState(radio: Chip_Radio) {
+    radio.state = !radio.state;
   }
 
   toggleCapture(device: Device, chip: Chip) {
-    if ("capture" in chip && chip.capture) {
-      chip.capture = chip.capture ===  State.ON ? State.OFF : State.ON;
-      simulationState.patchDevice({device: {
-        name: device.name,
-        chips: device.chips,
-      }});
+    if ('capture' in chip && chip.capture) {
+      chip.capture = !chip.capture;
+      simulationState.patchDevice({
+        device: {
+          name: device.name,
+          chips: device.chips,
+        },
+      });
     }
   }
 }
@@ -135,12 +120,10 @@ export class Device {
  */
 export interface SimulationInfo {
   devices: Device[];
+  captures: Capture[];
   selectedId: string;
-  dimension: {
-    x: number;
-    y: number;
-    z: number;
-  };
+  dimension: {x: number; y: number; z: number};
+  lastModified: string;
 }
 
 interface Observable {
@@ -153,35 +136,61 @@ class SimulationState implements Observable {
 
   private simulationInfo: SimulationInfo = {
     devices: [],
+    captures: [],
     selectedId: '',
-    dimension: { x: 10, y: 10, z: 0 },
+    dimension: {x: 10, y: 10, z: 0},
+    lastModified: '',
   };
 
   constructor() {
     // initial GET
     this.invokeGetDevice();
+    this.invokeListCaptures();
   }
 
-  invokeGetDevice() {
-    fetch(DEVICES_URL, {
+  async invokeGetDevice() {
+    await fetch(DEVICES_URL, {
       method: 'GET',
     })
-      .then(response => response.json())
-      .then(data => {
-        this.fetchDevice(data.devices);
-      })
-      .catch(error => {
-        // eslint-disable-next-line
-        console.log('Cannot connect to netsim web server', error);
-      });
+        .then(response => response.json())
+        .then(data => {
+          this.fetchDevice(data.devices);
+          this.updateLastModified(data.lastModified);
+        })
+        .catch(error => {
+          // eslint-disable-next-line
+          console.log('Cannot connect to netsim web server', error);
+        });
   }
 
-  fetchDevice(devices: ProtoDevice[]) {
+  async invokeListCaptures() {
+    await fetch(CAPTURES_URL, {
+      method: 'GET',
+    })
+        .then(response => response.json())
+        .then(data => {
+          this.simulationInfo.captures = data.captures;
+          this.notifyObservers();
+        })
+        .catch(error => {
+          console.log('Cannot connect to netsim web server', error);
+        });
+  }
+
+  fetchDevice(devices?: ProtoDevice[]) {
     this.simulationInfo.devices = [];
-    for (const device of devices) {
-      this.simulationInfo.devices.push(new Device(device));
+    if (devices) {
+      this.simulationInfo.devices = devices.map(device => new Device(device));
     }
     this.notifyObservers();
+  }
+
+  getLastModified() {
+    return this.simulationInfo.lastModified;
+  }
+
+  updateLastModified(timestamp: string) {
+    this.simulationInfo.lastModified = timestamp;
   }
 
   patchSelected(id: string) {
@@ -204,6 +213,18 @@ class SimulationState implements Observable {
     }
   }
 
+  patchCapture(id: string, state: string) {
+    fetch(CAPTURES_URL + '/' + id, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'text/plain',
+        'Content-Length': state.length.toString(),
+      },
+      body: state,
+    });
+    this.notifyObservers();
+  }
+
   patchDevice(obj: object) {
     const jsonBody = JSON.stringify(obj);
     fetch(DEVICES_URL, {
@@ -214,11 +235,11 @@ class SimulationState implements Observable {
       },
       body: jsonBody,
     })
-      .then(response => response.json())
-      .catch(error => {
-        // eslint-disable-next-line
-        console.error('Error:', error);
-      });
+        .then(response => response.json())
+        .catch(error => {
+          // eslint-disable-next-line
+          console.error('Error:', error);
+        });
     this.notifyObservers();
   }
 
@@ -246,12 +267,40 @@ class SimulationState implements Observable {
 /** Subscribed observers must register itself to the simulationState */
 export const simulationState = new SimulationState();
 
-async function subscribe() {
+async function subscribeCaptures() {
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
   while (true) {
-    simulationState.invokeGetDevice();
+    await simulationState.invokeListCaptures();
+    await simulationState.invokeGetDevice();
     await delay(1000);
   }
 }
 
-subscribe();
+async function subscribeDevices() {
+  await simulationState.invokeGetDevice();
+  while (true) {
+    const jsonBody = JSON.stringify({
+      lastModified: simulationState.getLastModified(),
+    });
+    await fetch(DEVICES_URL, {
+      method: 'SUBSCRIBE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': jsonBody.length.toString(),
+      },
+      body: jsonBody,
+    })
+        .then(response => response.json())
+        .then(data => {
+          simulationState.fetchDevice(data.devices);
+          simulationState.updateLastModified(data.lastModified);
+        })
+        .catch(error => {
+          // eslint-disable-next-line
+          console.log('Cannot connect to netsim web server', error);
+        });
+  }
+}
+
+subscribeCaptures();
+subscribeDevices();

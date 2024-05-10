@@ -1,16 +1,11 @@
-import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
-import {
-  simulationState,
-  Notifiable,
-  SimulationInfo,
-  Device,
-} from './device-observer.js';
+import {css, html, LitElement} from 'lit';
+import {customElement, property} from 'lit/decorators.js';
+
+import {Device, Notifiable, SimulationInfo, simulationState,} from './device-observer.js';
 
 @customElement('ns-device-list')
 export class DeviceList extends LitElement implements Notifiable {
-  @property()
-  deviceData: Device[] = [];
+  @property() deviceData: Device[] = [];
 
   connectedCallback(): void {
     // eslint-disable-next-line
@@ -62,6 +57,9 @@ export class DeviceList extends LitElement implements Notifiable {
     this.requestUpdate();
   }
 
+  checkBle(device: Device):
+      boolean{return device.chips.at(0)?.bleBeacon !== undefined}
+
   render() {
     const rainbow = [
       'red',
@@ -75,29 +73,57 @@ export class DeviceList extends LitElement implements Notifiable {
 
     // Repeating templates with map
     return html`
-      ${this.deviceData.map(
-        (device, idx) => html`
+      ${
+        this.deviceData.map(
+            (device, idx) => html`
           <li>
             <center>
-              ${device.visible === true
-                ? html`<ns-cube-sprite
+              ${
+                true ?  // TODO manage device.visible in Web UI
+                    this.checkBle(device) ? html`<ns-pyramid-sprite
                       id=${device.name}
                       color=${rainbow[idx % rainbow.length]}
                       size="30px"
                       style="opacity:0.5;"
-                    ></ns-cube-sprite
-                    >${device.name} `
-                : html`<ns-device-dragzone action="move">
-                      <ns-cube-sprite
+                      role="listitem"
+                      tabindex="0"
+                      aria-label="${device.name} in Device Legends"
+                    ></ns-pyramid-sprite
+                    >${device.name} ` :
+                                            html`<ns-cube-sprite
+                    id=${device.name}
+                    color=${rainbow[idx % rainbow.length]}
+                    size="30px"
+                    style="opacity:0.5;"
+                    role="listitem"
+                    tabindex="0"
+                    aria-label="${device.name} in Device Legends"
+                  ></ns-cube-sprite
+                  >${device.name} ` :
+                    this.checkBle(device) ?
+                    html`<ns-device-dragzone action="move">
+                      <ns-pyramid-sprite
                         id=${device.name}
                         color=${rainbow[idx % rainbow.length]}
                         size="30px"
-                      ></ns-cube-sprite> </ns-device-dragzone
-                    >${device.name}`}
+                        role="listitem"
+                        tabindex="0"
+                        aria-label="${device.name} in Device Legends"
+                      ></ns-pyramid-sprite> </ns-device-dragzone
+                    >${device.name}` :
+                    html`<ns-device-dragzone action="move">
+                  <ns-cube-sprite
+                    id=${device.name}
+                    color=${rainbow[idx % rainbow.length]}
+                    size="30px"
+                    role="listitem"
+                    tabindex="0"
+                    aria-label="${device.name} in Device Legends"
+                  ></ns-cube-sprite> </ns-device-dragzone
+                >${device.name}`}
             </center>
           </li>
-        `
-      )}
+        `)}
       <li>
         <center>
           <ns-pyramid-sprite
@@ -105,6 +131,9 @@ export class DeviceList extends LitElement implements Notifiable {
             color=${rainbow[this.deviceData.length % rainbow.length]}
             size="30px"
             style="opacity:0.5;"
+            role="listitem"
+            tabindex="0"
+            aria-label="beacon in Device Legends"
           ></ns-pyramid-sprite
           >beacon
         </center>
@@ -116,6 +145,9 @@ export class DeviceList extends LitElement implements Notifiable {
             color=${rainbow[(this.deviceData.length + 1) % rainbow.length]}
             size="30px"
             style="opacity:0.5;"
+            role="listitem"
+            tabindex="0"
+            aria-label="anchor in Device Legends"
           ></ns-pyramid-sprite
           >anchor
         </center>

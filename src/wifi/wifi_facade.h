@@ -18,7 +18,8 @@
 #include <memory>
 #include <string>
 
-#include "model.pb.h"
+#include "netsim/model.pb.h"
+#include "rust/cxx.h"
 
 /** Manages the WiFi chip emulation provided by the WiFi service library.
  *
@@ -32,9 +33,13 @@ void Reset(uint32_t);
 void Remove(uint32_t);
 void Patch(uint32_t, const model::Chip::Radio &);
 model::Chip::Radio Get(uint32_t);
-uint32_t Add(uint32_t simulation_device);
+void Add(uint32_t chip_id);
 
-void Start();
+void Start(const rust::Slice<::std::uint8_t const> proto_bytes);
 void Stop();
+
+// Cxx functions for rust ffi.
+void PatchCxx(uint32_t, const rust::Slice<::std::uint8_t const> _proto_bytes);
+rust::Vec<uint8_t> GetCxx(uint32_t);
 
 }  // namespace netsim::wifi::facade

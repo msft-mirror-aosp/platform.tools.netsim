@@ -15,22 +15,29 @@
 #pragma once
 #include <string>
 
-#include "../../rust/netsim-cxx/cxx/cxx.h"
+#include "grpcpp/support/sync_stream.h"
+#include "netsim/frontend.pb.h"
+#include "rust/cxx.h"
+
 namespace netsim {
 namespace frontend {
+
+/// The C++ definition of the CxxServerResponseWriter interface for CXX.
 class CxxServerResponseWriter {
  public:
-  CxxServerResponseWriter(){};
+  CxxServerResponseWriter() {};
+  CxxServerResponseWriter(
+      grpc::ServerWriter<netsim::frontend::GetCaptureResponse> *grpc_writer_) {
+  };
   virtual ~CxxServerResponseWriter() = default;
   virtual void put_error(unsigned int error_code,
                          const std::string &response) const = 0;
   virtual void put_ok_with_length(const std::string &mime_type,
-                                  unsigned int length) const = 0;
+                                  std::size_t length) const = 0;
   virtual void put_chunk(rust::Slice<const uint8_t> chunk) const = 0;
   virtual void put_ok(const std::string &mime_type,
                       const std::string &body) const = 0;
 };
 
-void StartMockGrpcServer();
 }  // namespace frontend
 }  // namespace netsim

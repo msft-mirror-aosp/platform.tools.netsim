@@ -18,10 +18,10 @@
 
 #include <memory>
 
-#include "hci_packet.pb.h"
 #include "model/hci/hci_transport.h"    // for HciTransport
 #include "model/setup/async_manager.h"  // for AsyncManager
 #include "model/setup/phy_device.h"     // for Identifier
+#include "netsim/hci_packet.pb.h"
 
 namespace netsim {
 namespace hci {
@@ -36,31 +36,25 @@ using rootcanal::PacketCallback;
  */
 class HciPacketTransport : public rootcanal::HciTransport {
  public:
-  HciPacketTransport(std::shared_ptr<rootcanal::AsyncManager>);
+  HciPacketTransport(uint32_t, std::shared_ptr<rootcanal::AsyncManager>);
   ~HciPacketTransport() = default;
 
   static void Add(rootcanal::PhyDevice::Identifier id,
                   const std::shared_ptr<HciPacketTransport> &transport);
+
+  static void Remove(rootcanal::PhyDevice::Identifier id);
 
   /**
    * @brief Constructor for HciPacketTransport class.
    *
    * Moves HCI packets between packet_hub and rootcanal HciTransport
    */
-  void Connect(rootcanal::PhyDevice::Identifier device_id);
+  void Connect(rootcanal::PhyDevice::Identifier rootcanal_id);
 
-  void SendEvent(const std::vector<uint8_t> &packet) override;
+  void Send(rootcanal::PacketType packet_type,
+            const std::vector<uint8_t> &packet) override;
 
-  void SendAcl(const std::vector<uint8_t> &packet) override;
-
-  void SendSco(const std::vector<uint8_t> &packet) override;
-
-  void SendIso(const std::vector<uint8_t> &packet) override;
-
-  void RegisterCallbacks(PacketCallback command_callback,
-                         PacketCallback acl_callback,
-                         PacketCallback sco_callback,
-                         PacketCallback iso_callback,
+  void RegisterCallbacks(PacketCallback packet_callback,
                          CloseCallback close_callback) override;
 
   void Tick() override;
@@ -71,18 +65,11 @@ class HciPacketTransport : public rootcanal::HciTransport {
                const std::shared_ptr<std::vector<uint8_t>> &packet);
 
  private:
-  void Response(packet::HCIPacket_PacketType packet_type,
-                const std::vector<uint8_t> &packet);
-  rootcanal::PacketCallback PacketTypeCallback(
-      packet::HCIPacket_PacketType packet_type);
-
-  rootcanal::PacketCallback mAclCallback;
-  rootcanal::PacketCallback mCommandCallback;
-  rootcanal::PacketCallback mScoCallback;
-  rootcanal::PacketCallback mIsoCallback;
+  rootcanal::PacketCallback mPacketCallback;
   rootcanal::CloseCallback mCloseCallback;
   // Device ID is the same as Chip Id externally.
-  std::optional<rootcanal::PhyDevice::Identifier> mDeviceId;
+  std::optional<rootcanal::PhyDevice::Identifier> rootcanalId;
+  uint32_t netsimChipId;
   std::shared_ptr<rootcanal::AsyncManager> mAsyncManager;
 };
 

@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-// Frontend command line interface.
+// Frontend client
 #pragma once
 
+#include <cstdint>
 #include <memory>
-#include <string_view>
 #include <vector>
 
-#include "../../rust/frontend-client-cxx/cxx/cxx.h"
-#include "frontend.grpc.pb.h"
+#include "rust/cxx.h"
 
 namespace netsim {
 namespace frontend {
@@ -34,7 +33,7 @@ class ClientResult {
  public:
   ClientResult(bool is_ok, const std::string &err,
                const std::vector<unsigned char> &byte_vec)
-      : is_ok_(is_ok), err_(err), byte_vec_(byte_vec){};
+      : is_ok_(is_ok), err_(err), byte_vec_(byte_vec) {};
 
   bool IsOk() const { return is_ok_; };
   rust::String Err() const { return err_; };
@@ -48,24 +47,24 @@ class ClientResult {
 
 class FrontendClient {
  public:
-  virtual ~FrontendClient(){};
+  virtual ~FrontendClient() {};
   virtual std::unique_ptr<ClientResult> SendGrpc(
       frontend::GrpcMethod const &grpc_method,
       rust::Vec<rust::u8> const &request_byte_vec) const = 0;
   virtual std::unique_ptr<ClientResult> GetVersion() const = 0;
-  virtual std::unique_ptr<ClientResult> GetDevices() const = 0;
+  virtual std::unique_ptr<ClientResult> ListDevice() const = 0;
   virtual std::unique_ptr<ClientResult> PatchDevice(
       rust::Vec<rust::u8> const &request_byte_vec) const = 0;
   virtual std::unique_ptr<ClientResult> Reset() const = 0;
-  virtual std::unique_ptr<ClientResult> ListPcap() const = 0;
-  virtual std::unique_ptr<ClientResult> PatchPcap(
+  virtual std::unique_ptr<ClientResult> ListCapture() const = 0;
+  virtual std::unique_ptr<ClientResult> PatchCapture(
       rust::Vec<rust::u8> const &request_byte_vec) const = 0;
-  virtual std::unique_ptr<ClientResult> GetPcap(
+  virtual std::unique_ptr<ClientResult> GetCapture(
       rust::Vec<::rust::u8> const &request_byte_vec,
       ClientResponseReader const &client_reader) const = 0;
 };
 
-std::unique_ptr<FrontendClient> NewFrontendClient();
+std::unique_ptr<FrontendClient> NewFrontendClient(const std::string &server);
 
 }  // namespace frontend
 }  // namespace netsim

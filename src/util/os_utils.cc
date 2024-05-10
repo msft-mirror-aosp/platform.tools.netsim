@@ -17,7 +17,11 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
+#include <memory>
 #include <string>
 
 #include "util/filesystem.h"
@@ -28,32 +32,27 @@ namespace netsim {
 namespace osutils {
 namespace {
 
+constexpr uint16_t DEFAULT_INSTANCE = 0;
+constexpr uint32_t DEFAULT_HCI_PORT = 6402;
+
 struct DiscoveryDir {
   const char *root_env;
   const char *subdir;
 };
 
-DiscoveryDir discovery {
+DiscoveryDir discovery{
 #if defined(_WIN32)
-  "LOCALAPPDATA", "Temp"
+    "LOCALAPPDATA", "Temp"
 #elif defined(__linux__)
-  "XDG_RUNTIME_DIR", ""
+    "XDG_RUNTIME_DIR", ""
 #elif defined(__APPLE__)
-  "HOME", "Library/Caches/TemporaryItems"
+    "HOME", "Library/Caches/TemporaryItems"
 #else
 #error This platform is not supported.
 #endif
 };
 
 }  // namespace
-
-std::string GetEnv(const std::string &name, const std::string &default_value) {
-  auto val = std::getenv(name.c_str());
-  if (!val) {
-    return default_value;
-  }
-  return val;
-}
 
 std::string GetDiscoveryDirectory() {
   // $TMPDIR is the temp directory on buildbots.
@@ -63,31 +62,38 @@ std::string GetDiscoveryDirectory() {
   }
   const char *env_p = std::getenv(discovery.root_env);
   if (!env_p) {
-    BtsLog("No discovery env for %s, using tmp/", discovery.root_env);
+    BtsLogWarn("No discovery env for %s, using tmp/", discovery.root_env);
     env_p = "/tmp";
   }
   return std::string(env_p) + netsim::filesystem::slash + discovery.subdir;
 }
 
-std::string GetNetsimIniFilepath() {
-  return GetDiscoveryDirectory()
-      .append(netsim::filesystem::slash)
-      .append("netsim.ini");
+std::string GetNetsimIniFilepath(uint16_t instance_num) {
+  auto discovery_dir = GetDiscoveryDirectory();
+  // Check if directory has a trailing slash.
+  if (discovery_dir.back() != netsim::filesystem::slash.back())
+    discovery_dir.append(netsim::filesystem::slash);
+  auto filename = (instance_num == 1)
+                      ? "netsim.ini"
+                      : "netsim_" + std::to_string(instance_num) + ".ini";
+  discovery_dir.append(filename);
+  return discovery_dir;
 }
 
-std::optional<std::string> GetServerAddress(bool frontend_server) {
-  auto filepath = GetNetsimIniFilepath();
+std::optional<std::string> GetServerAddress(uint16_t instance_num) {
+  auto filepath = GetNetsimIniFilepath(instance_num);
   if (!netsim::filesystem::exists(filepath)) {
-    BtsLog("Unable to find netsim ini file: %s", filepath.c_str());
+    BtsLogWarn("Unable to find netsim ini file: %s", filepath.c_str());
     return std::nullopt;
   }
   if (!netsim::filesystem::is_regular_file(filepath)) {
-    BtsLog("Not a regular file: %s", filepath.c_str());
+    BtsLogError("Not a regular file: %s", filepath.c_str());
     return std::nullopt;
   }
   IniFile iniFile(filepath);
   iniFile.Read();
   return iniFile.Get("grpc.port");
 }
+
 }  // namespace osutils
 }  // namespace netsim
