@@ -135,8 +135,8 @@ impl Chip {
         proto_chip.kind = EnumOrUnknown::new(self.kind);
         proto_chip.id = self.id.0;
         proto_chip.name.clone_from(&self.name);
-        proto_chip.manufacturer = self.manufacturer.read().unwrap().clone();
-        proto_chip.product_name = self.product_name.read().unwrap().clone();
+        proto_chip.manufacturer.clone_from(&self.manufacturer.read().unwrap());
+        proto_chip.product_name.clone_from(&self.product_name.read().unwrap());
         Ok(proto_chip)
     }
 
@@ -144,10 +144,10 @@ impl Chip {
     /// into the chip changing the ChipFacade as needed.
     pub fn patch(&self, patch: &ProtoChip) -> Result<(), String> {
         if !patch.manufacturer.is_empty() {
-            *self.manufacturer.write().unwrap() = patch.manufacturer.clone();
+            self.manufacturer.write().unwrap().clone_from(&patch.manufacturer);
         }
         if !patch.product_name.is_empty() {
-            *self.product_name.write().unwrap() = patch.product_name.clone();
+            self.product_name.write().unwrap().clone_from(&patch.product_name);
         }
         self.wireless_adaptor.patch(patch);
         Ok(())
