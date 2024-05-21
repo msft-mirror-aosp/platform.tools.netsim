@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::devices::chip::ChipIdentifier;
-use crate::echip::{packet::handle_response, EmulatedChip, SharedEmulatedChip};
 use crate::ffi::ffi_wifi;
 use crate::wifi::medium::Medium;
+use crate::wireless::{packet::handle_response, WirelessAdaptor, WirelessAdaptorImpl};
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use log::info;
@@ -24,7 +24,6 @@ use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 use protobuf::{Message, MessageField};
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -82,7 +81,7 @@ impl WifiManager {
             let packet = rx.recv().unwrap();
             WIFI_MANAGER.medium.process_response(&packet);
         });
-        WifiManager { medium: Medium::new(handle_response), request_sender, response_sender }
+        WifiManager { medium: Medium::new(medium_callback), request_sender, response_sender }
     }
 }
 
@@ -91,18 +90,24 @@ lazy_static! {
     static ref WIFI_MANAGER: WifiManager = WifiManager::new();
 }
 
-impl EmulatedChip for Wifi {
-    fn handle_request(&self, packet: Bytes) {
-        WIFI_MANAGER.request_sender.send((self.chip_id, packet)).unwrap();
+impl Drop for Wifi {
+    fn drop(&mut self) {
+        WIFI_MANAGER.medium.remove(self.chip_id.0);
+    }
+}
+
+impl WirelessAdaptor for Wifi {
+    fn handle_request(&self, packet: &Bytes) {
+        WIFI_MANAGER.request_sender.send((self.chip_id.0, packet.clone())).unwrap();
     }
 
     fn reset(&self) {
-        WIFI_MANAGER.medium.reset(self.chip_id);
+        WIFI_MANAGER.medium.reset(self.chip_id.0);
     }
 
     fn get(&self) -> ProtoChip {
         let mut chip_proto = ProtoChip::new();
-        if let Some(client) = WIFI_MANAGER.medium.get(self.chip_id) {
+        if let Some(client) = WIFI_MANAGER.medium.get(self.chip_id.0) {
             chip_proto.mut_wifi().state = Some(client.enabled.load(Ordering::Relaxed));
             chip_proto.mut_wifi().tx_count = client.tx_count.load(Ordering::Relaxed) as i32;
             chip_proto.mut_wifi().rx_count = client.rx_count.load(Ordering::Relaxed) as i32;
@@ -112,12 +117,8 @@ impl EmulatedChip for Wifi {
 
     fn patch(&self, patch: &ProtoChip) {
         if patch.wifi().state.is_some() {
-            WIFI_MANAGER.medium.set_enabled(self.chip_id, patch.wifi().state.unwrap());
+            WIFI_MANAGER.medium.set_enabled(self.chip_id.0, patch.wifi().state.unwrap());
         }
-    }
-
-    fn remove(&self) {
-        WIFI_MANAGER.medium.remove(self.chip_id);
     }
 
     fn get_stats(&self, duration_secs: u64) -> Vec<ProtoRadioStats> {
@@ -133,6 +134,10 @@ impl EmulatedChip for Wifi {
     }
 }
 
+fn medium_callback(id: u32, packet: &Bytes) {
+    handle_response(ChipIdentifier(id), packet);
+}
+
 pub fn handle_wifi_response(packet: &[u8]) {
     let bytes = Bytes::copy_from_slice(packet);
     WIFI_MANAGER.response_sender.send(bytes).unwrap();
@@ -141,11 +146,11 @@ pub fn handle_wifi_response(packet: &[u8]) {
 /// Create a new Emulated Wifi Chip
 /// allow(dead_code) due to not being used in unit tests
 #[allow(dead_code)]
-pub fn new(_params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmulatedChip {
-    WIFI_MANAGER.medium.add(chip_id);
-    info!("WiFi EmulatedChip created chip_id: {chip_id}");
-    let echip = Wifi { chip_id };
-    Arc::new(Box::new(echip))
+pub fn new(_params: &CreateParams, chip_id: ChipIdentifier) -> WirelessAdaptorImpl {
+    WIFI_MANAGER.medium.add(chip_id.0);
+    info!("WiFi WirelessAdaptor created chip_id: {chip_id}");
+    let wifi = Wifi { chip_id };
+    Box::new(wifi)
 }
 
 /// Starts the WiFi service.
