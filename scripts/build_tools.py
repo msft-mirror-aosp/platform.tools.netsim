@@ -168,11 +168,7 @@ def main():
 
   # Install Emulator artifacts and Run PyTests
   tasks.get("InstallEmulator").run()
-
-  try:
-    tasks.get("RunPyTest").run()
-  except Exception as e:
-    logging.warn(f"An error occurred when running PyTests: {e}")
+  tasks.get("RunPyTest").run()
 
 
 if __name__ == "__main__":
