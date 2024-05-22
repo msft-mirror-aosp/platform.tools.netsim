@@ -89,7 +89,7 @@ class RunPytestManager:
         PYTEST_DIR / "cfg" / "netsim_tests.json",
     ]
     # TODO: Resolve Windows PyTest flakiness by increasing timeout threshold
-    # TODO: Uncomment this line once abseil-lts upgrade topic is built in emu-master-dev postsubmit
-    # if platform.system() != "Windows": cmd.append("--failures_as_errors")
+    if platform.system() != "Windows":
+      cmd.append("--failures_as_errors")
     run(cmd, get_default_environment(AOSP_ROOT), "e2e_pytests")
     return True
