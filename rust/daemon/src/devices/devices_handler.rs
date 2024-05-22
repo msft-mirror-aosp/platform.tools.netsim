@@ -248,8 +248,6 @@ pub fn add_chip_cxx(
         "WIFI" => {
             (ProtoChipKind::WIFI, wireless::CreateParam::Wifi(wireless::wifi::CreateParams {}))
         }
-        // TODO(b/278268690): Add Pica Library to goldfish build
-        #[cfg(feature = "cuttlefish")]
         "UWB" => (
             ProtoChipKind::UWB,
             wireless::CreateParam::Uwb(wireless::uwb::CreateParams {
@@ -564,7 +562,6 @@ pub fn get_distance_cxx(a: u32, b: u32) -> f32 {
 }
 
 /// Function to obtain ProtoDevice given a ChipIdentifier
-#[cfg(feature = "cuttlefish")]
 pub fn get_device(chip_id: &ChipIdentifier) -> anyhow::Result<netsim_proto::model::Device> {
     let device_id = match chip::get_chip(chip_id) {
         Some(chip) => chip.device_id,
