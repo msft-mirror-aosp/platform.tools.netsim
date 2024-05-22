@@ -20,7 +20,6 @@ pub mod captures;
 mod config;
 mod config_file;
 mod devices;
-mod echip;
 mod events;
 mod ffi;
 mod http_server;
@@ -32,6 +31,7 @@ mod session;
 mod transport;
 mod version;
 mod wifi;
+mod wireless;
 
 // TODO(b/278268690): Add Pica Library to goldfish build
 #[cfg(feature = "cuttlefish")]
