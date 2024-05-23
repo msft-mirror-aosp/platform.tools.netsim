@@ -19,10 +19,12 @@ use super::h4;
 use super::h4::PacketError;
 use super::uci;
 use crate::devices::chip;
+use crate::devices::chip::ChipIdentifier;
+use crate::devices::device::DeviceIdentifier;
 use crate::devices::devices_handler::{add_chip, remove_chip};
-use crate::echip;
-use crate::echip::packet::{register_transport, unregister_transport, Response};
 use crate::ffi::ffi_transport;
+use crate::wireless;
+use crate::wireless::packet::{register_transport, unregister_transport, Response};
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use log::{error, info, warn};
@@ -105,8 +107,8 @@ impl Response for FdTransport {
 unsafe fn fd_reader(
     fd_rx: i32,
     kind: ChipKindEnum,
-    device_id: u32,
-    chip_id: u32,
+    device_id: DeviceIdentifier,
+    chip_id: ChipIdentifier,
 ) -> JoinHandle<()> {
     thread::Builder::new()
         .name(format!("fd_reader_{}", fd_rx))
@@ -124,12 +126,12 @@ unsafe fn fd_reader(
                             break;
                         }
                         Ok(uci::Packet { payload }) => {
-                            echip::handle_request(chip_id, &payload, 0);
+                            wireless::handle_request(chip_id, &payload, 0);
                         }
                     },
                     ChipKindEnum::BLUETOOTH => match h4::read_h4_packet(&mut rx) {
                         Ok(h4::Packet { h4_type, payload }) => {
-                            echip::handle_request(chip_id, &payload, h4_type);
+                            wireless::handle_request(chip_id, &payload, h4_type);
                         }
                         Err(PacketError::IoError(e))
                             if e.kind() == ErrorKind::UnexpectedEof =>
@@ -179,7 +181,7 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
     };
     // Vector for getting all fd_in, fd_out, chip_kind, device_id, chip_id information
     // of adding all chips to frontend resource.
-    let mut fd_vec: Vec<(i32, i32, ChipKindEnum, u32, u32)> = Vec::new();
+    let mut fd_vec: Vec<(i32, i32, ChipKindEnum, DeviceIdentifier, ChipIdentifier)> = Vec::new();
     let chip_count = startup_info.devices.iter().map(|d| d.chips.len()).sum();
     for (device_guid, device) in startup_info.devices.iter().enumerate() {
         for chip in &device.chips {
@@ -191,15 +193,15 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
             };
             // TODO(b/323899010): Avoid having cfg(test) in mainline code
             #[cfg(not(test))]
-            let echip_create_param = match chip_kind {
+            let wireless_create_param = match chip_kind {
                 ChipKind::BLUETOOTH => {
-                    echip::CreateParam::Bluetooth(echip::bluetooth::CreateParams {
+                    wireless::CreateParam::Bluetooth(wireless::bluetooth::CreateParams {
                         address: chip.address.clone().unwrap_or_default(),
                         bt_properties: None,
                     })
                 }
-                ChipKind::WIFI => echip::CreateParam::Wifi(echip::wifi::CreateParams {}),
-                ChipKind::UWB => echip::CreateParam::Uwb(echip::uwb::CreateParams {
+                ChipKind::WIFI => wireless::CreateParam::Wifi(wireless::wifi::CreateParams {}),
+                ChipKind::UWB => wireless::CreateParam::Uwb(wireless::uwb::CreateParams {
                     address: chip.address.clone().unwrap_or_default(),
                 }),
                 _ => {
@@ -208,8 +210,8 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
                 }
             };
             #[cfg(test)]
-            let echip_create_param =
-                echip::CreateParam::Mock(echip::mocked::CreateParams { chip_kind });
+            let wireless_create_param =
+                wireless::CreateParam::Mock(wireless::mocked::CreateParams { chip_kind });
             let chip_create_params = chip::CreateParams {
                 kind: chip_kind,
                 address: chip.address.clone().unwrap_or_default(),
@@ -222,7 +224,7 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
                 &format!("fd-device-{}", device_guid),
                 &device.name.clone(),
                 &chip_create_params,
-                &echip_create_param,
+                &wireless_create_param,
             ) {
                 Ok(chip_result) => chip_result,
                 Err(err) => {
