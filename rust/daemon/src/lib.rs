@@ -29,13 +29,10 @@ mod rust_main;
 mod service;
 mod session;
 mod transport;
+mod uwb;
 mod version;
 mod wifi;
 mod wireless;
-
-// TODO(b/278268690): Add Pica Library to goldfish build
-#[cfg(feature = "cuttlefish")]
-mod uwb;
 
 // This feature is enabled only for CMake builds
 #[cfg(feature = "local_ssl")]
