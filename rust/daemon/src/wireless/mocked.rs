@@ -13,15 +13,13 @@
 // limitations under the License.
 
 use crate::devices::chip::ChipIdentifier;
-use crate::echip::{EmulatedChip, SharedEmulatedChip};
+use crate::wireless::{WirelessAdaptor, WirelessAdaptorImpl};
 
 use bytes::Bytes;
 use netsim_proto::common::ChipKind as ProtoChipKind;
 use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 use protobuf::EnumOrUnknown;
-
-use std::sync::Arc;
 
 /// Parameters for creating Mocked chips
 pub struct CreateParams {
@@ -33,8 +31,8 @@ pub struct Mock {
     chip_kind: ProtoChipKind,
 }
 
-impl EmulatedChip for Mock {
-    fn handle_request(&self, _packet: Bytes) {}
+impl WirelessAdaptor for Mock {
+    fn handle_request(&self, _packet: &Bytes) {}
 
     fn reset(&self) {}
 
@@ -45,8 +43,6 @@ impl EmulatedChip for Mock {
     }
 
     fn patch(&self, _chip: &ProtoChip) {}
-
-    fn remove(&self) {}
 
     fn get_stats(&self, _duration_secs: u64) -> Vec<ProtoRadioStats> {
         let mut stats = ProtoRadioStats::new();
@@ -62,6 +58,6 @@ impl EmulatedChip for Mock {
 }
 
 /// Create a new MockedChip
-pub fn new(create_params: &CreateParams, _chip_id: ChipIdentifier) -> SharedEmulatedChip {
-    Arc::new(Box::new(Mock { chip_kind: create_params.chip_kind }))
+pub fn new(create_params: &CreateParams, _chip_id: ChipIdentifier) -> WirelessAdaptorImpl {
+    Box::new(Mock { chip_kind: create_params.chip_kind })
 }
