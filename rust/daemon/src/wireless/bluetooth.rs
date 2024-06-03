@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use crate::devices::chip::ChipIdentifier;
-use crate::echip::{EmulatedChip, SharedEmulatedChip};
 use crate::ffi::ffi_bluetooth;
+use crate::wireless::{WirelessAdaptor, WirelessAdaptorImpl};
 
+use bytes::Bytes;
 use cxx::{let_cxx_string, CxxString, CxxVector};
 use lazy_static::lazy_static;
 use log::{error, info};
@@ -26,13 +27,14 @@ use netsim_proto::model::chip::Radio as ProtoRadio;
 use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::invalid_packet::Reason as InvalidPacketReason;
 use netsim_proto::stats::{netsim_radio_stats, InvalidPacket, NetsimRadioStats as ProtoRadioStats};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use protobuf::{Enum, Message, MessageField};
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-static ECHIP_BT_MUTEX: Mutex<()> = Mutex::new(());
+static WIRELESS_BT_MUTEX: Mutex<()> = Mutex::new(());
 
 pub type RootcanalIdentifier = u32;
 
@@ -56,42 +58,48 @@ pub struct CreateParams {
 /// Bluetooth struct will keep track of rootcanal_id
 pub struct Bluetooth {
     rootcanal_id: RootcanalIdentifier,
-    low_energy_enabled: Option<bool>,
-    classic_enabled: Option<bool>,
+    low_energy_enabled: AtomicBool,
+    classic_enabled: AtomicBool,
 }
 
 fn patch_state(
-    enabled: &mut Option<bool>,
+    enabled: &AtomicBool,
     state: Option<bool>,
     id: RootcanalIdentifier,
     is_low_energy: bool,
 ) {
-    match (state, &enabled) {
-        (Some(true), None | Some(false)) => {
-            let _unused = ECHIP_BT_MUTEX.lock().expect("Failed to lock ECHIP_BT_MUTEX");
-            *enabled = Some(true);
-            ffi_bluetooth::add_device_to_phy(id, is_low_energy);
+    if let Some(state) = state {
+        let _guard = WIRELESS_BT_MUTEX.lock().expect("Failed to lock WIRELESS_BT_MUTEX");
+        let last_state: bool = enabled.swap(state, Ordering::SeqCst);
+        match (last_state, state) {
+            (false, true) => ffi_bluetooth::add_device_to_phy(id, is_low_energy),
+            (true, false) => ffi_bluetooth::remove_device_from_phy(id, is_low_energy),
+            _ => {}
         }
-        (Some(false), None | Some(true)) => {
-            let _unused = ECHIP_BT_MUTEX.lock().expect("Failed to lock ECHIP_BT_MUTEX");
-            *enabled = Some(false);
-            ffi_bluetooth::remove_device_from_phy(id, is_low_energy)
-        }
-        _ => {}
     }
 }
 
-impl EmulatedChip for Bluetooth {
-    fn handle_request(&self, packet: &[u8]) {
+impl Drop for Bluetooth {
+    fn drop(&mut self) {
+        // Lock to protect id_to_chip_info_ table in C++
+        let _guard = WIRELESS_BT_MUTEX.lock().expect("Failed to acquire lock on WIRELESS_BT_MUTEX");
+        ffi_bluetooth::bluetooth_remove(self.rootcanal_id);
+        BLUETOOTH_INVALID_PACKETS.lock().expect("invalid packets").remove(&self.rootcanal_id);
+    }
+}
+
+impl WirelessAdaptor for Bluetooth {
+    fn handle_request(&self, packet: &Bytes) {
         // Lock to protect device_to_transport_ table in C++
-        let _unused = ECHIP_BT_MUTEX.lock().expect("Failed to acquire lock on ECHIP_BT_MUTEX");
+        let _guard = WIRELESS_BT_MUTEX.lock().expect("Failed to acquire lock on WIRELESS_BT_MUTEX");
         ffi_bluetooth::handle_bt_request(self.rootcanal_id, packet[0], &packet[1..].to_vec())
     }
 
-    fn reset(&mut self) {
+    fn reset(&self) {
+        let _guard = WIRELESS_BT_MUTEX.lock().expect("Failed to acquire lock on WIRELESS_BT_MUTEX");
         ffi_bluetooth::bluetooth_reset(self.rootcanal_id);
-        self.low_energy_enabled = Some(true);
-        self.classic_enabled = Some(true);
+        self.low_energy_enabled.store(true, Ordering::SeqCst);
+        self.classic_enabled.store(true, Ordering::SeqCst);
     }
 
     fn get(&self) -> ProtoChip {
@@ -100,14 +108,14 @@ impl EmulatedChip for Bluetooth {
         let mut chip_proto = ProtoChip::new();
         chip_proto.set_bt(ProtoBluetooth {
             low_energy: Some(ProtoRadio {
-                state: self.low_energy_enabled,
+                state: self.low_energy_enabled.load(Ordering::SeqCst).into(),
                 tx_count: bt_proto.low_energy.tx_count,
                 rx_count: bt_proto.low_energy.rx_count,
                 ..Default::default()
             })
             .into(),
             classic: Some(ProtoRadio {
-                state: self.classic_enabled,
+                state: self.classic_enabled.load(Ordering::SeqCst).into(),
                 tx_count: bt_proto.classic.tx_count,
                 rx_count: bt_proto.classic.rx_count,
                 ..Default::default()
@@ -120,20 +128,13 @@ impl EmulatedChip for Bluetooth {
         chip_proto
     }
 
-    fn patch(&mut self, chip: &ProtoChip) {
+    fn patch(&self, chip: &ProtoChip) {
         if !chip.has_bt() {
             return;
         }
         let id = self.rootcanal_id;
-        patch_state(&mut self.low_energy_enabled, chip.bt().low_energy.state, id, true);
-        patch_state(&mut self.classic_enabled, chip.bt().classic.state, id, false);
-    }
-
-    fn remove(&mut self) {
-        // Lock to protect id_to_chip_info_ table in C++
-        let _unused = ECHIP_BT_MUTEX.lock().expect("Failed to acquire lock on ECHIP_BT_MUTEX");
-        ffi_bluetooth::bluetooth_remove(self.rootcanal_id);
-        BLUETOOTH_INVALID_PACKETS.lock().expect("invalid packets").remove(&self.rootcanal_id);
+        patch_state(&self.low_energy_enabled, chip.bt().low_energy.state, id, true);
+        patch_state(&self.classic_enabled, chip.bt().classic.state, id, false);
     }
 
     fn get_stats(&self, duration_secs: u64) -> Vec<ProtoRadioStats> {
@@ -170,20 +171,23 @@ impl EmulatedChip for Bluetooth {
 /// Create a new Emulated Bluetooth Chip
 /// allow(dead_code) due to not being used in unit tests
 #[allow(dead_code)]
-pub fn new(create_params: &CreateParams, chip_id: ChipIdentifier) -> SharedEmulatedChip {
+pub fn new(create_params: &CreateParams, chip_id: ChipIdentifier) -> WirelessAdaptorImpl {
     // Lock to protect id_to_chip_info_ table in C++
-    let _unused = ECHIP_BT_MUTEX.lock().expect("Failed to acquire lock on ECHIP_BT_MUTEX");
+    let _guard = WIRELESS_BT_MUTEX.lock().expect("Failed to acquire lock on WIRELESS_BT_MUTEX");
     let_cxx_string!(cxx_address = create_params.address.clone());
     let proto_bytes = match &create_params.bt_properties {
         Some(properties) => properties.write_to_bytes().unwrap(),
         None => Vec::new(),
     };
-    let rootcanal_id = ffi_bluetooth::bluetooth_add(chip_id, &cxx_address, &proto_bytes);
-    info!("Bluetooth EmulatedChip created with rootcanal_id: {rootcanal_id} chip_id: {chip_id}");
-    let echip =
-        Bluetooth { rootcanal_id, low_energy_enabled: Some(true), classic_enabled: Some(true) };
+    let rootcanal_id = ffi_bluetooth::bluetooth_add(chip_id.0, &cxx_address, &proto_bytes);
+    info!("Bluetooth WirelessAdaptor created with rootcanal_id: {rootcanal_id} chip_id: {chip_id}");
+    let wireless_adaptor = Bluetooth {
+        rootcanal_id,
+        low_energy_enabled: AtomicBool::new(true),
+        classic_enabled: AtomicBool::new(true),
+    };
     BLUETOOTH_INVALID_PACKETS.lock().expect("invalid packets").insert(rootcanal_id, Vec::new());
-    SharedEmulatedChip(Arc::new(Mutex::new(Box::new(echip))))
+    Box::new(wireless_adaptor)
 }
 
 /// Starts the Bluetooth service.
@@ -197,6 +201,35 @@ pub fn bluetooth_stop() {
     ffi_bluetooth::bluetooth_stop();
 }
 
+/// Report Invalid Packet
+pub fn report_invalid_packet(
+    rootcanal_id: RootcanalIdentifier,
+    reason: InvalidPacketReason,
+    description: String,
+    packet: Vec<u8>,
+) {
+    // TODO(b/330726276): spawn task on tokio once context is provided from rust_main
+    let _ = std::thread::Builder::new().name("report_invalid_packet".to_string()).spawn(move || {
+        match BLUETOOTH_INVALID_PACKETS.lock().unwrap().get_mut(&rootcanal_id) {
+            Some(v) => {
+                // Remove the earliest reported packet if length greater than 5
+                if v.len() >= 5 {
+                    v.remove(0);
+                }
+                // append error packet
+                let mut invalid_packet = InvalidPacket::new();
+                invalid_packet.set_reason(reason);
+                invalid_packet.set_description(description.clone());
+                invalid_packet.set_packet(packet.clone());
+                v.push(invalid_packet);
+                // Log the report
+                info!("Invalid Packet for rootcanal_id: {rootcanal_id}, reason: {reason:?}, description: {description:?}, packet: {packet:?}");
+            }
+            None => error!("Bluetooth WirelessAdaptor not created for rootcanal_id: {rootcanal_id}"),
+        }
+    });
+}
+
 /// (Called by C++) Report Invalid Packet
 pub fn report_invalid_packet_cxx(
     rootcanal_id: RootcanalIdentifier,
@@ -204,23 +237,10 @@ pub fn report_invalid_packet_cxx(
     description: &CxxString,
     packet: &CxxVector<u8>,
 ) {
-    match BLUETOOTH_INVALID_PACKETS.lock().unwrap().get_mut(&rootcanal_id) {
-        Some(v) => {
-            // Remove the earliest reported packet if length greater than 5
-            if v.len() >= 5 {
-                v.remove(0);
-            }
-            // append error packet
-            let mut invalid_packet = InvalidPacket::new();
-            invalid_packet.set_reason(
-                InvalidPacketReason::from_i32(reason).unwrap_or(InvalidPacketReason::UNKNOWN),
-            );
-            invalid_packet.set_description(description.to_string());
-            invalid_packet.set_packet(packet.as_slice().to_vec());
-            v.push(invalid_packet);
-            // Log the report
-            info!("Reported Invalid Packet for Bluetooth EmulatedChip with rootcanal_id: {rootcanal_id}, reason:{reason}, description: {description:?}, packet: {packet:?}");
-        }
-        None => error!("Bluetooth EmulatedChip not created for rootcanal_id: {rootcanal_id}"),
-    }
+    report_invalid_packet(
+        rootcanal_id,
+        InvalidPacketReason::from_i32(reason).unwrap_or(InvalidPacketReason::UNKNOWN),
+        description.to_string(),
+        packet.as_slice().to_vec(),
+    );
 }

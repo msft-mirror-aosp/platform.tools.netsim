@@ -15,9 +15,10 @@
 use super::h4::PacketError;
 use crate::devices::chip::{self, ChipIdentifier};
 use crate::devices::devices_handler::{add_chip, remove_chip};
-use crate::echip;
-use crate::echip::packet::{register_transport, unregister_transport, Response};
 use crate::transport::h4;
+use crate::wireless;
+use crate::wireless::packet::{register_transport, unregister_transport, Response};
+use bytes::Bytes;
 use log::{error, info, warn};
 use netsim_proto::common::ChipKind;
 use std::io::{ErrorKind, Write};
@@ -39,7 +40,7 @@ struct SocketTransport {
 }
 
 impl Response for SocketTransport {
-    fn response(&mut self, packet: Vec<u8>, packet_type: u8) {
+    fn response(&mut self, packet: Bytes, packet_type: u8) {
         let mut buffer = Vec::new();
         buffer.push(packet_type);
         buffer.extend(packet);
@@ -89,18 +90,20 @@ fn handle_hci_client(stream: TcpStream) {
         bt_properties: None,
     };
     #[cfg(not(test))]
-    let echip_create_params = echip::CreateParam::Bluetooth(echip::bluetooth::CreateParams {
-        address: String::new(),
-        bt_properties: None,
-    });
+    let wireless_create_params =
+        wireless::CreateParam::Bluetooth(wireless::bluetooth::CreateParams {
+            address: String::new(),
+            bt_properties: None,
+        });
     #[cfg(test)]
-    let echip_create_params =
-        echip::CreateParam::Mock(echip::mocked::CreateParams { chip_kind: ChipKind::BLUETOOTH });
+    let wireless_create_params = wireless::CreateParam::Mock(wireless::mocked::CreateParams {
+        chip_kind: ChipKind::BLUETOOTH,
+    });
     let result = match add_chip(
         &stream.peer_addr().unwrap().port().to_string(),
         &format!("socket-{}", stream.peer_addr().unwrap()),
         &chip_create_params,
-        &echip_create_params,
+        &wireless_create_params,
     ) {
         Ok(chip_result) => chip_result,
         Err(err) => {
@@ -130,8 +133,8 @@ fn reader(mut tcp_rx: TcpStream, kind: ChipKind, chip_id: ChipIdentifier) -> std
     loop {
         if let ChipKind::BLUETOOTH = kind {
             match h4::read_h4_packet(&mut tcp_rx) {
-                Ok(mut packet) => {
-                    echip::handle_request(chip_id, &mut packet.payload, packet.h4_type);
+                Ok(packet) => {
+                    wireless::handle_request(chip_id, &packet.payload, packet.h4_type);
                 }
                 Err(PacketError::IoError(e)) if e.kind() == ErrorKind::UnexpectedEof => {
                     info!("End socket reader connection with {}.", &tcp_rx.peer_addr().unwrap());

@@ -14,17 +14,14 @@
 
 pub mod ble_beacon;
 pub mod bluetooth;
-pub mod emulated_chip;
 pub mod mocked;
 pub mod packet;
-pub mod wifi;
-
-// TODO: Remove the allow block once it's stitched with pica library
-#[allow(dead_code, unused_variables)]
 pub mod uwb;
+pub mod wifi;
+pub mod wireless_adaptor;
 
-pub use crate::echip::emulated_chip::CreateParam;
-pub use crate::echip::emulated_chip::EmulatedChip;
-pub use crate::echip::emulated_chip::SharedEmulatedChip;
-pub use crate::echip::emulated_chip::{get, new, remove};
-pub use crate::echip::packet::{handle_request, handle_request_cxx, handle_response};
+pub use crate::wireless::packet::{handle_request, handle_request_cxx, handle_response_cxx};
+pub use crate::wireless::wireless_adaptor::new;
+pub use crate::wireless::wireless_adaptor::CreateParam;
+pub use crate::wireless::wireless_adaptor::WirelessAdaptor;
+pub use crate::wireless::wireless_adaptor::WirelessAdaptorImpl;
