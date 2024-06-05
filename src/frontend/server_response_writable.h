@@ -15,8 +15,8 @@
 #pragma once
 #include <string>
 
-#include "frontend.pb.h"
 #include "grpcpp/support/sync_stream.h"
+#include "netsim/frontend.pb.h"
 #include "rust/cxx.h"
 
 namespace netsim {
@@ -25,9 +25,10 @@ namespace frontend {
 /// The C++ definition of the CxxServerResponseWriter interface for CXX.
 class CxxServerResponseWriter {
  public:
-  CxxServerResponseWriter(){};
+  CxxServerResponseWriter() {};
   CxxServerResponseWriter(
-      grpc::ServerWriter<netsim::frontend::GetCaptureResponse> *grpc_writer_){};
+      grpc::ServerWriter<netsim::frontend::GetCaptureResponse> *grpc_writer_) {
+  };
   virtual ~CxxServerResponseWriter() = default;
   virtual void put_error(unsigned int error_code,
                          const std::string &response) const = 0;

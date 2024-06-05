@@ -1,0 +1,21 @@
+{
+  "presubmit": [
+    {
+      "name": "CtsBluetoothTestCases",
+      "options": [
+        {
+          // TODO(b/303306195): Exclude a flaky test the other team is already working on from our check
+          "exclude-filter": "android.bluetooth.cts.LeL2capSocketTest#openInsecureLeL2capServerSocketRepeatedly"
+        }
+      ]
+    },
+    {
+      "name": "net_test_bluetooth"
+    },
+    {
+      // CtsUwbTestCases: Single Device Cts tests for UWB
+      // Multi Device Cts tests are brought to presubmit with cl/618942497
+      "name": "CtsUwbTestCases"
+    }
+  ]
+}

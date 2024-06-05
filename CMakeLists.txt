@@ -19,6 +19,7 @@ cmake_minimum_required(VERSION 3.5)
 cmake_policy(SET CMP0079 NEW)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 if(NOT ANDROID_EMULATOR_BUILD)
@@ -27,13 +28,14 @@ if(NOT ANDROID_EMULATOR_BUILD)
 endif()
 
 if(TARGET Rust::Rustc)
+  add_subdirectory(pdl)
   add_subdirectory(rust)
 else()
   message(WARNING "Only building client side dependencies.")
 endif()
 
+add_subdirectory(proto)
 add_subdirectory(src)
-add_subdirectory(ui)
 
 if(TARGET Rust::Rustc)
   android_add_executable(
@@ -42,55 +44,61 @@ if(TARGET Rust::Rustc)
          protobuf::libprotobuf util-lib)
 
   android_add_executable(
-    TARGET netsimd LICENSE Apache-2.0 INSTALL . SRC src/netsimd.cc
-    DEPS grpc++ netsim-cxx netsimd-lib netsimd-proto-lib)
+    TARGET netsimd
+    LICENSE Apache-2.0 INSTALL .
+    SRC rust/netsimd.cc
+    DEPS grpc++
+         libbt-rootcanal
+         netsim-cli-proto-lib
+         netsim-daemon
+         netsimd-lib
+         netsimd-proto-lib
+         packet-streamer-proto-lib)
+
   if(NOT DARWIN_AARCH64 AND NOT DARWIN_X86_64)
     # Prevent duplicate symbol for cxx Rust crate.
     target_link_libraries(netsimd PRIVATE -Wl,--allow-multiple-definition)
   endif()
 
-  target_include_directories(netsimd PRIVATE src)
-
   android_target_dependency(netsimd linux TCMALLOC_OS_DEPENDENCIES)
-
-  target_compile_definitions(netsimd PUBLIC NETSIM_ANDROID_EMULATOR)
 
   android_add_test(
     TARGET netsim-test LICENSE Apache-2.0
-    SRC src/backend/packet_streamer_client_test.cc
-        src/backend/startup_test.cc
-        src/controller/device_test.cc
-        src/controller/scene_controller_test.cc
-        src/frontend/frontend_server_test.cc
-        src/util/ini_file_test.cc
-        src/util/os_utils_test.cc
+    SRC src/util/ini_file_test.cc src/util/os_utils_test.cc
         src/util/string_utils_test.cc
-        src/wifi/wifi_facade_test.cc
     DEPS android-emu-base-headers
-         frontend-proto
          grpc++
          gtest
          gtest_main
          libbt-rootcanal
-         netsim-cxx
+         netsim-cli-proto-lib
+         netsim-daemon
+         netsim-proto
          netsimd-lib
          netsimd-proto-lib
-         packet-streamer-client-lib
          protobuf::libprotobuf
          util-lib)
 
-  add_dependencies(netsim-test netsimd)
   target_compile_definitions(netsim-test PUBLIC NETSIM_ANDROID_EMULATOR)
-
-  if(ANDROID_EMULATOR_BUILD)
-    add_dependencies(netsim-test emulator) # For PacketStreamerClientTest.
-  endif()
   target_include_directories(netsim-test PRIVATE src)
+
+  # Link NtDll to netsim executables.
+  if(WIN32)
+    target_link_libraries(netsim PRIVATE ntdll)
+    target_link_libraries(netsimd PRIVATE ntdll)
+    target_link_libraries(netsim-test PRIVATE ntdll)
+    android_license(TARGET "ntdll" LIBNAME None SPDX None LICENSE None
+                    LOCAL None)
+  endif()
 endif()
 
-android_add_executable(
-  TARGET netsim-packet-streamer-client
-  LICENSE Apache-2.0
-  SRC src/netsim-packet-streamer-client.cc
-  DEPS grpc++ packet-streamer-client-lib packet-streamer-proto-lib
-       protobuf::libprotobuf)
+if(NOT NETSIM_EXT)
+  android_add_executable(
+    TARGET netsim-packet-streamer-client
+    LICENSE Apache-2.0
+    SRC src/netsim-packet-streamer-client.cc
+    DEPS grpc++ packet-streamer-client-lib packet-streamer-proto-lib
+         protobuf::libprotobuf)
+endif()
+
+add_subdirectory(ui)

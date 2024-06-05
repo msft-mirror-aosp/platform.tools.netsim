@@ -2,8 +2,13 @@
 **/build/
 *~
 objs
+# python
+*.pyc
 # clangd
 .cache
 # rust
 **/target
 **/Cargo.lock
+# Android test
+**/.idea
+**/out

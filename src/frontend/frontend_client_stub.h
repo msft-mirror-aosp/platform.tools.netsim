@@ -19,12 +19,13 @@
 
 #include <memory>
 
-#include "frontend.grpc.pb.h"
+#include "netsim/frontend.grpc.pb.h"
 
 namespace netsim {
 namespace frontend {
 
-std::unique_ptr<frontend::FrontendService::Stub> NewFrontendClient();
+// Create a frontend grpc client to check if a netsimd is already running.
+bool IsNetsimdAlive(uint16_t instance_num);
 
 }  // namespace frontend
 }  // namespace netsim

@@ -19,17 +19,17 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
-#include "common.pb.h"
-#include "controller/controller.h"
 #include "google/protobuf/empty.pb.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/status.h"
-#include "packet_hub/packet_hub.h"
-#include "packet_streamer.grpc.pb.h"
-#include "packet_streamer.pb.h"
+#include "netsim-daemon/src/ffi.rs.h"
+#include "netsim/common.pb.h"
+#include "netsim/packet_streamer.grpc.pb.h"
+#include "netsim/packet_streamer.pb.h"
 #include "util/log.h"
 
 namespace netsim {
@@ -43,12 +43,12 @@ using Stream =
 
 using netsim::startup::Chip;
 
-// Mapping from <chip kind, facade id> to streams.
-std::unordered_map<std::string, Stream *> facade_to_stream;
+// Mapping from chip_id to streams.
+std::unordered_map<uint32_t, Stream *> chip_id_to_stream;
 
-std::string ChipFacade(ChipKind chip_kind, uint32_t facade_id) {
-  return std::to_string(chip_kind) + "/" + std::to_string(facade_id);
-}
+// Libslirp is not thread safe. Use a lock to prevent concurrent access to
+// libslirp.
+std::mutex gSlirpMutex;
 
 // Service handles the gRPC StreamPackets requests.
 
@@ -58,14 +58,14 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
                                Stream *stream) override {
     // Now connected to a peer issuing a bi-directional streaming grpc
     auto peer = context->peer();
-    BtsLog("grpc_server new packet_stream for peer %s", peer.c_str());
+    BtsLogInfo("grpc_server new packet_stream for peer %s", peer.c_str());
 
     packet::PacketRequest request;
 
     // First packet must have initial_info describing the peer
     bool success = stream->Read(&request);
     if (!success || !request.has_initial_info()) {
-      BtsLog("ServiceImpl no initial information or stream closed");
+      BtsLogError("ServiceImpl no initial information or stream closed");
       return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                             "Missing initial_info in first packet.");
     }
@@ -76,24 +76,63 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
     auto chip_name = request.initial_info().chip().id();
     auto manufacturer = request.initial_info().chip().manufacturer();
     auto product_name = request.initial_info().chip().product_name();
+    auto chip_address = request.initial_info().chip().address();
+    auto bt_properties = request.initial_info().chip().bt_properties();
     // Add a new chip to the device
-    auto [device_id, chip_id, facade_id] = scene_controller::AddChip(
-        peer, device_name, chip_kind, chip_name, manufacturer, product_name);
+    std::string chip_kind_string;
+    switch (chip_kind) {
+      case common::ChipKind::BLUETOOTH:
+        chip_kind_string = "BLUETOOTH";
+        break;
+      case common::ChipKind::WIFI:
+        chip_kind_string = "WIFI";
+        break;
+      case common::ChipKind::UWB:
+        chip_kind_string = "UWB";
+        break;
+      default:
+        chip_kind_string = "UNSPECIFIED";
+        break;
+    }
 
-    BtsLog("grpc_server: adding chip %d with facade %d to %s", chip_id,
-           facade_id, device_name.c_str());
+    std::vector<unsigned char> message_vec(bt_properties.ByteSizeLong());
+    if (!bt_properties.SerializeToArray(message_vec.data(),
+                                        message_vec.size())) {
+      BtsLogError("Failed to serialize bt_properties to bytes");
+    }
+
+    auto result = netsim::device::AddChipCxx(
+        peer, device_name, chip_kind_string, chip_address, chip_name,
+        manufacturer, product_name, message_vec);
+    if (result->IsError()) {
+      return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
+                            "AddChipCxx failed to add chip into netsim");
+    }
+    uint32_t device_id = result->GetDeviceId();
+    uint32_t chip_id = result->GetChipId();
+
+    BtsLogInfo(
+        "grpc_server: adding chip - chip_id: %d, "
+        "device_name: "
+        "%s",
+        chip_id, device_name.c_str());
     // connect packet responses from chip facade to the peer
-    facade_to_stream[ChipFacade(chip_kind, facade_id)] = stream;
-    this->ProcessRequests(stream, device_id, chip_kind, facade_id);
+    chip_id_to_stream[chip_id] = stream;
+    netsim::transport::RegisterGrpcTransport(chip_id);
+    this->ProcessRequests(stream, chip_id, chip_kind);
 
     // no longer able to send responses to peer
-    facade_to_stream.erase(ChipFacade(chip_kind, facade_id));
+    netsim::transport::UnregisterGrpcTransport(chip_id);
+    chip_id_to_stream.erase(chip_id);
 
     // Remove the chip from the device
-    scene_controller::RemoveChip(device_id, chip_id);
+    netsim::device::RemoveChipCxx(device_id, chip_id);
 
-    BtsLog("grpc_server: removing chip %d from %s", chip_id,
-           device_name.c_str());
+    BtsLogInfo(
+        "grpc_server: removing chip - chip_id: %d, "
+        "device_name: "
+        "%s",
+        chip_id, device_name.c_str());
 
     return ::grpc::Status::OK;
   }
@@ -110,37 +149,48 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
 
   // Process requests in a loop forwarding packets to the packet_hub and
   // returning when the channel is closed.
-  void ProcessRequests(Stream *stream, uint32_t device_id,
-                       common::ChipKind chip_kind, uint32_t facade_id) {
+  void ProcessRequests(Stream *stream, uint32_t chip_id,
+                       common::ChipKind chip_kind) {
     packet::PacketRequest request;
     while (true) {
       if (!stream->Read(&request)) {
-        BtsLog("grpc_server: reading stopped for %d", facade_id);
+        BtsLogWarn("grpc_server: reading stopped - chip_id: %d", chip_id);
         break;
       }
       // All kinds possible (bt, uwb, wifi), but each rpc only streames one.
       if (chip_kind == common::ChipKind::BLUETOOTH) {
         if (!request.has_hci_packet()) {
-          BtsLog("grpc_server: unknown packet type from %d", facade_id);
+          BtsLogWarn("grpc_server: unknown packet type from chip_id: %d",
+                     chip_id);
           continue;
         }
         auto packet_type = request.hci_packet().packet_type();
         auto packet =
             ToSharedVec(request.mutable_hci_packet()->mutable_packet());
-        packet_hub::HandleRequest(chip_kind, facade_id, *packet, packet_type);
+        wireless::HandleRequestCxx(chip_id, *packet, packet_type);
       } else if (chip_kind == common::ChipKind::WIFI) {
         if (!request.has_packet()) {
-          BtsLog("grpc_server: unknown packet type from %d", facade_id);
+          BtsLogWarn("grpc_server: unknown packet type from chip_id: %d",
+                     chip_id);
           continue;
         }
         auto packet = ToSharedVec(request.mutable_packet());
-        packet_hub::HandleRequest(chip_kind, facade_id,
+        {
+          std::lock_guard<std::mutex> guard(gSlirpMutex);
+          wireless::HandleRequestCxx(chip_id, *packet,
+                                     packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
+        }
+      } else if (chip_kind == common::ChipKind::UWB) {
+        if (!request.has_packet()) {
+          BtsLogWarn("grpc_server: unknown packet from chip_id: %d", chip_id);
+          continue;
+        }
+        auto packet = ToSharedVec(request.mutable_packet());
+        wireless::HandleRequestCxx(chip_id, *packet,
+                                   packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
 
-                                  *packet,
-                                  packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
       } else {
-        // TODO: add UWB here
-        BtsLog("grpc_server: unknown chip kind");
+        BtsLogWarn("grpc_server: unknown chip_kind");
       }
     }
   }
@@ -148,31 +198,37 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
 }  // namespace
 
 // handle_response is called by packet_hub to forward a response to the gRPC
-// stream associated with chip_kind and facade_id.
+// stream associated with chip_id.
 //
 // When writing, the packet is copied because is borrowed from a shared_ptr and
 // grpc++ doesn't know about smart pointers.
-void HandleResponse(ChipKind kind, uint32_t facade_id,
-                    const std::vector<uint8_t> &packet,
+void HandleResponse(uint32_t chip_id, const std::vector<uint8_t> &packet,
                     packet::HCIPacket_PacketType packet_type) {
-  auto stream = facade_to_stream[ChipFacade(kind, facade_id)];
+  auto stream = chip_id_to_stream[chip_id];
   if (stream) {
     // TODO: lock or caller here because gRPC does not allow overlapping writes.
     packet::PacketResponse response;
     // Copies the borrowed packet for output
     auto str_packet = std::string(packet.begin(), packet.end());
-    if (kind == ChipKind::BLUETOOTH) {
+    if (packet_type != packet::HCIPacket_PacketType_HCI_PACKET_UNSPECIFIED) {
       response.mutable_hci_packet()->set_packet_type(packet_type);
       response.mutable_hci_packet()->set_packet(str_packet);
     } else {
       response.set_packet(str_packet);
     }
     if (!stream->Write(response)) {
-      BtsLog("grpc_server: write failed %d", facade_id);
+      BtsLogWarn("grpc_server: write failed for chip_id: %d", chip_id);
     }
   } else {
-    BtsLog("grpc_server: no stream for %d", facade_id);
+    BtsLogWarn("grpc_server: no stream for chip_id: %d", chip_id);
   }
+}
+
+// for cxx
+void HandleResponseCxx(uint32_t chip_id, const rust::Vec<rust::u8> &packet,
+                       /* optional */ uint8_t packet_type) {
+  std::vector<uint8_t> vec(packet.begin(), packet.end());
+  HandleResponse(chip_id, vec, packet::HCIPacket_PacketType(packet_type));
 }
 
 }  // namespace backend

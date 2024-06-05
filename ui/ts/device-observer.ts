@@ -1,4 +1,4 @@
-import {Capture, Chip, Device as ProtoDevice, State} from './model.js';
+import {Capture, Chip, Chip_Radio, Device as ProtoDevice,} from './netsim/model.js';
 
 // URL for netsim
 const DEVICES_URL = './v1/devices';
@@ -90,55 +90,25 @@ export class Device {
   }
 
   get visible(): boolean {
-    return this.device.visible ?? true;
+    return Boolean(this.device.visible);
   }
 
   set visible(value: boolean) {
     this.device.visible = value;
   }
 
-  toggleChipState(chip: Chip, btType?: string) {
-    if ('bt' in chip && chip.bt) {
-      if (typeof (btType) === 'undefined') {
-        // eslint-disable-next-line
-        console.log(
-            'netsim-ui: must specify lowEnergy or classic for Bluetooth');
-        return;
-      }
-      if (btType === 'lowEnergy' && 'lowEnergy' in chip.bt &&
-          chip.bt.lowEnergy) {
-        if ('state' in chip.bt.lowEnergy) {
-          chip.bt.lowEnergy.state =
-              chip.bt.lowEnergy.state === State.ON ? State.OFF : State.ON;
-        }
-      }
-      if (btType === 'classic' && 'classic' in chip.bt && chip.bt.classic) {
-        if ('state' in chip.bt.classic) {
-          chip.bt.classic.state =
-              chip.bt.classic.state === State.ON ? State.OFF : State.ON;
-        }
-      }
-    }
-    if ('wifi' in chip && chip.wifi) {
-      if ('state' in chip.wifi) {
-        chip.wifi.state = chip.wifi.state === State.ON ? State.OFF : State.ON;
-      }
-    }
-    if ('uwb' in chip && chip.uwb) {
-      if ('state' in chip.uwb) {
-        chip.uwb.state = chip.uwb.state === State.ON ? State.OFF : State.ON;
-      }
-    }
+  toggleChipState(radio: Chip_Radio) {
+    radio.state = !radio.state;
   }
 
   toggleCapture(device: Device, chip: Chip) {
     if ('capture' in chip && chip.capture) {
-      chip.capture = chip.capture === State.ON ? State.OFF : State.ON;
+      chip.capture = !chip.capture;
       simulationState.patchDevice({
         device: {
           name: device.name,
           chips: device.chips,
-        }
+        },
       });
     }
   }
@@ -152,7 +122,8 @@ export interface SimulationInfo {
   devices: Device[];
   captures: Capture[];
   selectedId: string;
-  dimension: {x: number; y: number; z: number;};
+  dimension: {x: number; y: number; z: number};
+  lastModified: string;
 }
 
 interface Observable {
@@ -168,6 +139,7 @@ class SimulationState implements Observable {
     captures: [],
     selectedId: '',
     dimension: {x: 10, y: 10, z: 0},
+    lastModified: '',
   };
 
   constructor() {
@@ -176,13 +148,14 @@ class SimulationState implements Observable {
     this.invokeListCaptures();
   }
 
-  invokeGetDevice() {
-    fetch(DEVICES_URL, {
+  async invokeGetDevice() {
+    await fetch(DEVICES_URL, {
       method: 'GET',
     })
         .then(response => response.json())
         .then(data => {
           this.fetchDevice(data.devices);
+          this.updateLastModified(data.lastModified);
         })
         .catch(error => {
           // eslint-disable-next-line
@@ -190,25 +163,34 @@ class SimulationState implements Observable {
         });
   }
 
-  invokeListCaptures() {
-    fetch(CAPTURES_URL, {
+  async invokeListCaptures() {
+    await fetch(CAPTURES_URL, {
       method: 'GET',
     })
         .then(response => response.json())
         .then(data => {
           this.simulationInfo.captures = data.captures;
+          this.notifyObservers();
         })
         .catch(error => {
           console.log('Cannot connect to netsim web server', error);
-        })
+        });
   }
 
-  fetchDevice(devices: ProtoDevice[]) {
+  fetchDevice(devices?: ProtoDevice[]) {
     this.simulationInfo.devices = [];
-    for (const device of devices) {
-      this.simulationInfo.devices.push(new Device(device));
+    if (devices) {
+      this.simulationInfo.devices = devices.map(device => new Device(device));
     }
     this.notifyObservers();
+  }
+
+  getLastModified() {
+    return this.simulationInfo.lastModified;
+  }
+
+  updateLastModified(timestamp: string) {
+    this.simulationInfo.lastModified = timestamp;
   }
 
   patchSelected(id: string) {
@@ -285,13 +267,40 @@ class SimulationState implements Observable {
 /** Subscribed observers must register itself to the simulationState */
 export const simulationState = new SimulationState();
 
-async function subscribe() {
+async function subscribeCaptures() {
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
   while (true) {
-    simulationState.invokeGetDevice();
-    simulationState.invokeListCaptures();
+    await simulationState.invokeListCaptures();
+    await simulationState.invokeGetDevice();
     await delay(1000);
   }
 }
 
-subscribe();
+async function subscribeDevices() {
+  await simulationState.invokeGetDevice();
+  while (true) {
+    const jsonBody = JSON.stringify({
+      lastModified: simulationState.getLastModified(),
+    });
+    await fetch(DEVICES_URL, {
+      method: 'SUBSCRIBE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': jsonBody.length.toString(),
+      },
+      body: jsonBody,
+    })
+        .then(response => response.json())
+        .then(data => {
+          simulationState.fetchDevice(data.devices);
+          simulationState.updateLastModified(data.lastModified);
+        })
+        .catch(error => {
+          // eslint-disable-next-line
+          console.log('Cannot connect to netsim web server', error);
+        });
+  }
+}
+
+subscribeCaptures();
+subscribeDevices();

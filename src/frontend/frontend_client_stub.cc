@@ -19,18 +19,20 @@
 #include <chrono>
 #include <memory>
 
-#include "frontend.grpc.pb.h"
-#include "frontend.pb.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/security/credentials.h"
+#include "netsim/frontend.grpc.pb.h"
+#include "netsim/frontend.pb.h"
 #include "util/os_utils.h"
 
 namespace netsim {
 namespace frontend {
+namespace {
 const std::chrono::duration kConnectionDeadline = std::chrono::seconds(1);
 
-std::unique_ptr<frontend::FrontendService::Stub> NewFrontendClient() {
-  auto port = netsim::osutils::GetServerAddress();
+std::unique_ptr<frontend::FrontendService::Stub> NewFrontendClient(
+    uint16_t instance_num) {
+  auto port = netsim::osutils::GetServerAddress(instance_num);
   if (!port.has_value()) {
     return nullptr;
   }
@@ -44,6 +46,11 @@ std::unique_ptr<frontend::FrontendService::Stub> NewFrontendClient() {
   }
 
   return frontend::FrontendService::NewStub(channel);
+}
+}  // namespace
+
+bool IsNetsimdAlive(uint16_t instance_num) {
+  return NewFrontendClient(instance_num) != nullptr;
 }
 
 }  // namespace frontend
