@@ -145,7 +145,7 @@ genrule {
 
 genrule {
     name: "netsim_netlink_rust_gen",
-    defaults: ["pdl_rust_legacy_generator_defaults"],
+    defaults: ["pdl_rust_generator_defaults"],
     srcs: ["pdl/netlink.pdl"],
     out: ["netlink_packets.rs"],
 }
