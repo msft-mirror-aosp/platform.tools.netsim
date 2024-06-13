@@ -10,7 +10,7 @@ pdl_gen(
   OUTPUT
   netlink_packets.rs
   LANG
-  rust_legacy)
+  rust)
 
 pdl_gen(
   NAME

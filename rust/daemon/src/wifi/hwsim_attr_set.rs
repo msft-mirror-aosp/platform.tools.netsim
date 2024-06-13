@@ -17,7 +17,7 @@ use std::fmt;
 use super::packets::ieee80211::MacAddress;
 use super::packets::mac80211_hwsim::{self, HwsimAttr, HwsimAttrChild::*, TxRate, TxRateFlag};
 use super::packets::netlink::NlAttrHdr;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use pdl_runtime::Packet;
 use std::option::Option;
 
@@ -267,7 +267,8 @@ impl HwsimAttrSet {
         let mut builder = HwsimAttrSet::builder();
         while index < attributes.len() {
             // Parse a generic netlink attribute to get the size
-            let nla_hdr = NlAttrHdr::parse(&attributes[index..index + 4]).unwrap();
+            let nla_hdr =
+                NlAttrHdr::decode_full(&attributes[index..index + 4]).context("NlAttrHdr")?;
             let nla_len = nla_hdr.nla_len as usize;
             // Now parse a single attribute at a time from the
             // attributes to allow padding per attribute.
