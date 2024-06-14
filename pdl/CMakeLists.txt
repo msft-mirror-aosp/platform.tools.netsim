@@ -20,7 +20,7 @@ pdl_gen(
   OUTPUT
   mac80211_hwsim_packets.rs
   LANG
-  rust_legacy)
+  rust)
 
 pdl_gen(
   NAME
