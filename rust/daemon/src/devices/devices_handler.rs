@@ -124,11 +124,12 @@ impl DeviceManager {
         name: Option<&str>,
         builtin: bool,
     ) -> (DeviceIdentifier, String) {
+        // Hold a lock while checking and updating devices.
+        let mut guard = self.devices.write().unwrap();
+
         // Check if a device with the same guid already exists and if so, return it
         if let Some(guid) = guid {
-            if let Some(existing_device) =
-                self.devices.read().unwrap().values().find(|d| d.guid == *guid)
-            {
+            if let Some(existing_device) = guard.values().find(|d| d.guid == *guid) {
                 if existing_device.builtin != builtin {
                     warn!("builtin mismatch for device {} during add_chip", existing_device.name);
                 }
@@ -140,10 +141,11 @@ impl DeviceManager {
         let id = self.next_id();
         let default = format!("device-{}", id);
         let name = name.unwrap_or(&default);
-        self.devices.write().unwrap().insert(
+        guard.insert(
             id,
             Device::new(id, String::from(guid.unwrap_or(&default)), String::from(name), builtin),
         );
+        drop(guard);
         // Update last modified timestamp for devices
         self.update_timestamp();
         events::publish(Event::DeviceAdded(DeviceAdded { id, name: name.to_string(), builtin }));
