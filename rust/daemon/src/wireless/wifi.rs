@@ -64,7 +64,8 @@ impl WifiManager {
                         if crate::config::get_disable_wifi_p2p()
                             || !WIFI_MANAGER.medium.process(chip_id, &packet)
                         {
-                            ffi_wifi::handle_wifi_request(chip_id, &packet.to_vec());
+                            // TODO: Replace with libslirp_send() and hostapd_send()
+                            ffi_wifi::handle_wifi_request(&packet.to_vec());
                             ffi_wifi::libslirp_main_loop_wait();
                         }
                     }
