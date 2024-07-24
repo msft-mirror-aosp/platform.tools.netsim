@@ -76,7 +76,7 @@ mod tests {
         model::{
             self,
             chip::{Bluetooth as Chip_Bluetooth, Radio as Chip_Radio},
-            Device, Position, State,
+            Device, Position,
         },
     };
     use protobuf::Message;
@@ -100,10 +100,7 @@ mod tests {
 
     fn get_expected_radio(name: &str, radio_type: &str, state: &str) -> BinaryProtobuf {
         let mut chip = model::Chip { ..Default::default() };
-        let chip_state = match state {
-            "up" => State::ON,
-            _ => State::OFF,
-        };
+        let chip_state = state == "up";
         if radio_type == "wifi" {
             let mut wifi_chip = Chip_Radio::new();
             wifi_chip.state = chip_state.into();
@@ -128,7 +125,7 @@ mod tests {
         }
         let mut result = frontend::PatchDeviceRequest::new();
         let mut device = Device::new();
-        device.name = name.to_owned();
+        name.clone_into(&mut device.name);
         device.chips.push(chip);
         result.device = Some(device).into();
         result.write_to_bytes().unwrap()
@@ -218,7 +215,7 @@ mod tests {
         let mut result = frontend::PatchDeviceRequest::new();
         let mut device = Device::new();
         let position = Position { x, y, z: z.unwrap_or_default(), ..Default::default() };
-        device.name = name.to_owned();
+        name.clone_into(&mut device.name);
         device.position = Some(position).into();
         result.device = Some(device).into();
         result.write_to_bytes().unwrap()

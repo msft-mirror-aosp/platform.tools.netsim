@@ -18,11 +18,14 @@
 //! the protobuf structure. CaptureMaps contains mappings of
 //! ChipIdentifier and <FacadeIdentifier, Kind> to CaptureInfo.
 
+use bytes::Bytes;
+
 use std::collections::btree_map::{Iter, Values};
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Result};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -30,16 +33,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::pcap_util::{write_pcap_header, write_pcapng_header, LinkType};
 use log::{info, warn};
 
-use netsim_proto::{
-    common::ChipKind,
-    model::{Capture as ProtoCapture, State},
-};
+use netsim_proto::{common::ChipKind, model::Capture as ProtoCapture};
 use protobuf::well_known_types::timestamp::Timestamp;
 
 use crate::config::get_pcap;
 use crate::events::{ChipAdded, ChipRemoved, Event};
 use crate::resource::clone_captures;
 
+use crate::captures::captures_handler::handle_packet;
+use crate::captures::pcap_util::PacketDirection;
 use crate::devices::chip::ChipIdentifier;
 
 /// Internal Capture struct
@@ -77,6 +79,7 @@ pub struct Captures {
     /// BTreeMap is used for chip_id_to_capture, so that the CaptureInfo can always be
     /// ordered by ChipId. ListCaptureResponse will produce a ordered list of CaptureInfos.
     pub chip_id_to_capture: BTreeMap<ChipIdentifier, Arc<Mutex<CaptureInfo>>>,
+    sender: Sender<CapturePacket>,
 }
 
 impl CaptureInfo {
@@ -150,13 +153,10 @@ impl CaptureInfo {
         let timestamp =
             Timestamp { seconds: self.seconds, nanos: self.nanos, ..Default::default() };
         ProtoCapture {
-            id: self.id,
+            id: self.id.0,
             chip_kind: self.chip_kind.into(),
             device_name: self.device_name.clone(),
-            state: match self.file.is_some() {
-                true => State::ON.into(),
-                false => State::OFF.into(),
-            },
+            state: Some(self.file.is_some()),
             size: self.size as i32,
             records: self.records,
             timestamp: Some(timestamp).into(),
@@ -166,10 +166,44 @@ impl CaptureInfo {
     }
 }
 
+struct CapturePacket {
+    chip_id: ChipIdentifier,
+    packet: Bytes,
+    packet_type: u32,
+    direction: PacketDirection,
+}
+
 impl Captures {
     /// Create an instance of Captures, which includes 2 empty hashmaps
     pub fn new() -> Self {
-        Captures { chip_id_to_capture: BTreeMap::<ChipIdentifier, Arc<Mutex<CaptureInfo>>>::new() }
+        let (sender, rx) = channel::<CapturePacket>();
+        let _ =
+            thread::Builder::new().name("capture_packet_handler".to_string()).spawn(move || {
+                while let Ok(CapturePacket { chip_id, packet, packet_type, direction }) = rx.recv()
+                {
+                    handle_packet(chip_id, &packet, packet_type, direction);
+                }
+            });
+        Captures {
+            chip_id_to_capture: BTreeMap::<ChipIdentifier, Arc<Mutex<CaptureInfo>>>::new(),
+            sender,
+        }
+    }
+
+    /// Sends a captured packet to the output processing thread.
+    pub fn send(
+        &self,
+        chip_id: ChipIdentifier,
+        packet: &Bytes,
+        packet_type: u32,
+        direction: PacketDirection,
+    ) {
+        let _ = self.sender.send(CapturePacket {
+            chip_id,
+            packet: packet.clone(),
+            packet_type,
+            direction,
+        });
     }
 
     /// Returns true if key exists in Captures.chip_id_to_capture

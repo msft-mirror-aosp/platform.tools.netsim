@@ -27,9 +27,14 @@ namespace netsim::wifi {
 /* Handle packet requests for the WiFi Facade which may come over
    different transports including gRPC. */
 
-void HandleWifiRequest(uint32_t chip_id,
-                       const std::shared_ptr<std::vector<uint8_t>> &packet);
+void libslirp_main_loop_wait();
 
-void HandleWifiRequestCxx(uint32_t chip_id, const rust::Vec<uint8_t> &packet);
+void HandleWifiRequestCxx(const rust::Vec<uint8_t> &packet);
+
+void HostapdSendCxx(const rust::Vec<uint8_t> &packet);
+
+void LibslirpSendCxx(const rust::Vec<uint8_t> &packet);
+
+bool IsEapolCxx(const rust::Vec<uint8_t> &packet);
 
 }  // namespace netsim::wifi

@@ -13,11 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import glob
 import json
 import logging
 import os
 from pathlib import Path
 import platform
+import shutil
 import socket
 import subprocess
 import sys
@@ -34,6 +36,7 @@ from threading import Thread, currentThread
 
 AOSP_ROOT = Path(__file__).absolute().parents[3]
 TOOLS = Path(AOSP_ROOT, "tools")
+EMULATOR_ARTIFACT_PATH = Path(AOSP_ROOT, "tools", "netsim", "emulator_tmp")
 PYTHON_EXE = sys.executable or "python3"
 TARGET_MAP = {
     "windows": "windows_msvc-x86_64",
@@ -56,6 +59,56 @@ AVAILABLE = {
     "linux-aarch64": "toolchain-linux-aarch64.cmake",
     "darwin-aarch64": "toolchain-darwin-aarch64.cmake",
 }
+
+CMAKE = shutil.which(
+    "cmake",
+    path=str(
+        AOSP_ROOT
+        / "prebuilts"
+        / "cmake"
+        / f"{platform.system().lower()}-x86"
+        / "bin"
+    ),
+)
+
+
+def default_target() -> str:
+  """Returns default value for target"""
+  # If Mac M1, the default target should be 'darwin-aarch64'
+  if platform.system() == "Darwin" and platform.machine() == "arm64":
+    return "darwin-aarch64"
+  return platform.system()
+
+
+def create_emulator_artifact_path():
+  """Refresh or construct EMULATOR_ARTIFACT_PATH"""
+  if EMULATOR_ARTIFACT_PATH.exists():
+    shutil.rmtree(EMULATOR_ARTIFACT_PATH)
+  EMULATOR_ARTIFACT_PATH.mkdir(exist_ok=True, parents=True)
+
+
+def fetch_build_chaining_artifacts(out_dir, presubmit):
+  """Fetch the Emulator prebuilts for build_bots (go/build_chaining)"""
+  try:
+    out = Path(out_dir)
+    prebuilt_path = out / "prebuilt_cached" / "artifacts"
+    files = glob.glob(str(prebuilt_path / f"*.zip"))
+    for file in files:
+      shutil.copy2(prebuilt_path / file, EMULATOR_ARTIFACT_PATH)
+  except Exception as e:
+    if presubmit:
+      raise e
+    else:
+      logging.warn(
+          f"An error occurred during fetch_build_chaining_artifacts: {e}"
+      )
+
+
+def binary_extension(filename):
+  """Appends exe extension in case of Windows"""
+  if platform.system() == "Windows":
+    return filename + ".exe"
+  return filename
 
 
 def platform_to_cmake_target(target):

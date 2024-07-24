@@ -56,6 +56,16 @@ pub struct NetsimdArgs {
     #[arg(short, long)]
     pub dev: bool,
 
+    /// Disable Wi-Fi peer-to-peer features.
+    /// WARNING: This flag is for development purpose.
+    #[arg(long)]
+    pub disable_wifi_p2p: bool,
+
+    /// Use Rust gRPC server.
+    /// WARNING: This flag is for development purpose.
+    #[arg(long)]
+    pub rust_grpc: bool,
+
     /// Set the vsock port number to be listened by the frontend grpc server
     #[arg(short, long)]
     pub vsock: Option<u16>,
@@ -63,6 +73,24 @@ pub struct NetsimdArgs {
     /// The name of a config file to load
     #[arg(long)]
     pub config: Option<String>,
+
+    /// Comma separated list of host DNS servers
+    #[arg(long)]
+    pub host_dns: Option<String>,
+
+    /// Redirect all TCP connections through the specified HTTP/HTTPS proxy.
+    /// Can be one of the following:
+    ///     http://<server>:<port>
+    ///     http://<username>:<password>@<server>:<port>
+    ///     (the 'http://' prefix can be omitted)
+    /// WARNING: This flag is still working in progress.
+    #[arg(long, verbatim_doc_comment)]
+    pub http_proxy: Option<String>,
+
+    // Use TAP interface instead of libslirp for Wi-Fi
+    /// WARNING: This flag is still working in progress.
+    #[arg(long)]
+    pub wifi_tap: Option<String>,
 
     /// Start with test beacons
     #[arg(long, alias = "test_beacons", overrides_with("no_test_beacons"))]
@@ -76,6 +104,10 @@ pub struct NetsimdArgs {
     /// WARNING: This flag is for development purpose. netsimd will not shutdown without SIGKILL.
     #[arg(long, alias = "no_shutdown")]
     pub no_shutdown: bool,
+
+    /// Entering Verbose mode
+    #[arg(short = 'v', long)]
+    pub verbose: bool,
 
     /// Print Netsimd version information
     #[arg(long)]

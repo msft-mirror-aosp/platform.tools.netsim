@@ -15,138 +15,35 @@
 #include "wifi/wifi_facade.h"
 
 #include <memory>
-#include <optional>
 
 #include "netsim-daemon/src/ffi.rs.h"
 #include "netsim/config.pb.h"
-#include "netsim/hci_packet.pb.h"
 #include "rust/cxx.h"
 #include "util/log.h"
+#include "util/string_utils.h"
 #ifdef NETSIM_ANDROID_EMULATOR
+#include "android-qemu2-glue/emulation/VirtioWifiForwarder.h"
 #include "android-qemu2-glue/emulation/WifiService.h"
+#include "android-qemu2-glue/netsim/libslirp_driver.h"
 #endif
 
 namespace netsim::wifi {
 namespace {
 
-class ChipInfo {
- public:
-  std::shared_ptr<model::Chip::Radio> model;
-
-  ChipInfo(std::shared_ptr<model::Chip::Radio> model)
-      : model(std::move(model)) {}
-};
-
-std::unordered_map<uint32_t, std::shared_ptr<ChipInfo>> id_to_chip_info_;
 #ifdef NETSIM_ANDROID_EMULATOR
 std::shared_ptr<android::qemu2::WifiService> wifi_service;
 #endif
 ;
 
-bool ChangedState(model::State a, model::State b) {
-  return (b != model::State::UNKNOWN && a != b);
-}
-
-std::optional<model::State> GetState(uint32_t id) {
-  if (auto it = id_to_chip_info_.find(id); it != id_to_chip_info_.end()) {
-    auto &model = it->second->model;
-    return model->state();
-  }
-  BtsLogWarn("Failed to get WiFi state with unknown chip_id %d", id);
-  return std::nullopt;
-}
-
-void IncrTx(uint32_t id) {
-  if (auto it = id_to_chip_info_.find(id); it != id_to_chip_info_.end()) {
-    auto &model = it->second->model;
-    model->set_tx_count(model->tx_count() + 1);
-  }
-}
-
-void IncrRx(uint32_t id) {
-  if (auto it = id_to_chip_info_.find(id); it != id_to_chip_info_.end()) {
-    auto &model = it->second->model;
-    model->set_rx_count(model->rx_count() + 1);
-  }
-}
-
 }  // namespace
 
 namespace facade {
 
-void Reset(uint32_t id) {
-  BtsLog("wifi::facade::Reset(%d)", id);
-  if (auto it = id_to_chip_info_.find(id); it != id_to_chip_info_.end()) {
-    auto chip_info = it->second;
-    chip_info->model->set_state(model::State::ON);
-    chip_info->model->set_tx_count(0);
-    chip_info->model->set_rx_count(0);
-  }
-}
-void Remove(uint32_t id) {
-  BtsLog("wifi::facade::Remove(%d)", id);
-  id_to_chip_info_.erase(id);
-}
-
-void Patch(uint32_t id, const model::Chip::Radio &request) {
-  BtsLog("wifi::facade::Patch(%d)", id);
-  auto it = id_to_chip_info_.find(id);
-  if (it == id_to_chip_info_.end()) {
-    BtsLogWarn("Patch an unknown chip_id: %d", id);
-    return;
-  }
-  auto &model = it->second->model;
-  if (ChangedState(model->state(), request.state())) {
-    model->set_state(request.state());
-  }
-}
-
-model::Chip::Radio Get(uint32_t id) {
-  BtsLog("wifi::facade::Get(%d)", id);
-  model::Chip::Radio radio;
-  if (auto it = id_to_chip_info_.find(id); it != id_to_chip_info_.end()) {
-    radio.CopyFrom(*it->second->model);
-  }
-  return radio;
-}
-
-void PatchCxx(uint32_t id,
-              const rust::Slice<::std::uint8_t const> proto_bytes) {
-  model::Chip::Radio radio;
-  radio.ParseFromArray(proto_bytes.data(), proto_bytes.size());
-  Patch(id, radio);
-}
-
-rust::Vec<uint8_t> GetCxx(uint32_t id) {
-  auto radio = Get(id);
-  std::vector<uint8_t> proto_bytes(radio.ByteSizeLong());
-  radio.SerializeToArray(proto_bytes.data(), proto_bytes.size());
-  rust::Vec<uint8_t> proto_rust_bytes;
-  std::copy(proto_bytes.begin(), proto_bytes.end(),
-            std::back_inserter(proto_rust_bytes));
-  return proto_rust_bytes;
-}
-
-void Add(uint32_t chip_id) {
-  BtsLog("wifi::facade::Add(%d)", chip_id);
-
-  auto model = std::make_shared<model::Chip::Radio>();
-  model->set_state(model::State::ON);
-  id_to_chip_info_.emplace(chip_id, std::make_shared<ChipInfo>(model));
-}
-
 size_t HandleWifiCallback(const uint8_t *buf, size_t size) {
   //  Broadcast the response to all WiFi chips.
   std::vector<uint8_t> packet(buf, buf + size);
-  for (auto [chip_id, chip_info] : id_to_chip_info_) {
-    if (auto state = chip_info->model->state();
-        !state || state == model::State::OFF) {
-      continue;
-    }
-    netsim::wifi::IncrRx(chip_id);
-    echip::HandleResponse(chip_id, packet,
-                          packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
-  }
+  rust::Slice<const uint8_t> packet_slice(packet.data(), packet.size());
+  wifi::facade::HandleWiFiResponse(packet_slice);
   return size;
 }
 
@@ -161,6 +58,7 @@ void Start(const rust::Slice<::std::uint8_t const> proto_bytes) {
       .ssid = config.hostapd_options().ssid(),
       .passwd = config.hostapd_options().passwd()};
 
+  auto host_dns = stringutils::Split(config.slirp_options().host_dns(), ",");
   android::qemu2::SlirpOptions slirpOpts = {
       .disabled = config.slirp_options().disabled(),
       .ipv4 = (config.slirp_options().has_ipv4() ? config.slirp_options().ipv4()
@@ -180,8 +78,12 @@ void Start(const rust::Slice<::std::uint8_t const> proto_bytes) {
       .dhcpstart = config.slirp_options().dhcpstart(),
       .dns = config.slirp_options().dns(),
       .dns6 = config.slirp_options().dns6(),
+      .host_dns = host_dns,
   };
-
+  if (!config.slirp_options().host_dns().empty()) {
+    BtsLogInfo("Host DNS server: %s",
+               config.slirp_options().host_dns().c_str());
+  }
   auto builder = android::qemu2::WifiService::Builder()
                      .withHostapd(hostapd)
                      .withSlirp(slirpOpts)
@@ -201,25 +103,57 @@ void Stop() {
 
 }  // namespace facade
 
-void HandleWifiRequest(uint32_t chip_id,
-                       const std::shared_ptr<std::vector<uint8_t>> &packet) {
+void libslirp_main_loop_wait() {
 #ifdef NETSIM_ANDROID_EMULATOR
-  if (auto state = GetState(chip_id); !state || state == model::State::OFF) {
-    return;
-  }
-  netsim::wifi::IncrTx(chip_id);
+  // main_loop_wait is a non-blocking call where fds maintained by the
+  // WiFi service (slirp) are polled and serviced for I/O. When any fd
+  // become ready for I/O, slirp_pollfds_poll() will be invoked to read
+  // from the open sockets therefore incoming packets are serviced.
+  android::qemu2::libslirp_main_loop_wait(true);
+#endif
+}
+
+void HandleWifiRequestCxx(const rust::Vec<uint8_t> &packet) {
+#ifdef NETSIM_ANDROID_EMULATOR
   // Send the packet to the WiFi service.
   struct iovec iov[1];
-  iov[0].iov_base = packet->data();
-  iov[0].iov_len = packet->size();
+  iov[0].iov_base = (void *)packet.data();
+  iov[0].iov_len = packet.size();
   wifi_service->send(android::base::IOVector(iov, iov + 1));
 #endif
 }
 
-void HandleWifiRequestCxx(uint32_t chip_id, const rust::Vec<uint8_t> &packet) {
-  std::vector<uint8_t> buffer(packet.begin(), packet.end());
-  auto packet_ptr = std::make_shared<std::vector<uint8_t>>(buffer);
-  HandleWifiRequest(chip_id, packet_ptr);
+void HostapdSendCxx(const rust::Vec<uint8_t> &packet) {
+#ifdef NETSIM_ANDROID_EMULATOR
+  // Send the packet to Hostapd.
+  struct iovec iov[1];
+  iov[0].iov_base = (void *)packet.data();
+  iov[0].iov_len = packet.size();
+  wifi_service->hostapd_send(android::base::IOVector(iov, iov + 1));
+#endif
+}
+
+void LibslirpSendCxx(const rust::Vec<uint8_t> &packet) {
+#ifdef NETSIM_ANDROID_EMULATOR
+  // Send the packet to libslirp.
+  struct iovec iov[1];
+  iov[0].iov_base = (void *)packet.data();
+  iov[0].iov_len = packet.size();
+  wifi_service->libslirp_send(android::base::IOVector(iov, iov + 1));
+#endif
+}
+
+bool IsEapolCxx(const rust::Vec<uint8_t> &packet) {
+#ifdef NETSIM_ANDROID_EMULATOR
+  struct iovec iov[1];
+  iov[0].iov_base = (void *)packet.data();
+  iov[0].iov_len = packet.size();
+  return std::dynamic_pointer_cast<android::qemu2::VirtioWifiForwarder>(
+             wifi_service)
+      ->is_eapol(android::base::IOVector(iov, iov + 1));
+#else
+  return 0;
+#endif
 }
 
 }  // namespace netsim::wifi

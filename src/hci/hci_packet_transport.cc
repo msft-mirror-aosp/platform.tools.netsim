@@ -21,6 +21,7 @@
 #include "model/hci/hci_transport.h"
 #include "netsim-daemon/src/ffi.rs.h"
 #include "netsim/hci_packet.pb.h"
+#include "netsim/stats.pb.h"
 #include "rust/cxx.h"
 #include "util/log.h"
 
@@ -69,7 +70,7 @@ void HciPacketTransport::Send(rootcanal::PacketType packet_type,
     return;
   }
   // Send response to transport dispatcher.
-  netsim::echip::HandleResponse(netsimChipId, data, hci_packet_type);
+  netsim::wireless::HandleResponse(netsimChipId, data, hci_packet_type);
 }
 
 // Called by HCITransport (rootcanal)
@@ -92,9 +93,36 @@ void HciPacketTransport::Request(
   // HCIPacket_PacketType to rootcanal::PacketType is safe.
   rootcanal::PacketType rootcanal_packet_type =
       static_cast<rootcanal::PacketType>(packet_type);
-  mAsyncManager->Synchronize([this, rootcanal_packet_type, packet]() {
-    mPacketCallback(rootcanal_packet_type, packet);
-  });
+  auto beforeScheduleTime = std::chrono::steady_clock::now();
+  mAsyncManager->Synchronize(
+      [this, rootcanal_packet_type, packet, beforeScheduleTime]() {
+        auto elapsedTime =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - beforeScheduleTime)
+                .count();
+        // If the elapsed time of the packet delivery is greater than 5ms,
+        // report invalid packet with DELAYED reasoning.
+        if (elapsedTime > 5) {
+          // Create a new vector to hold the combined data
+          std::vector<uint8_t> combinedPacket;
+
+          // Prepend rootcanal_packet_type
+          combinedPacket.push_back(static_cast<uint8_t>(rootcanal_packet_type));
+
+          // Append the original packet data
+          combinedPacket.insert(combinedPacket.end(), packet->begin(),
+                                packet->end());
+
+          // Report Invalid Packet
+          netsim::hci::facade::ReportInvalidPacket(
+              this->rootcanalId.value(),
+              stats::InvalidPacket_Reason::InvalidPacket_Reason_DELAYED,
+              "Delayed packet with " + std::to_string(elapsedTime) +
+                  " milliseconds",
+              combinedPacket);
+        }
+        mPacketCallback(rootcanal_packet_type, packet);
+      });
 }
 
 void HciPacketTransport::Add(

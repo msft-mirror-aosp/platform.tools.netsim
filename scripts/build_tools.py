@@ -19,26 +19,29 @@ import argparse
 import logging
 import os
 from pathlib import Path
-import platform
-import shutil
-import sys
-import zipfile
 
+from environment import get_default_environment
 from server_config import ServerConfig
+from tasks import (
+    TASK_LIST,
+    get_tasks,
+    log_enabled_tasks,
+)
 from utils import (
     AOSP_ROOT,
-    cmake_toolchain,
     config_logging,
+    create_emulator_artifact_path,
+    default_target,
+    fetch_build_chaining_artifacts,
     is_presubmit,
     log_system_info,
-    platform_to_cmake_target,
-    run,
 )
 
 
 def main():
   config_logging()
   log_system_info()
+  create_emulator_artifact_path()
 
   parser = argparse.ArgumentParser(
       description=(
@@ -46,23 +49,25 @@ def main():
       )
   )
   parser.add_argument(
-      "--out_dir", type=str, required=True, help="The output directory"
+      "--out_dir",
+      type=str,
+      default="tools/netsim/objs/",
+      help="The output directory",
   )
   parser.add_argument(
-      "--dist_dir", type=str, required=True, help="The destination directory"
+      "--dist_dir", type=str, default="dist/", help="The destination directory"
   )
   parser.add_argument(
       "--build-id",
       type=str,
-      default=[],
-      required=True,
+      default="",
       dest="build_id",
       help="The netsim build number",
   )
   parser.add_argument(
       "--target",
       type=str,
-      default=platform.system(),
+      default=default_target(),
       help="The build target, defaults to current os",
   )
   parser.add_argument(
@@ -73,81 +78,107 @@ def main():
   parser.add_argument(
       "--with_debug", action="store_true", help="Build debug instead of release"
   )
+  parser.add_argument(
+      "--buildbot", action="store_true", help="Invoked by Android buildbots"
+  )
+  parser.add_argument(
+      "--task",
+      nargs="+",
+      type=str.lower,
+      choices=[choice.lower() for choice in TASK_LIST],
+      help=(
+          "Tasks to perform (Configure, Compile, CompileInstall,"
+          " InstallEmulator, RunPyTest, LocalRunAll)"
+      ),
+  )
+  parser.add_argument(
+      "--config",
+      default="release",
+      choices=["debug", "release"],
+      help="Whether we are building a release or debug configuration.",
+  )
+  parser.add_argument(
+      "--emulator_target",
+      type=str,
+      default="emulator-linux_x64",
+      help=(
+          "The emulator build target to install for local case, defaults to"
+          " emulator-linux_x64"
+      ),
+  )
+  parser.add_argument(
+      "--local_emulator_dir",
+      type=str,
+      default="",
+      help=(
+          "For providing an emulator build artifact in a directory."
+          " This will install the emulator from local_emulator_dir instead of"
+          " fetching the artifacts"
+      ),
+  )
+  parser.add_argument(
+      "--pytest_input_dir",
+      type=str,
+      default="",
+      help=(
+          "For providing netsim & emulator binaries and libraries for pytest."
+          " This will allow pytest to be run on directory path specified on"
+          " pytest_input_dir"
+      ),
+  )
 
   args = parser.parse_args()
 
+  presubmit = is_presubmit(args.build_id)
+
+  # The environment of build
+  env = get_default_environment(AOSP_ROOT)
+  if args.buildbot:
+    cfg = ServerConfig(presubmit, args)
+    env = cfg.get_env()
+
+  # Set Environment Variables
   os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"] = "1"
+  if not args.buildbot:
+    # Able to config C++ file in vscode.
+    os.environ["CMAKE_EXPORT_COMPILE_COMMANDS"] = "1"
 
-  target = platform.system().lower()
-
-  if args.target:
-    target = args.target.lower()
-
+  # Provide absolute path for args.out_dir
   if not os.path.isabs(args.out_dir):
     args.out_dir = os.path.join(AOSP_ROOT, args.out_dir)
 
-  out = Path(args.out_dir)
-  if out.exists():
-    shutil.rmtree(out)
-  out.mkdir(exist_ok=True, parents=True)
+  # Build preparation work for buildbot
+  if args.buildbot:
+    # Fetch Emulator Artifacts
+    fetch_build_chaining_artifacts(args.out_dir, presubmit)
+    # Set the out_dir to "out/objs"
+    args.out_dir = Path(args.out_dir) / "objs"
 
-  cmake = shutil.which(
-      "cmake",
-      path=str(
-          AOSP_ROOT
-          / "prebuilts"
-          / "cmake"
-          / f"{platform.system().lower()}-x86"
-          / "bin"
-      ),
-  )
-  launcher = [
-      cmake,
-      f"-B{out}",
-      "-G Ninja",
-      f"-DCMAKE_TOOLCHAIN_FILE={cmake_toolchain(target)}",
-      AOSP_ROOT / "tools" / "netsim",
-  ]
+  # Obtain tasks
+  tasks = get_tasks(args, env)
 
-  presubmit = is_presubmit(args.build_id)
+  # Log enabled tasks
+  log_enabled_tasks(tasks)
 
-  # Make sure the dist directory exists.
-  dist = Path(args.dist_dir).absolute()
-  dist.mkdir(exist_ok=True, parents=True)
+  # Turn on sccache?
+  # if args.buildbot and cfg.sccache:
+  #    launcher.append(f"-DOPTION_CCACHE=${cfg.sccache}")
 
-  with ServerConfig(presubmit, args) as cfg:
-    # Turn on sccache?
-    # if cfg.sccache:
-    #    launcher.append(f"-DOPTION_CCACHE=${cfg.sccache}")
+  # Configure
+  tasks.get("Configure").run()
 
-    # Configure
-    run(launcher, cfg.get_env(), "bld")
+  # Build
+  tasks.get("Compile").run()
 
-    # Build
-    run(
-        [cmake, "--build", out, "--target", "install"],
-        cfg.get_env(),
-        "bld",
-    )
+  # Install
+  tasks.get("CompileInstall").run()
 
-    # Run tests?
+  # Zip results..
+  tasks.get("ZipArtifact").run()
 
-    # Zip results..
-    zip_fname = (
-        dist / f"netsim-{platform_to_cmake_target(target)}-{args.build_id}.zip"
-    )
-    search_dir = out / "distribution" / "emulator"
-    logging.info("Creating zip file: %s", zip_fname)
-    with zipfile.ZipFile(
-        zip_fname, "w", zipfile.ZIP_DEFLATED, allowZip64=True
-    ) as zipf:
-      logging.info("Searching %s", search_dir)
-      for fname in search_dir.glob("**/*"):
-        arcname = fname.relative_to(search_dir)
-        logging.info("Adding %s as %s", fname, arcname)
-        zipf.write(fname, arcname)
-
-  logging.info("Build completed!")
+  # Install Emulator artifacts and Run PyTests
+  tasks.get("InstallEmulator").run()
+  tasks.get("RunPyTest").run()
 
 
 if __name__ == "__main__":

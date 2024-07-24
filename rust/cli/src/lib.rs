@@ -22,13 +22,13 @@ mod file_handler;
 mod requests;
 mod response;
 
-use log::error;
 use netsim_common::util::os_utils::{get_instance, get_server_address};
 use netsim_proto::frontend::{DeleteChipRequest, ListDeviceResponse};
 use protobuf::Message;
 use std::env;
 use std::fs::File;
 use std::path::PathBuf;
+use tracing::error;
 
 use crate::ffi::frontend_client_ffi::{
     new_frontend_client, ClientResult, FrontendClient, GrpcMethod,
@@ -169,9 +169,8 @@ fn process_result(
 #[no_mangle]
 /// main Rust netsim CLI function to be called by C wrapper netsim.cc
 pub extern "C" fn rust_main() {
-    netsim_logger::init("netsim");
-
     let mut args = NetsimArgs::parse();
+    netsim_logger::init("netsim", args.verbose);
     if matches!(args.command, args::Command::Gui) {
         println!("Opening netsim web UI on default web browser");
         browser::open("http://localhost:7681/");

@@ -64,7 +64,12 @@ rust_defaults {
         "libcxx",
         "libanyhow",
         "libdata_encoding",
+        "libfutures",
+        "libfutures_channel",
+        "libfutures_executor",
+        "libfutures_util",
         "libglam",
+        "libgrpcio",
         "libnetsim_proto",
         "libhttp",
         "libnetsim_common",
@@ -72,10 +77,13 @@ rust_defaults {
         "libpica",
         "libprotobuf",
         "libprotobuf_json_mapping",
+        "librand",
         "libregex",
         "libserde",
         "libserde_json",
         "libthiserror",
+        "libtokio",
+        "libtokio_stream",
         "libtungstenite",
         "liblazy_static",
         "liblog_rust",
@@ -192,7 +200,6 @@ cc_library_host_static {
     ],
     static_libs: [
         "breakpad_client",
-        "libc++fs",
         "libjsoncpp",
         "libprotobuf-cpp-full",
         "libscriptedbeaconpayload-protos-lite",
@@ -218,7 +225,6 @@ netsim_ui_modules = [
     "netsim_ui_js_netsim-app.js",
     "netsim_ui_js_packet-info.js",
     "netsim_ui_js_pyramid-sprite.js",
-    "netsim_ui_js_model.js",
     "netsim_ui_tslib",
     "netsim_ui_assets_grid-background.svg",
     "netsim_ui_assets_hexagonal-background.png",
@@ -248,7 +254,6 @@ cc_binary_host {
     ],
     static_libs: [
         "breakpad_client",
-        "libc++fs",
         "libprotobuf-cpp-full",
         "libscriptedbeaconpayload-protos-lite", // TODO: Remove this after using pdl library.
         "lib-netsimd-proto",
@@ -261,7 +266,6 @@ cc_binary_host {
         "libnetsim_daemon",
         "libbt-rootcanal",
     ],
-    ldflags: ["-Wl,--allow-multiple-definition"],
     required: netsim_ui_modules,
     strip: {
         keep_symbols_and_debug_frame: true,
@@ -275,7 +279,6 @@ cc_test_host {
         "src/util/ini_file_test.cc",
         "src/util/os_utils_test.cc",
         "src/util/string_utils_test.cc",
-        "src/wifi/wifi_facade_test.cc",
     ],
     generated_headers: [
         "cxx-bridge-header",
@@ -291,7 +294,6 @@ cc_test_host {
     ],
     static_libs: [
         "breakpad_client",
-        "libc++fs",
         "libgrpc_wrap",
         "libjsoncpp",
         "libprotobuf-cpp-full",
@@ -305,7 +307,6 @@ cc_test_host {
         "libnetsim_daemon",
         "libbt-rootcanal",
     ],
-    ldflags: ["-Wl,--allow-multiple-definition"],
 }
 
 rust_library_host {
@@ -323,8 +324,10 @@ rust_defaults {
     name: "libnetsim_common_defaults",
     srcs: ["rust/common/src/lib.rs"],
     rustlibs: [
+        "libanyhow",
         "libchrono",
         "librand",
+        "liblibc",
         "liblog_rust",
         "libenv_logger",
         "libzip",
@@ -360,7 +363,6 @@ cc_library_host_static {
     shared_libs: ["libgrpc++"],
     generated_sources: ["netsim_cli_cc"],
     static_libs: [
-        "libc++fs",
         "libprotobuf-cpp-full",
         "lib-netsim-frontend-proto",
     ],
@@ -372,10 +374,10 @@ rust_defaults {
         "libclap",
         "libcxx",
         "libhex",
-        "liblog_rust",
         "libnetsim_common",
         "libnetsim_proto",
         "libprotobuf",
+        "libtracing",
     ],
 }
 
@@ -385,7 +387,6 @@ rust_defaults {
     static_libs: [
         "lib-netsim-frontend-client",
         "lib-netsim-frontend-proto",
-        "libc++fs",
         "libprotobuf-cpp-full",
     ],
 }

@@ -23,25 +23,27 @@ use crate::http_server::server_response::ServerResponseWritable;
 use crate::http_server::server_response::StrHeaders;
 use cxx::let_cxx_string;
 
-use crate::echip::{bluetooth::report_invalid_packet_cxx, handle_request_cxx, handle_response};
-use crate::transport::grpc::{register_grpc_transport, unregister_grpc_transport};
-
 use crate::captures::captures_handler::handle_capture_cxx;
 use crate::devices::devices_handler::{
     add_chip_cxx, get_distance_cxx, handle_device_cxx, remove_chip_cxx, AddChipResultCxx,
 };
 use crate::ranging::*;
+use crate::transport::grpc::{register_grpc_transport, unregister_grpc_transport};
 use crate::version::*;
+use crate::wireless::wifi::handle_wifi_response;
+use crate::wireless::{
+    bluetooth::report_invalid_packet_cxx, handle_request_cxx, handle_response_cxx,
+};
 
 #[allow(unsafe_op_in_unsafe_fn)]
-#[cxx::bridge(namespace = "netsim::echip")]
-pub mod ffi_echip {
+#[cxx::bridge(namespace = "netsim::wireless")]
+pub mod ffi_wireless {
     extern "Rust" {
         #[cxx_name = HandleRequestCxx]
         fn handle_request_cxx(chip_id: u32, packet: &CxxVector<u8>, packet_type: u8);
 
         #[cxx_name = HandleResponse]
-        fn handle_response(chip_id: u32, packet: &CxxVector<u8>, packet_type: u8);
+        fn handle_response_cxx(chip_id: u32, packet: &CxxVector<u8>, packet_type: u8);
     }
 }
 
@@ -249,24 +251,24 @@ pub mod ffi_wifi {
 
         #[rust_name = handle_wifi_request]
         #[namespace = "netsim::wifi"]
-        fn HandleWifiRequestCxx(chip_id: u32, packet: &Vec<u8>);
+        fn HandleWifiRequestCxx(packet: &Vec<u8>);
+
+        #[rust_name = hostapd_send]
+        #[namespace = "netsim::wifi"]
+        fn HostapdSendCxx(packet: &Vec<u8>);
+
+        #[rust_name = libslirp_send]
+        #[namespace = "netsim::wifi"]
+        fn LibslirpSendCxx(packet: &Vec<u8>);
+
+        #[rust_name = is_eapol]
+        #[namespace = "netsim::wifi"]
+        fn IsEapolCxx(packet: &Vec<u8>) -> bool;
+
+        #[namespace = "netsim::wifi"]
+        pub fn libslirp_main_loop_wait();
 
         include!("wifi/wifi_facade.h");
-
-        #[rust_name = wifi_patch_cxx]
-        pub fn PatchCxx(chip_id: u32, proto_bytes: &[u8]);
-
-        #[rust_name = wifi_get_cxx]
-        pub fn GetCxx(chip_id: u32) -> Vec<u8>;
-
-        #[rust_name = wifi_reset]
-        pub fn Reset(chip_id: u32);
-
-        #[rust_name = wifi_remove]
-        pub fn Remove(chip_id: u32);
-
-        #[rust_name = wifi_add]
-        pub fn Add(chip_id: u32);
 
         #[rust_name = wifi_start]
         pub fn Start(proto_bytes: &[u8]);
@@ -274,6 +276,12 @@ pub mod ffi_wifi {
         #[rust_name = wifi_stop]
         pub fn Stop();
 
+    }
+
+    #[allow(unsafe_op_in_unsafe_fn)]
+    extern "Rust" {
+        #[cxx_name = HandleWiFiResponse]
+        fn handle_wifi_response(packet: &[u8]);
     }
 }
 
@@ -373,13 +381,6 @@ pub mod ffi_util {
 
     #[allow(dead_code)]
     unsafe extern "C++" {
-
-        // OS utilities.
-        include!("util/os_utils.h");
-
-        #[rust_name = redirect_std_stream]
-        #[namespace = "netsim::osutils"]
-        pub fn RedirectStdStream(netsim_temp_dir: &CxxString, instance_name: &CxxString);
 
         // Crash report.
         include!("util/crash_report.h");

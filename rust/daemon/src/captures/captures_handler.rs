@@ -27,6 +27,7 @@
 // TODO(b/274506882): Implement gRPC status proto on error responses. Also write better
 // and more descriptive error messages with proper error codes.
 
+use bytes::Bytes;
 use http::{Request, Version};
 use log::warn;
 use netsim_common::util::time_display::TimeDisplay;
@@ -171,8 +172,11 @@ pub fn handle_capture(request: &Request<Vec<u8>>, param: &str, writer: ResponseW
     }
 }
 
-fn get_id(param: &str) -> anyhow::Result<u32> {
-    param.parse::<u32>().map_err(|_| anyhow!("Capture ID must be u32, found {}", param))
+fn get_id(param: &str) -> anyhow::Result<ChipIdentifier> {
+    param
+        .parse::<u32>()
+        .map_err(|_| anyhow!("Capture ID must be u32, found {}", param))
+        .map(ChipIdentifier)
 }
 
 fn handle_capture_internal(
@@ -193,8 +197,8 @@ fn handle_capture_internal(
                 let body = request.body();
                 let state = String::from_utf8(body.to_vec()).unwrap();
                 match state.as_str() {
+                    "0" => handle_capture_patch(writer, id, false),
                     "1" => handle_capture_patch(writer, id, true),
-                    "2" => handle_capture_patch(writer, id, false),
                     _ => Err(anyhow!("Incorrect state for PatchCapture")),
                 }
             }
@@ -232,7 +236,7 @@ pub fn handle_capture_cxx(
 }
 
 /// A common code for handle_request and handle_response methods.
-fn handle_packet(
+pub(super) fn handle_packet(
     chip_id: ChipIdentifier,
     packet: &[u8],
     packet_type: u32,
@@ -284,13 +288,23 @@ fn handle_packet(
 }
 
 /// Method for dispatcher to invoke (Host to Controller Packet Flow)
-pub fn handle_packet_request(chip_id: u32, packet: &[u8], packet_type: u32) {
-    handle_packet(chip_id, packet, packet_type, PacketDirection::HostToController)
+pub fn host_to_controller(chip_id: ChipIdentifier, packet: &Bytes, packet_type: u32) {
+    clone_captures().read().unwrap().send(
+        chip_id,
+        packet,
+        packet_type,
+        PacketDirection::HostToController,
+    );
 }
 
 /// Method for dispatcher to invoke (Controller to Host Packet Flow)
-pub fn handle_packet_response(chip_id: u32, packet: &[u8], packet_type: u32) {
-    handle_packet(chip_id, packet, packet_type, PacketDirection::ControllerToHost)
+pub fn controller_to_host(chip_id: ChipIdentifier, packet: &Bytes, packet_type: u32) {
+    clone_captures().read().unwrap().send(
+        chip_id,
+        packet,
+        packet_type,
+        PacketDirection::ControllerToHost,
+    );
 }
 
 /// Method for clearing pcap files in temp directory

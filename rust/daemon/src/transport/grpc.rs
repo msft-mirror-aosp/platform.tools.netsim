@@ -12,8 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::echip::packet::{register_transport, unregister_transport, Response};
+use crate::devices::chip::ChipIdentifier;
 use crate::ffi::ffi_transport::handle_grpc_response;
+use crate::wireless::packet::{register_transport, unregister_transport, Response};
+use bytes::Bytes;
+use futures_executor::block_on;
+use futures_util::SinkExt as _;
+use grpcio::WriteFlags;
+use netsim_proto::hci_packet::{hcipacket::PacketType, HCIPacket};
+use netsim_proto::packet_streamer::PacketResponse;
+use protobuf::Enum;
+use protobuf::EnumOrUnknown;
 
 /// Grpc transport.
 ///
@@ -25,17 +34,41 @@ struct GrpcTransport {
 }
 
 impl Response for GrpcTransport {
-    fn response(&mut self, packet: Vec<u8>, packet_type: u8) {
-        handle_grpc_response(self.chip_id, &packet, packet_type)
+    fn response(&mut self, packet: Bytes, packet_type: u8) {
+        handle_grpc_response(self.chip_id, &packet.to_vec(), packet_type)
     }
 }
 
 // for grpc server in C++
 pub fn register_grpc_transport(chip_id: u32) {
-    register_transport(chip_id, Box::new(GrpcTransport { chip_id }));
+    register_transport(ChipIdentifier(chip_id), Box::new(GrpcTransport { chip_id }));
 }
 
 // for grpc server in C++
 pub fn unregister_grpc_transport(chip_id: u32) {
-    unregister_transport(chip_id);
+    unregister_transport(ChipIdentifier(chip_id));
+}
+
+/// Rust grpc transport.s
+pub struct RustGrpcTransport {
+    pub sink: grpcio::DuplexSink<PacketResponse>,
+}
+
+impl Response for RustGrpcTransport {
+    fn response(&mut self, packet: Bytes, packet_type: u8) {
+        let mut response = PacketResponse::new();
+        if packet_type != (PacketType::HCI_PACKET_UNSPECIFIED.value() as u8) {
+            let hci_packet = HCIPacket {
+                packet_type: EnumOrUnknown::from_i32(packet_type as i32),
+                packet: packet.to_vec(),
+                ..Default::default()
+            };
+            response.set_hci_packet(hci_packet);
+        } else {
+            response.set_packet(packet.to_vec());
+        }
+        block_on(async {
+            let _ = self.sink.send((response, WriteFlags::default())).await;
+        });
+    }
 }

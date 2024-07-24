@@ -16,6 +16,7 @@
 
 package android.test.wifi.nsd;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -24,7 +25,14 @@ import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
 import android.util.Log;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /** Helper class for NsdManager. */
@@ -33,12 +41,17 @@ public final class NsdHelper {
   private final WifiManager wifi;
   private WifiManager.MulticastLock multicastLock;
 
-  private static final String SERVICE_NAME = "WifiNsdTest";
+  private String serviceName = "WifiNsdTest";
   private static final String SERVICE_TYPE = "_wifi_nsd_test._tcp.";
   private static final String TAG = "WifiTest-NsdInstrumentationTest";
+  private static final String PING = "Hello";
+  private static final String PONG = "World";
 
-  public NsdHelper(Context context) {
+  public NsdHelper(Context context, String testId) {
     this.wifi = context.getSystemService(WifiManager.class);
+    // Previously unregistered services may still be discoverable.
+    // Use unique service name to prevent the discovery of unregistered services.
+    this.serviceName += "-" + testId;
     this.multicastLock = this.wifi.createMulticastLock("multicastLock");
     this.nsdManager = context.getSystemService(NsdManager.class);
   }
@@ -47,13 +60,24 @@ public final class NsdHelper {
     assertTrue(latch.await(60, TimeUnit.SECONDS));
   }
 
-  public void serviceTest() throws InterruptedException {
-    // TODO: Use service port.
-    RegistrationListener listener = registerService(12345);
+  public void serviceTest() throws InterruptedException, IOException {
+    ServerSocket serverSocket = new ServerSocket(0);
+    RegistrationListener listener = registerService(serverSocket.getLocalPort());
     await(listener.serviceRegistered);
 
-    // TODO: Replace with connection and send PING PONG messages.
-    TimeUnit.SECONDS.sleep(10);
+    Socket clientSocket = serverSocket.accept();
+
+    // Wait for ping message.
+    BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    String msg = in.readLine();
+    assertEquals(PING, msg);
+
+    // Send pong message.
+    PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+    out.println(PONG);
+
+    serverSocket.close();
+    clientSocket.close();
 
     unregisterService(listener);
     await(listener.serviceUnregistered);
@@ -95,7 +119,7 @@ public final class NsdHelper {
     RegistrationListener listener = new RegistrationListener();
     NsdServiceInfo serviceInfo = new NsdServiceInfo();
     serviceInfo.setPort(port);
-    serviceInfo.setServiceName(SERVICE_NAME);
+    serviceInfo.setServiceName(serviceName);
     serviceInfo.setServiceType(SERVICE_TYPE);
 
     nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, listener);
@@ -107,13 +131,27 @@ public final class NsdHelper {
     return listener.serviceUnregistered;
   }
 
-  public void discoverTest() throws InterruptedException {
+  public void discoverTest() throws InterruptedException, IOException {
     DiscoveryListener listener = discoverServices();
     await(listener.serviceFound);
-    CountDownLatch serviceResolved = resolveServices(listener.service);
-    await(serviceResolved);
+    ServiceInfoCallback callback = resolveServices(listener.service);
+    await(callback.serviceResolved);
     CountDownLatch discoveryStopped = stopDiscovery(listener);
     await(discoveryStopped);
+
+    // Set up connection.
+    NsdServiceInfo service = callback.service;
+    Socket clientSocket = new Socket(service.getHost(), service.getPort());
+
+    // Send ping message.
+    PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+    out.println(PING);
+
+    // Wait for pong message.
+    BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    String msg = in.readLine();
+    assertEquals(PONG, msg);
+    clientSocket.close();
   }
 
   private static class DiscoveryListener implements NsdManager.DiscoveryListener {
@@ -121,9 +159,12 @@ public final class NsdHelper {
     CountDownLatch discoveryStopped;
     NsdServiceInfo service;
 
-    DiscoveryListener() {
+    private String serviceName;
+
+    DiscoveryListener(String serviceName) {
       serviceFound = new CountDownLatch(1);
       discoveryStopped = new CountDownLatch(1);
+      this.serviceName = serviceName;
     }
 
     @Override
@@ -132,7 +173,7 @@ public final class NsdHelper {
     @Override
     public void onServiceFound(NsdServiceInfo serviceInfo) {
       if (serviceInfo.getServiceType().equals(SERVICE_TYPE)
-          && serviceInfo.getServiceName().equals(SERVICE_NAME)) {
+          && serviceInfo.getServiceName().equals(serviceName)) {
         service = serviceInfo;
         serviceFound.countDown();
       }
@@ -158,7 +199,7 @@ public final class NsdHelper {
   }
 
   private DiscoveryListener discoverServices() {
-    DiscoveryListener discoveryListener = new DiscoveryListener();
+    DiscoveryListener discoveryListener = new DiscoveryListener(serviceName);
 
     multicastLock.setReferenceCounted(true);
     multicastLock.acquire();
@@ -168,34 +209,42 @@ public final class NsdHelper {
     return discoveryListener;
   }
 
-  private CountDownLatch resolveServices(NsdServiceInfo service) {
-    ResolveListener listener = new ResolveListener();
+  private ServiceInfoCallback resolveServices(NsdServiceInfo service) {
+    ServiceInfoCallback callback = new ServiceInfoCallback(serviceName);
+    nsdManager.registerServiceInfoCallback(service, Executors.newSingleThreadExecutor(), callback);
 
-    // TODO: Deprecated as of API level 34. For API levels 34 and above, use
-    // registerServiceInfoCallback().
-    nsdManager.resolveService(service, listener);
-
-    return listener.serviceResolved;
+    return callback;
   }
 
-  private static class ResolveListener implements NsdManager.ResolveListener {
+  private static class ServiceInfoCallback implements NsdManager.ServiceInfoCallback {
     CountDownLatch serviceResolved;
+    NsdServiceInfo service;
 
-    ResolveListener() {
+    private String serviceName;
+
+    ServiceInfoCallback(String serviceName) {
       serviceResolved = new CountDownLatch(1);
+      this.serviceName = serviceName;
     }
 
     @Override
-    public void onServiceResolved(NsdServiceInfo serviceInfo) {
-      if (serviceInfo.getServiceName().equals(SERVICE_NAME)) {
+    public void onServiceUpdated(NsdServiceInfo serviceInfo) {
+      if (serviceInfo.getServiceName().equals(serviceName)) {
+        service = serviceInfo;
         serviceResolved.countDown();
       }
     }
 
     @Override
-    public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-      fail("Resolve failed");
+    public void onServiceInfoCallbackRegistrationFailed(int errorCode) {
+      fail("Callback registration failed");
     }
+
+    @Override
+    public void onServiceInfoCallbackUnregistered() {}
+
+    @Override
+    public void onServiceLost() {}
   }
 
   private CountDownLatch stopDiscovery(DiscoveryListener listener) {

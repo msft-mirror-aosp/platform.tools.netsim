@@ -15,6 +15,7 @@
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, io::Cursor, net::TcpStream};
 
+use bytes::Bytes;
 use http::Request;
 use log::{error, info, warn};
 use netsim_proto::common::ChipKind;
@@ -22,9 +23,9 @@ use tungstenite::{protocol::Role, Message, WebSocket};
 
 use crate::devices::chip;
 use crate::devices::devices_handler::{add_chip, remove_chip};
-use crate::echip;
-use crate::echip::packet::{register_transport, unregister_transport, Response};
 use crate::http_server::server_response::ResponseWritable;
+use crate::wireless;
+use crate::wireless::packet::{register_transport, unregister_transport, Response};
 
 use super::h4;
 
@@ -71,7 +72,7 @@ struct WebSocketTransport {
 }
 
 impl Response for WebSocketTransport {
-    fn response(&mut self, packet: Vec<u8>, packet_type: u8) {
+    fn response(&mut self, packet: Bytes, packet_type: u8) {
         let mut buffer = Vec::new();
         buffer.push(packet_type);
         buffer.extend(packet);
@@ -97,13 +98,15 @@ pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) 
         bt_properties: None,
     };
     #[cfg(not(test))]
-    let echip_create_params = echip::CreateParam::Bluetooth(echip::bluetooth::CreateParams {
-        address: chip_create_params.address.clone(),
-        bt_properties: None,
-    });
+    let wireless_create_params =
+        wireless::CreateParam::Bluetooth(wireless::bluetooth::CreateParams {
+            address: chip_create_params.address.clone(),
+            bt_properties: None,
+        });
     #[cfg(test)]
-    let echip_create_params =
-        echip::CreateParam::Mock(echip::mocked::CreateParams { chip_kind: ChipKind::BLUETOOTH });
+    let wireless_create_params = wireless::CreateParam::Mock(wireless::mocked::CreateParams {
+        chip_kind: ChipKind::BLUETOOTH,
+    });
     // Add Chip
     let result = match add_chip(
         &stream.peer_addr().unwrap().port().to_string(),
@@ -111,7 +114,7 @@ pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) 
             .get("name")
             .unwrap_or(&format!("websocket-device-{}", stream.peer_addr().unwrap()).as_str()),
         &chip_create_params,
-        &echip_create_params,
+        &wireless_create_params,
     ) {
         Ok(chip_result) => chip_result,
         Err(err) => {
@@ -148,8 +151,8 @@ pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) 
         if packet_msg.is_binary() {
             let mut cursor = Cursor::new(packet_msg.into_data());
             match h4::read_h4_packet(&mut cursor) {
-                Ok(mut packet) => {
-                    echip::handle_request(result.chip_id, &mut packet.payload, packet.h4_type);
+                Ok(packet) => {
+                    wireless::handle_request(result.chip_id, &packet.payload, packet.h4_type);
                 }
                 Err(error) => {
                     error!(

@@ -15,20 +15,20 @@
 use clap::Parser;
 use log::warn;
 use log::{error, info};
-use netsim_common::system::netsimd_temp_dir_string;
+use netsim_common::system::netsimd_temp_dir;
 use netsim_common::util::os_utils::{
-    get_hci_port, get_instance, get_instance_name, remove_netsim_ini,
+    get_hci_port, get_instance, get_instance_name, redirect_std_stream, remove_netsim_ini,
 };
 use netsim_common::util::zip_artifact::zip_artifacts;
 
 use crate::captures::capture::spawn_capture_event_subscriber;
 use crate::config_file;
 use crate::devices::devices_handler::spawn_shutdown_publisher;
-use crate::echip;
 use crate::events;
 use crate::events::{Event, ShutDown};
 use crate::session::Session;
 use crate::version::get_version;
+use crate::wireless;
 use netsim_common::util::netsim_logger;
 
 use crate::args::NetsimdArgs;
@@ -49,9 +49,11 @@ use std::sync::mpsc::Receiver;
 /// long as the program runs.
 #[no_mangle]
 pub unsafe extern "C" fn rust_main(argc: c_int, argv: *const *const c_char) {
+    // enable Rust backtrace by setting env RUST_BACKTRACE=full
+    env::set_var("RUST_BACKTRACE", "full");
     ffi_util::set_up_crash_report();
-    netsim_logger::init("netsimd");
     let netsimd_args = get_netsimd_args(argc, argv);
+    netsim_logger::init("netsimd", netsimd_args.verbose);
     run_netsimd_with_args(netsimd_args);
 }
 
@@ -93,19 +95,19 @@ fn run_netsimd_with_args(args: NetsimdArgs) {
     }
 
     // Log where netsim artifacts are located
-    info!("netsim artifacts path: {}", netsimd_temp_dir_string());
+    info!("netsim artifacts path: {:?}", netsimd_temp_dir());
 
     // Log all args
     info!("{:#?}", args);
 
     if !args.logtostderr {
-        cxx::let_cxx_string!(netsimd_temp_dir = netsimd_temp_dir_string());
-        cxx::let_cxx_string!(
-            netsimd_instance_name = get_instance_name(args.instance, args.connector_instance)
-        );
-        ffi_util::redirect_std_stream(&netsimd_temp_dir, &netsimd_instance_name);
+        if let Err(err) =
+            redirect_std_stream(&get_instance_name(args.instance, args.connector_instance))
+        {
+            error!("{err:?}");
+        }
         // Duplicating the previous two logs to be included in netsim_stderr.log
-        info!("netsim artifacts path: {}", netsimd_temp_dir_string());
+        info!("netsim artifacts path: {:?}", netsimd_temp_dir());
         info!("{:#?}", args);
     }
 
@@ -242,6 +244,11 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
     // Print config file settings
     info!("{:#?}", config);
 
+    if let Some(host_dns) = args.host_dns {
+        config.wifi.mut_or_insert_default().slirp_options.mut_or_insert_default().host_dns =
+            host_dns;
+    }
+
     let service_params = ServiceParams::new(
         fd_startup_str,
         args.no_cli_ui,
@@ -250,7 +257,9 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
         hci_port,
         instance_num,
         args.dev,
+        args.disable_wifi_p2p,
         args.vsock.unwrap_or_default(),
+        args.rust_grpc,
     );
 
     // SAFETY: The caller guaranteed that the file descriptors in `fd_startup_str` would remain
@@ -276,8 +285,9 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
     }
 
     // Start radio facades
-    echip::bluetooth::bluetooth_start(&config.bluetooth, instance_num);
-    echip::wifi::wifi_start(&config.wifi);
+    wireless::bluetooth::bluetooth_start(&config.bluetooth, instance_num);
+    wireless::wifi::wifi_start(&config.wifi);
+    wireless::uwb::uwb_start();
 
     // Create test beacons if required
     if config.bluetooth.test_beacons == Some(true) {

@@ -32,10 +32,6 @@
 #include "netsim/packet_streamer.pb.h"
 #include "util/log.h"
 
-#ifdef NETSIM_ANDROID_EMULATOR
-#include "android-qemu2-glue/netsim/libslirp_driver.h"
-#endif
-
 namespace netsim {
 namespace backend {
 namespace {
@@ -171,7 +167,7 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
         auto packet_type = request.hci_packet().packet_type();
         auto packet =
             ToSharedVec(request.mutable_hci_packet()->mutable_packet());
-        echip::HandleRequestCxx(chip_id, *packet, packet_type);
+        wireless::HandleRequestCxx(chip_id, *packet, packet_type);
       } else if (chip_kind == common::ChipKind::WIFI) {
         if (!request.has_packet()) {
           BtsLogWarn("grpc_server: unknown packet type from chip_id: %d",
@@ -181,21 +177,19 @@ class ServiceImpl final : public packet::PacketStreamer::Service {
         auto packet = ToSharedVec(request.mutable_packet());
         {
           std::lock_guard<std::mutex> guard(gSlirpMutex);
-          echip::HandleRequestCxx(chip_id, *packet,
-                                  packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
+          wireless::HandleRequestCxx(chip_id, *packet,
+                                     packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
         }
-#ifdef NETSIM_ANDROID_EMULATOR
-        // main_loop_wait is a non-blocking call where fds maintained by the
-        // WiFi service (slirp) are polled and serviced for I/O. When any fd
-        // become ready for I/O, slirp_pollfds_poll() will be invoked to read
-        // from the open sockets therefore incoming packets are serviced.
-        {
-          std::lock_guard<std::mutex> guard(gSlirpMutex);
-          android::qemu2::libslirp_main_loop_wait(true);
+      } else if (chip_kind == common::ChipKind::UWB) {
+        if (!request.has_packet()) {
+          BtsLogWarn("grpc_server: unknown packet from chip_id: %d", chip_id);
+          continue;
         }
-#endif
+        auto packet = ToSharedVec(request.mutable_packet());
+        wireless::HandleRequestCxx(chip_id, *packet,
+                                   packet::HCIPacket::HCI_PACKET_UNSPECIFIED);
+
       } else {
-        // TODO: add UWB here
         BtsLogWarn("grpc_server: unknown chip_kind");
       }
     }
