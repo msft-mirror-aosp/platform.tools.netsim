@@ -100,15 +100,26 @@ void HciPacketTransport::Request(
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - beforeScheduleTime)
                 .count();
-        // If the elapsed time of the packet delivery is greater than 5ms,
+        // If the elapsed time of the packet delivery is greater than 100ms,
         // report invalid packet with DELAYED reasoning.
-        if (elapsedTime > 5) {
+        if (elapsedTime > 100) {
+          // Create a new vector to hold the combined data
+          std::vector<uint8_t> combinedPacket;
+
+          // Prepend rootcanal_packet_type
+          combinedPacket.push_back(static_cast<uint8_t>(rootcanal_packet_type));
+
+          // Append the original packet data
+          combinedPacket.insert(combinedPacket.end(), packet->begin(),
+                                packet->end());
+
+          // Report Invalid Packet
           netsim::hci::facade::ReportInvalidPacket(
               this->rootcanalId.value(),
               stats::InvalidPacket_Reason::InvalidPacket_Reason_DELAYED,
               "Delayed packet with " + std::to_string(elapsedTime) +
                   " milliseconds",
-              *packet);
+              combinedPacket);
         }
         mPacketCallback(rootcanal_packet_type, packet);
       });
@@ -166,7 +177,7 @@ void handle_bt_request(uint32_t rootcanal_id,
 }
 
 void HandleBtRequestCxx(uint32_t rootcanal_id, uint8_t packet_type,
-                        const rust::Vec<uint8_t> &packet) {
+                        const rust::Slice<uint8_t const> packet) {
   std::vector<uint8_t> buffer(packet.begin(), packet.end());
   auto packet_ptr = std::make_shared<std::vector<uint8_t>>(buffer);
   handle_bt_request(rootcanal_id,
