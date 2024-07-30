@@ -58,7 +58,6 @@ use protobuf_json_mapping::merge_from_str;
 use protobuf_json_mapping::print_to_string;
 use protobuf_json_mapping::print_to_string_with_options;
 use protobuf_json_mapping::PrintOptions;
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -124,11 +123,12 @@ impl DeviceManager {
         name: Option<&str>,
         builtin: bool,
     ) -> (DeviceIdentifier, String) {
+        // Hold a lock while checking and updating devices.
+        let mut guard = self.devices.write().unwrap();
+
         // Check if a device with the same guid already exists and if so, return it
         if let Some(guid) = guid {
-            if let Some(existing_device) =
-                self.devices.read().unwrap().values().find(|d| d.guid == *guid)
-            {
+            if let Some(existing_device) = guard.values().find(|d| d.guid == *guid) {
                 if existing_device.builtin != builtin {
                     warn!("builtin mismatch for device {} during add_chip", existing_device.name);
                 }
@@ -140,10 +140,11 @@ impl DeviceManager {
         let id = self.next_id();
         let default = format!("device-{}", id);
         let name = name.unwrap_or(&default);
-        self.devices.write().unwrap().insert(
+        guard.insert(
             id,
             Device::new(id, String::from(guid.unwrap_or(&default)), String::from(name), builtin),
         );
+        drop(guard);
         // Update last modified timestamp for devices
         self.update_timestamp();
         events::publish(Event::DeviceAdded(DeviceAdded { id, name: name.to_string(), builtin }));
@@ -310,52 +311,36 @@ pub fn add_chip_cxx(
     }
 }
 
-/// Remove a device from the simulation.
-///
-/// Called when the last chip for the device is removed.
-fn remove_device(devices: Arc<DeviceManager>, id: &DeviceIdentifier) -> Result<(), String> {
-    match devices.devices.write().unwrap().remove(id) {
-        Some(device) => events::publish(Event::DeviceRemoved(DeviceRemoved {
-            id: device.id,
-            name: device.name,
-            builtin: device.builtin,
-        })),
-        None => return Err(format!("Device not found for device_id: {id}")),
-    }
-    // Update last modified timestamp for devices
-    devices.update_timestamp();
-    Ok(())
-}
-
 /// Remove a chip from a device.
 ///
 /// Called when the packet transport for the chip shuts down.
 pub fn remove_chip(device_id: DeviceIdentifier, chip_id: ChipIdentifier) -> Result<(), String> {
     let manager = get_manager();
-    let (is_empty, radio_stats) = match manager.devices.write().unwrap().entry(device_id) {
-        Entry::Occupied(entry) => {
-            let device = entry.get();
-            let radio_stats = device.remove_chip(&chip_id)?;
-            (device.chips.read().unwrap().is_empty(), radio_stats)
-        }
-        Entry::Vacant(_) => return Err(format!("RemoveChip device id {} not found", device_id)),
-    };
-    if is_empty {
-        remove_device(manager.clone(), &device_id)?;
+    let mut guard = manager.devices.write().unwrap();
+    let device =
+        guard.get(&device_id).ok_or(format!("RemoveChip device id {device_id} not found"))?;
+    let radio_stats = device.remove_chip(&chip_id)?;
+
+    if device.chips.read().unwrap().is_empty() {
+        let device = guard
+            .remove(&device_id)
+            .ok_or(format!("RemoveChip device id {device_id} not found"))?;
+        events::publish(Event::DeviceRemoved(DeviceRemoved {
+            id: device.id,
+            name: device.name,
+            builtin: device.builtin,
+        }));
     }
-    manager.update_timestamp();
+
+    let remaining_nonbuiltin_devices = guard.values().filter(|device| !device.builtin).count();
     events::publish(Event::ChipRemoved(ChipRemoved {
         chip_id,
         device_id,
-        remaining_nonbuiltin_devices: manager
-            .devices
-            .read()
-            .unwrap()
-            .values()
-            .filter(|device| !device.builtin)
-            .count(),
+        remaining_nonbuiltin_devices,
         radio_stats,
     }));
+
+    manager.update_timestamp();
     Ok(())
 }
 
@@ -445,19 +430,64 @@ pub fn create_device(create_json: &str) -> Result<DeviceIdentifier, String> {
 }
 
 // lock the devices, find the id and call the patch function
-#[allow(dead_code)]
-fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result<(), String> {
-    let mut patch_device_request = PatchDeviceRequest::new();
-    if merge_from_str(&mut patch_device_request, patch_json).is_ok() {
-        let manager = get_manager();
-        let proto_device = patch_device_request.device;
-        match id_option {
-            Some(id) => match manager.devices.read().unwrap().get(&id) {
+pub fn patch_device(
+    id_option: Option<DeviceIdentifier>,
+    patch_device_request: PatchDeviceRequest,
+) -> Result<(), String> {
+    let manager = get_manager();
+    let proto_device = patch_device_request.device;
+    match id_option {
+        Some(id) => match manager.devices.read().unwrap().get(&id) {
+            Some(device) => {
+                let result = device.patch(&proto_device);
+                let name = device.name.clone();
+                if result.is_ok() {
+                    // Update last modified timestamp for manager
+                    manager.update_timestamp();
+
+                    // Publish Device Patched event
+                    events::publish(Event::DevicePatched(DevicePatched { id, name }));
+                }
+                result
+            }
+            None => Err(format!("No such device with id {id}")),
+        },
+        None => {
+            let mut multiple_matches = false;
+            let mut target: Option<&Device> = None;
+            let devices = manager.devices.read().unwrap();
+            for device in devices.values() {
+                if device.name.contains(&proto_device.name) {
+                    if device.name == proto_device.name {
+                        let result = device.patch(&proto_device);
+                        let id = device.id;
+                        let name = device.name.clone();
+                        if result.is_ok() {
+                            // Update last modified timestamp for manager
+                            manager.update_timestamp();
+
+                            // Publish Device Patched event
+                            events::publish(Event::DevicePatched(DevicePatched { id, name }));
+                        }
+                        return result;
+                    }
+                    multiple_matches = target.is_some();
+                    target = Some(device);
+                }
+            }
+            if multiple_matches {
+                return Err(format!(
+                    "Multiple ambiguous matches were found with substring {}",
+                    proto_device.name
+                ));
+            }
+            match target {
                 Some(device) => {
                     let result = device.patch(&proto_device);
+                    let id = device.id;
                     let name = device.name.clone();
                     if result.is_ok() {
-                        // Update last modified timestamp for manager
+                        // Update last modified timestamp for devices
                         manager.update_timestamp();
 
                         // Publish Device Patched event
@@ -465,55 +495,18 @@ fn patch_device(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result
                     }
                     result
                 }
-                None => Err(format!("No such device with id {id}")),
-            },
-            None => {
-                let mut multiple_matches = false;
-                let mut target: Option<&Device> = None;
-                let devices = manager.devices.read().unwrap();
-                for device in devices.values() {
-                    if device.name.contains(&proto_device.name) {
-                        if device.name == proto_device.name {
-                            let result = device.patch(&proto_device);
-                            let id = device.id;
-                            let name = device.name.clone();
-                            if result.is_ok() {
-                                // Update last modified timestamp for manager
-                                manager.update_timestamp();
-
-                                // Publish Device Patched event
-                                events::publish(Event::DevicePatched(DevicePatched { id, name }));
-                            }
-                            return result;
-                        }
-                        multiple_matches = target.is_some();
-                        target = Some(device);
-                    }
-                }
-                if multiple_matches {
-                    return Err(format!(
-                        "Multiple ambiguous matches were found with substring {}",
-                        proto_device.name
-                    ));
-                }
-                match target {
-                    Some(device) => {
-                        let result = device.patch(&proto_device);
-                        let id = device.id;
-                        let name = device.name.clone();
-                        if result.is_ok() {
-                            // Update last modified timestamp for devices
-                            manager.update_timestamp();
-
-                            // Publish Device Patched event
-                            events::publish(Event::DevicePatched(DevicePatched { id, name }));
-                        }
-                        result
-                    }
-                    None => Err(format!("No such device with name {}", proto_device.name)),
-                }
+                None => Err(format!("No such device with name {}", proto_device.name)),
             }
         }
+    }
+}
+
+// Parse from input json string to proto
+#[allow(dead_code)]
+fn patch_device_json(id_option: Option<DeviceIdentifier>, patch_json: &str) -> Result<(), String> {
+    let mut patch_device_request = PatchDeviceRequest::new();
+    if merge_from_str(&mut patch_device_request, patch_json).is_ok() {
+        patch_device(id_option, patch_device_request)
     } else {
         Err(format!("Incorrect format of patch json {}", patch_json))
     }
@@ -577,7 +570,7 @@ pub fn get_device(chip_id: &ChipIdentifier) -> anyhow::Result<netsim_proto::mode
         .map_err(|e| anyhow::anyhow!("{e:?}"))
 }
 
-fn reset_all() -> Result<(), String> {
+pub fn reset_all() -> Result<(), String> {
     let manager = get_manager();
     // Perform reset for all manager
     for device in manager.devices.read().unwrap().values() {
@@ -614,7 +607,7 @@ fn handle_device_create(writer: ResponseWritable, create_json: &str) {
 
 /// Performs PatchDevice to patch a single device
 fn handle_device_patch(writer: ResponseWritable, id: Option<DeviceIdentifier>, patch_json: &str) {
-    match patch_device(id, patch_json) {
+    match patch_device_json(id, patch_json) {
         Ok(()) => writer.put_ok("text/plain", "Device Patch Success", vec![]),
         Err(err) => writer.put_error(404, err.as_str()),
     }
@@ -627,8 +620,7 @@ fn handle_chip_delete(writer: ResponseWritable, delete_json: &str) {
     }
 }
 
-/// Performs ListDevices to get the list of DeviceManager and write to writer.
-fn handle_device_list(writer: ResponseWritable) {
+pub fn list_device() -> anyhow::Result<ListDeviceResponse, String> {
     // Instantiate ListDeviceResponse and add DeviceManager
     let mut response = ListDeviceResponse::new();
     let manager = get_manager();
@@ -645,7 +637,12 @@ fn handle_device_list(writer: ResponseWritable) {
         ..Default::default()
     })
     .into();
+    Ok(response)
+}
 
+/// Performs ListDevices to get the list of DeviceManager and write to writer.
+fn handle_device_list(writer: ResponseWritable) {
+    let response = list_device().unwrap();
     // Perform protobuf-json-mapping with the given protobuf
     if let Ok(json_response) = print_to_string_with_options(&response, &JSON_PRINT_OPTION) {
         writer.put_ok("text/json", &json_response, vec![])
@@ -1169,7 +1166,7 @@ mod tests {
     }
 
     #[test]
-    fn test_patch_device() {
+    fn test_patch_device_json() {
         // Initializing Logger
         logger_setup();
 
@@ -1186,7 +1183,7 @@ mod tests {
         proto_device.orientation = Some(request_orientation.clone()).into();
         patch_device_request.device = Some(proto_device.clone()).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
-        patch_device(Some(chip_result.device_id), patch_json.as_str()).unwrap();
+        patch_device_json(Some(chip_result.device_id), patch_json.as_str()).unwrap();
         match get_manager().devices.read().unwrap().get(&chip_result.device_id) {
             Some(device) => {
                 assert_eq!(device.position.read().unwrap().x, request_position.x);
@@ -1204,7 +1201,7 @@ mod tests {
         proto_device.name = format!("test-device-name-1-{:?}", thread::current().id());
         patch_device_request.device = Some(proto_device).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
-        assert!(patch_device(None, patch_json.as_str()).is_ok());
+        assert!(patch_device_json(None, patch_json.as_str()).is_ok());
     }
 
     #[test]
@@ -1223,7 +1220,7 @@ mod tests {
             "{{\"device\": {{\"name\": \"test-device-name-1-{:?}\", \"position\": 1.1}}}}",
             thread::current().id()
         );
-        let patch_result = patch_device(Some(bt_chip_result.device_id), error_json.as_str());
+        let patch_result = patch_device_json(Some(bt_chip_result.device_id), error_json.as_str());
         assert!(patch_result.is_err());
         assert_eq!(
             patch_result.unwrap_err(),
@@ -1235,7 +1232,7 @@ mod tests {
             "{{\"device\": {{\"name\": \"test-device-name-1-{:?}\", \"hello\": \"world\"}}}}",
             thread::current().id()
         );
-        let patch_result = patch_device(Some(bt_chip_result.device_id), error_json.as_str());
+        let patch_result = patch_device_json(Some(bt_chip_result.device_id), error_json.as_str());
         assert!(patch_result.is_err());
         assert_eq!(
             patch_result.unwrap_err(),
@@ -1244,7 +1241,8 @@ mod tests {
 
         // Incorrect Id
         let error_json = r#"{"device": {"name": "test-device-name-1"}}"#;
-        let patch_result = patch_device(Some(DeviceIdentifier(INITIAL_DEVICE_ID - 1)), error_json);
+        let patch_result =
+            patch_device_json(Some(DeviceIdentifier(INITIAL_DEVICE_ID - 1)), error_json);
         assert!(patch_result.is_err());
         assert_eq!(
             patch_result.unwrap_err(),
@@ -1253,13 +1251,13 @@ mod tests {
 
         // Incorrect name
         let error_json = r#"{"device": {"name": "wrong-name"}}"#;
-        let patch_result = patch_device(None, error_json);
+        let patch_result = patch_device_json(None, error_json);
         assert!(patch_result.is_err());
         assert_eq!(patch_result.unwrap_err(), "No such device with name wrong-name");
 
         // Multiple ambiguous matching
         let error_json = r#"{"device": {"name": "test-device"}}"#;
-        let patch_result = patch_device(None, error_json);
+        let patch_result = patch_device_json(None, error_json);
         assert!(patch_result.is_err());
         assert_eq!(
             patch_result.unwrap_err(),
@@ -1313,7 +1311,7 @@ mod tests {
         proto_device.position = Some(request_position).into();
         proto_device.orientation = Some(request_orientation).into();
         patch_device_request.device = Some(proto_device).into();
-        patch_device(
+        patch_device_json(
             Some(chip_result.device_id),
             print_to_string(&patch_device_request).unwrap().as_str(),
         )
@@ -1418,7 +1416,7 @@ mod tests {
         proto_device.position = Some(request_position.clone()).into();
         patch_device_request.device = Some(proto_device.clone()).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
-        patch_device(Some(bt_chip_result.device_id), patch_json.as_str()).unwrap();
+        patch_device_json(Some(bt_chip_result.device_id), patch_json.as_str()).unwrap();
 
         // Patch the second chip
         let mut patch_device_request = PatchDeviceRequest::new();
@@ -1428,7 +1426,7 @@ mod tests {
         proto_device.position = Some(request_position.clone()).into();
         patch_device_request.device = Some(proto_device.clone()).into();
         let patch_json = print_to_string(&patch_device_request).unwrap();
-        patch_device(Some(bt_chip_2_result.device_id), patch_json.as_str()).unwrap();
+        patch_device_json(Some(bt_chip_2_result.device_id), patch_json.as_str()).unwrap();
 
         // Verify the get_distance performs the correct computation of
         // sqrt((1-1)**2 + (4-1)**2 + (5-1)**2)
