@@ -91,7 +91,7 @@ impl LibSlirp {
         self.tx_cmds.send(SlirpCmd::Shutdown);
     }
 
-    pub fn input(self, bytes: Bytes) {
+    pub fn input(&self, bytes: Bytes) {
         self.tx_cmds.send(SlirpCmd::Input(bytes));
     }
 }
