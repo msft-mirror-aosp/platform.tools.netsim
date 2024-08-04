@@ -7,6 +7,7 @@ file(REMOVE ${CMAKE_CURRENT_LIST_DIR}/Cargo.lock)
 corrosion_import_crate(MANIFEST_PATH Cargo.toml FLAGS --offline --verbose)
 corrosion_set_env_vars(netsim-common CARGO_HOME=${Rust_CARGO_HOME})
 corrosion_set_env_vars(libslirp-rs CARGO_HOME=${Rust_CARGO_HOME})
+corrosion_set_env_vars(hostapd-rs CARGO_HOME=${Rust_CARGO_HOME})
 corrosion_set_env_vars(
   netsim-daemon
   LINK_LAYER_PACKETS_PREBUILT=${RootCanalGeneratedPackets_rs}
@@ -61,21 +62,10 @@ endif()
 
 add_subdirectory(proto)
 
-# Steps to generate protobuf -> rust files are as follows:
+# To re-generate Rust protobuf files, follow these steps:
 #
-# 1. Install protobuf for protoc binary.
-#
-# Linux: sudo apt-get install protobuf-compiler
-#
-# Mac: brew install protobuf
-#
-# 1. Uncomment the following lines in rust/proto/Cargo.toml. build =
-#    "build_cargo.rs" protobuf = "=3.2.0" protobuf-codegen = "3.2.0"
-# 2. export CARGO_HOME=$REPO_EMU/tools/netsim/objs/rust/.cargo
-# 3. cd $REPO_EMU/tools/netsim
-# 4. cargo build --manifest-path rust/proto/Cargo.toml
-# 5. git checkout rust/proto/Cargo.toml
-# 6. bash scripts/format_code.sh
+# 1. Read the file comments in scripts/proto_update.sh
+# 2. Execute `scripts/proto_update.sh`
 
 android_license(TARGET "netsim-daemon" LIBNAME None SPDX None LICENSE None
                 LOCAL None)
