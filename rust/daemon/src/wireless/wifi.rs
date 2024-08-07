@@ -42,7 +42,6 @@ pub struct WifiManager {
     medium: Medium,
     tx_request: mpsc::Sender<(u32, Bytes)>,
     tx_response: mpsc::Sender<Bytes>,
-    #[allow(dead_code)]
     slirp: Option<libslirp::LibSlirp>,
 }
 
@@ -95,7 +94,16 @@ impl WifiManager {
                             }
                             if processor.network {
                                 if rust_slirp {
-                                    // TODO: Convert Wi-Fi to ethernet and send to libslirp.
+                                    match processor.frame.ieee80211.to_ieee8023() {
+                                        Ok(ethernet_frame) => get_wifi_manager()
+                                            .slirp
+                                            .as_ref()
+                                            .expect("slirp initialized")
+                                            .input(ethernet_frame.into()),
+                                        Err(err) => {
+                                            warn!("Failed to convert 802.11 to 802.3: {:?}", err)
+                                        }
+                                    }
                                 } else {
                                     ffi_wifi::libslirp_send(&packet.to_vec());
                                     ffi_wifi::libslirp_main_loop_wait();
