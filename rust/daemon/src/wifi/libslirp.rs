@@ -24,6 +24,10 @@ use std::sync::mpsc;
 // Provides a stub implementation while the libslirp-rs crate is not integrated into the aosp-main.
 #[cfg(feature = "cuttlefish")]
 pub struct LibSlirp {}
+#[cfg(feature = "cuttlefish")]
+impl LibSlirp {
+    pub fn input(&self, _bytes: Bytes) {}
+}
 
 #[cfg(not(feature = "cuttlefish"))]
 pub fn slirp_run(_opt: ProtoSlirpOptions) -> anyhow::Result<(LibSlirp, mpsc::Receiver<Bytes>)> {
