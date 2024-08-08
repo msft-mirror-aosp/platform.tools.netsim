@@ -30,17 +30,19 @@ impl LibSlirp {
 }
 
 #[cfg(not(feature = "cuttlefish"))]
-pub fn slirp_run(_opt: ProtoSlirpOptions) -> anyhow::Result<(LibSlirp, mpsc::Receiver<Bytes>)> {
+pub fn slirp_run(
+    _opt: ProtoSlirpOptions,
+    tx_bytes: mpsc::Sender<Bytes>,
+) -> anyhow::Result<LibSlirp> {
     // TODO: Convert ProtoSlirpOptions to SlirpConfig.
     let config = SlirpConfig { ..Default::default() };
-    let (tx, rx) = mpsc::channel();
-    let slirp = LibSlirp::new(config, tx);
-    Ok((slirp, rx))
+    Ok(LibSlirp::new(config, tx_bytes))
 }
 
 #[cfg(feature = "cuttlefish")]
-pub fn slirp_run(_opt: ProtoSlirpOptions) -> anyhow::Result<(LibSlirp, mpsc::Receiver<Bytes>)> {
-    let slirp = LibSlirp {};
-    let (_, rx) = mpsc::channel();
-    Ok((slirp, rx))
+pub fn slirp_run(
+    _opt: ProtoSlirpOptions,
+    _tx_bytes: mpsc::Sender<Bytes>,
+) -> anyhow::Result<LibSlirp> {
+    Ok(LibSlirp {})
 }
