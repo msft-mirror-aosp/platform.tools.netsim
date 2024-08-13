@@ -263,11 +263,12 @@ pub fn wifi_start(config: &MessageField<WiFiConfig>, rust_slirp: bool, rust_host
     }
 
     let _ = WIFI_MANAGER.set(WifiManager::new(tx_request, tx_response, slirp, hostapd));
-    get_wifi_manager().start(rx_request, rx_response, rx_ieee8023_response);
 
     // WifiService
     let proto_bytes = wifi_config.write_to_bytes().unwrap();
     ffi_wifi::wifi_start(&proto_bytes);
+
+    get_wifi_manager().start(rx_request, rx_response, rx_ieee8023_response);
 }
 
 /// Stops the WiFi service.
