@@ -81,7 +81,7 @@ const JSON_PRINT_OPTION: PrintOptions = PrintOptions {
 #[macro_export]
 macro_rules! info_linux_arm {
     ($($arg:tt)*) => {
-        #[cfg(all(target_os = "linux", target_arch = "arm64"))]
+        #[cfg(all(target_os = "linux", target_arch = "arch64"))]
         {
             let current_thread = std::thread::current();
             let thread_name = current_thread.name().unwrap_or("unnamed");
