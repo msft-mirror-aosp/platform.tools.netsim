@@ -209,7 +209,12 @@ fn disambiguate_args(args: &mut NetsimdArgs, config: &mut Config) {
 }
 
 fn run_netsimd_primary(mut args: NetsimdArgs) {
-    info!("Netsim Version: {}", get_version());
+    info!(
+        "Netsim Version: {}, OS: {}, Arch: {}",
+        get_version(),
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
 
     let fd_startup_str = args.fd_startup_str.clone().unwrap_or_default();
     let instance_num = get_instance(args.instance);
