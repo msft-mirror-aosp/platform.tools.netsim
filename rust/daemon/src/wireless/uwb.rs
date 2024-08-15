@@ -22,9 +22,11 @@ use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 
 use crate::devices::chip::ChipIdentifier;
+use crate::info_linux_arm;
 use crate::uwb::ranging_estimator::{SharedState, UwbRangingEstimator};
 use crate::wireless::packet::handle_response;
 
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -43,17 +45,17 @@ lazy_static! {
 
 /// Parameters for creating UWB chips
 pub struct CreateParams {
+    #[allow(dead_code)]
     pub address: String,
 }
 
 /// UWB struct will keep track of pica_id
 pub struct Uwb {
-    chip_id: ChipIdentifier,
     pica_id: Handle,
     uci_stream_writer: UnboundedSender<Vec<u8>>,
-    state: bool,
-    tx_count: i32,
-    rx_count: i32, // TODO(b/330788870): Increment rx_count after handle_response
+    state: AtomicBool,
+    tx_count: AtomicI32,
+    rx_count: Arc<AtomicI32>,
 }
 
 impl Drop for Uwb {
@@ -68,33 +70,38 @@ impl WirelessAdaptor for Uwb {
         self.uci_stream_writer
             .unbounded_send(packet.clone().into())
             .expect("UciStream Receiver Disconnected");
+        let _ = self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     fn reset(&self) {
-        // TODO: Use AtomicBool, etc
-        // self.state = true;
-        // self.tx_count = 0;
-        // self.rx_count = 0;
+        self.state.store(true, Ordering::SeqCst);
+        self.tx_count.store(0, Ordering::SeqCst);
+        self.rx_count.store(0, Ordering::SeqCst);
     }
 
     fn get(&self) -> ProtoChip {
         let mut chip_proto = ProtoChip::new();
         let uwb_proto = ProtoRadio {
-            state: Some(self.state),
-            tx_count: self.tx_count,
-            rx_count: self.rx_count,
+            state: self.state.load(Ordering::SeqCst).into(),
+            tx_count: self.tx_count.load(Ordering::SeqCst),
+            rx_count: self.rx_count.load(Ordering::SeqCst),
             ..Default::default()
         };
         chip_proto.mut_uwb().clone_from(&uwb_proto);
         chip_proto
     }
 
-    fn patch(&self, _chip: &ProtoChip) {
-        // TODO(b/330789027): Patch the state of UWB chip
-        log::info!("Patch Uwb Chip for chip_id: {}", self.chip_id);
+    fn patch(&self, chip: &ProtoChip) {
+        if !chip.has_uwb() {
+            return;
+        }
+        if let Some(patch_state) = chip.uwb().state {
+            self.state.store(patch_state, Ordering::SeqCst);
+        }
     }
 
     fn get_stats(&self, duration_secs: u64) -> Vec<ProtoRadioStats> {
+        info_linux_arm!("uwb get_stats");
         let mut stats_proto = ProtoRadioStats::new();
         stats_proto.set_duration_secs(duration_secs);
         stats_proto.set_kind(netsim_radio_stats::Kind::UWB);
@@ -126,13 +133,14 @@ pub fn new(_create_params: &CreateParams, chip_id: ChipIdentifier) -> WirelessAd
         .add_device(Box::pin(uci_stream_receiver), Box::pin(uci_sink_sender.sink_err_into()))
         .unwrap();
     PICA_HANDLE_TO_STATE.insert(pica_id, chip_id);
+
+    let rx_count = Arc::new(AtomicI32::new(0));
     let uwb = Uwb {
-        chip_id,
         pica_id,
         uci_stream_writer: uci_stream_sender,
-        state: true,
-        tx_count: 0,
-        rx_count: 0,
+        state: AtomicBool::new(true),
+        tx_count: AtomicI32::new(0),
+        rx_count: rx_count.clone(),
     };
 
     // Spawn a future for obtaining packet from pica and invoking handle_response_rust
@@ -140,6 +148,7 @@ pub fn new(_create_params: &CreateParams, chip_id: ChipIdentifier) -> WirelessAd
         let mut uci_sink_receiver = uci_sink_receiver;
         while let Some(packet) = uci_sink_receiver.next().await {
             handle_response(chip_id, &Bytes::from(packet));
+            rx_count.fetch_add(1, Ordering::SeqCst);
         }
     });
     Box::new(uwb)
@@ -154,6 +163,13 @@ mod tests {
         new(&CreateParams { address: "test".to_string() }, ChipIdentifier(0))
     }
 
+    fn patch_chip_proto() -> ProtoChip {
+        let mut chip_proto = ProtoChip::new();
+        let uwb_proto = ProtoRadio { state: false.into(), ..Default::default() };
+        chip_proto.mut_uwb().clone_from(&uwb_proto);
+        chip_proto
+    }
+
     #[test]
     fn test_uwb_get() {
         let wireless_adaptor = new_uwb_wireless_adaptor();
@@ -161,9 +177,12 @@ mod tests {
     }
 
     #[test]
-    fn test_uwb_reset() {
-        // TODO(b/330789027): Patch the state of UWB wireless_adaptor before reset
+    fn test_uwb_patch_and_reset() {
         let wireless_adaptor = new_uwb_wireless_adaptor();
+        wireless_adaptor.patch(&patch_chip_proto());
+        let binding = wireless_adaptor.get();
+        let radio = binding.uwb();
+        assert_eq!(radio.state, Some(false));
         wireless_adaptor.reset();
         let binding = wireless_adaptor.get();
         let radio = binding.uwb();

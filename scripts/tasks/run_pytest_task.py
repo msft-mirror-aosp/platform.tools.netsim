@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from pathlib import Path
 import platform
 
 from environment import get_default_environment
@@ -35,9 +36,10 @@ class RunPyTestTask(Task):
   def __init__(self, args):
     super().__init__("RunPyTest")
     self.buildbot = args.buildbot
+    self.pytest_input_dir = args.pytest_input_dir
 
   def do_run(self):
-    run_pytest_manager = RunPytestManager(self.buildbot)
+    run_pytest_manager = RunPytestManager(self.buildbot, self.pytest_input_dir)
     return run_pytest_manager.process()
 
 
@@ -55,14 +57,35 @@ class RunPytestManager:
     Bots
   """
 
-  def __init__(self, buildbot):
+  def __init__(self, buildbot, pytest_input_dir):
     """Initializes the instances based on environment
 
     Args:
         buildbot: Defines if it's being invoked with Build Bots and defines
           self.dir as the directory of the emulator binary
+        pytest_input_dir: Defined the directory that includes netsim and
+          emulator binaries and libraries. Ignore if the string is empty.
     """
+    # Default self.dir
     self.dir = EMULATOR_ARTIFACT_PATH / "emulator" if buildbot else OBJS_DIR
+
+    # If pytest_input_dir is provided, set self.dir accordingly
+    if pytest_input_dir:
+      try:
+        self.dir = AOSP_ROOT / "tools" / "netsim" / Path(pytest_input_dir)
+      except Exception as e:
+        logging.error(f"Invalid pytest_input_dir value: {e}")
+
+  def _run_with_n_attempts(cmd, n):
+    for attempt in range(1, n + 1):
+      try:
+        run(cmd, get_default_environment(AOSP_ROOT), "e2e_pytests")
+        return
+      except Exception as e:
+        if attempt == n:
+          raise e
+        else:
+          logging.error(f"PyTest Attempt {attempt} Error: {e}")
 
   def process(self) -> bool:
     """Process the emulator e2e pytests
@@ -81,14 +104,18 @@ class RunPytestManager:
       run_tests_script = PYTEST_DIR / "run_tests.cmd"
     else:
       run_tests_script = PYTEST_DIR / "run_tests.sh"
+    if platform.system() == "Linux":
+      test_config = PYTEST_DIR / "cfg" / "netsim_linux_tests.json"
+    else:
+      test_config = PYTEST_DIR / "cfg" / "netsim_tests.json"
     cmd = [
         run_tests_script,
         "--emulator",
         emulator_bin,
         "--test_config",
-        PYTEST_DIR / "cfg" / "netsim_tests.json",
+        test_config,
     ]
-    # TODO: Resolve Windows PyTest flakiness by increasing timeout threshold
+    # TODO: Resolve Windows PyTest failure
     if platform.system() != "Windows":
       cmd.append("--failures_as_errors")
     run(cmd, get_default_environment(AOSP_ROOT), "e2e_pytests")

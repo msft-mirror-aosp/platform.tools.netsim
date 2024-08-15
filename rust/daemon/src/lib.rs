@@ -22,6 +22,7 @@ mod config_file;
 mod devices;
 mod events;
 mod ffi;
+mod grpc_server;
 mod http_server;
 mod ranging;
 mod resource;

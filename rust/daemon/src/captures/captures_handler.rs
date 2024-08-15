@@ -27,6 +27,7 @@
 // TODO(b/274506882): Implement gRPC status proto on error responses. Also write better
 // and more descriptive error messages with proper error codes.
 
+use bytes::Bytes;
 use http::{Request, Version};
 use log::warn;
 use netsim_common::util::time_display::TimeDisplay;
@@ -50,7 +51,8 @@ use anyhow::anyhow;
 use super::pcap_util::{append_record, append_record_pcapng, wrap_bt_packet, PacketDirection};
 use super::PCAP_MIME_TYPE;
 
-const CHUNK_LEN: usize = 1024;
+/// Max Chunk length of capture file during get_capture
+pub const CHUNK_LEN: usize = 1024;
 const JSON_PRINT_OPTION: PrintOptions = PrintOptions {
     enum_values_int: false,
     proto_field_name: false,
@@ -68,6 +70,27 @@ fn get_file(id: ChipIdentifier, device_name: String, chip_kind: ChipKind) -> Res
     filename.push("pcaps");
     filename.push(format!("netsim-{:?}-{:}-{:?}.{}", id, device_name, chip_kind, extension));
     File::open(filename)
+}
+
+/// Getting capture file of the provided ChipIdentifier
+pub fn get_capture(id: ChipIdentifier) -> anyhow::Result<File> {
+    let captures_arc = clone_captures();
+    let mut captures = captures_arc.write().unwrap();
+    let capture = captures
+        .get(id)
+        .ok_or(anyhow!("Cannot access Capture Resource"))?
+        .lock()
+        .map_err(|_| anyhow!("Failed to lock Capture"))?;
+
+    if capture.size == 0 {
+        return Err(anyhow!(
+            "Capture file not found for {:?}-{}-{:?}",
+            id,
+            capture.device_name,
+            capture.chip_kind
+        ));
+    }
+    Ok(get_file(id, capture.device_name.clone(), capture.chip_kind)?)
 }
 
 // TODO: GetCapture should return the information of the capture. Need to reconsider
@@ -118,8 +141,8 @@ fn handle_capture_get(writer: ResponseWritable, id: ChipIdentifier) -> anyhow::R
     Ok(())
 }
 
-/// Performs ListCapture to get the list of CaptureInfos and write to writer.
-fn handle_capture_list(writer: ResponseWritable) -> anyhow::Result<()> {
+/// List capture information of all chips
+pub fn list_capture() -> anyhow::Result<ListCaptureResponse> {
     let captures_arc = clone_captures();
     let captures = captures_arc.write().unwrap();
     // Instantiate ListCaptureResponse and add Captures
@@ -129,11 +152,34 @@ fn handle_capture_list(writer: ResponseWritable) -> anyhow::Result<()> {
             capture.lock().expect("Failed to acquire lock on CaptureInfo").get_capture_proto(),
         );
     }
+    Ok(response)
+}
+
+/// Performs ListCapture to get the list of CaptureInfos and write to writer.
+fn handle_capture_list(writer: ResponseWritable) -> anyhow::Result<()> {
+    let response = list_capture()?;
 
     // Perform protobuf-json-mapping with the given protobuf
     let json_response = print_to_string_with_options(&response, &JSON_PRINT_OPTION)
         .map_err(|e| anyhow!("proto to JSON mapping failure: {}", e))?;
     writer.put_ok("text/json", &json_response, vec![]);
+    Ok(())
+}
+
+/// Patch capture state of a chip with provided ChipIdentifier
+pub fn patch_capture(id: ChipIdentifier, state: bool) -> anyhow::Result<()> {
+    let captures_arc = clone_captures();
+    let mut captures = captures_arc.write().unwrap();
+    if let Some(mut capture) = captures
+        .get(id)
+        .map(|arc_capture| arc_capture.lock().expect("Failed to acquire lock on CaptureInfo"))
+    {
+        if state {
+            capture.start_capture()?;
+        } else {
+            capture.stop_capture();
+        }
+    }
     Ok(())
 }
 
@@ -235,8 +281,8 @@ pub fn handle_capture_cxx(
 }
 
 /// A common code for handle_request and handle_response methods.
-fn handle_packet(
-    chip_id: &ChipIdentifier,
+pub(super) fn handle_packet(
+    chip_id: ChipIdentifier,
     packet: &[u8],
     packet_type: u32,
     direction: PacketDirection,
@@ -245,7 +291,7 @@ fn handle_packet(
     let captures = captures_arc.write().unwrap();
     if let Some(mut capture) = captures
         .chip_id_to_capture
-        .get(chip_id)
+        .get(&chip_id)
         .map(|arc_capture| arc_capture.lock().expect("Failed to acquire lock on CaptureInfo"))
     {
         let chip_kind = capture.chip_kind;
@@ -287,13 +333,23 @@ fn handle_packet(
 }
 
 /// Method for dispatcher to invoke (Host to Controller Packet Flow)
-pub fn handle_packet_request(chip_id: &ChipIdentifier, packet: &[u8], packet_type: u32) {
-    handle_packet(chip_id, packet, packet_type, PacketDirection::HostToController)
+pub fn host_to_controller(chip_id: ChipIdentifier, packet: &Bytes, packet_type: u32) {
+    clone_captures().read().unwrap().send(
+        chip_id,
+        packet,
+        packet_type,
+        PacketDirection::HostToController,
+    );
 }
 
 /// Method for dispatcher to invoke (Controller to Host Packet Flow)
-pub fn handle_packet_response(chip_id: &ChipIdentifier, packet: &[u8], packet_type: u32) {
-    handle_packet(chip_id, packet, packet_type, PacketDirection::ControllerToHost)
+pub fn controller_to_host(chip_id: ChipIdentifier, packet: &Bytes, packet_type: u32) {
+    clone_captures().read().unwrap().send(
+        chip_id,
+        packet,
+        packet_type,
+        PacketDirection::ControllerToHost,
+    );
 }
 
 /// Method for clearing pcap files in temp directory
