@@ -66,6 +66,16 @@ pub struct NetsimdArgs {
     #[arg(long)]
     pub rust_grpc: bool,
 
+    /// Use hostapd-rs and disable c++ hostapd.
+    /// WARNING: This flag is for development purpose.
+    #[arg(long)]
+    pub rust_hostapd: bool,
+
+    /// Use libslirp-rs and disable qemu slirp.
+    /// WARNING: This flag is for development purpose.
+    #[arg(long)]
+    pub rust_slirp: bool,
+
     /// Set the vsock port number to be listened by the frontend grpc server
     #[arg(short, long)]
     pub vsock: Option<u16>,
@@ -86,6 +96,11 @@ pub struct NetsimdArgs {
     /// WARNING: This flag is still working in progress.
     #[arg(long, verbatim_doc_comment)]
     pub http_proxy: Option<String>,
+
+    // Use TAP interface instead of libslirp for Wi-Fi
+    /// WARNING: This flag is still working in progress.
+    #[arg(long)]
+    pub wifi_tap: Option<String>,
 
     /// Start with test beacons
     #[arg(long, alias = "test_beacons", overrides_with("no_test_beacons"))]
