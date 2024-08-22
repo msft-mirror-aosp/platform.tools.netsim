@@ -197,8 +197,8 @@ impl Medium {
     /// This is the processing that will be implemented:
     ///
     /// * The source MacAddress in 802.11 frames is re-mapped to a globally
-    /// unique MacAddress because resumed Emulator AVDs appear with the
-    /// same address.
+    ///   unique MacAddress because resumed Emulator AVDs appear with the
+    ///   same address.
     ///
     /// * 802.11 frames sent between stations
     ///
@@ -242,7 +242,7 @@ impl Medium {
             // EAPoL is used in Wi-Fi 4-way handshake.
             // Need to decrypt frame to access LLC header.
             // TODO: Implement this function in ieee80211.rs after Hostapd is in Rust.
-            if is_eapol(&frame.data) {
+            if is_eapol(packet) {
                 processor.hostapd = true;
             } else if frame.ieee80211.is_to_ap() {
                 processor.network = true;
