@@ -51,7 +51,8 @@ use netsim_proto::model::chip_create::Chip as ProtoBuiltin;
 use netsim_proto::model::Device as ProtoDevice;
 use netsim_proto::model::Orientation as ProtoOrientation;
 use netsim_proto::model::Position as ProtoPosition;
-use netsim_proto::stats::NetsimRadioStats;
+use netsim_proto::startup::DeviceInfo as ProtoDeviceInfo;
+use netsim_proto::stats::{NetsimDeviceStats as ProtoDeviceStats, NetsimRadioStats};
 use protobuf::well_known_types::timestamp::Timestamp;
 use protobuf::Message;
 use protobuf::MessageField;
@@ -172,7 +173,7 @@ impl DeviceManager {
         guid: Option<&str>,
         name: Option<&str>,
         builtin: bool,
-        kind: Option<&str>,
+        device_info: ProtoDeviceInfo,
     ) -> (DeviceIdentifier, String) {
         // Hold a lock while checking and updating devices.
         let mut guard = self.devices.write().unwrap();
@@ -189,17 +190,22 @@ impl DeviceManager {
         let id = self.next_id();
         let default = format!("device-{}", id);
         let name = name.unwrap_or(&default);
-        let kind = kind.unwrap_or("UNKNOWN");
-        guard.insert(id, Device::new(id, guid.unwrap_or(&default), name, builtin, kind));
+        guard.insert(id, Device::new(id, guid.unwrap_or(&default), name, builtin));
         drop(guard);
         // Update last modified timestamp for devices
         self.update_timestamp();
-        let event = Event::DeviceAdded(DeviceAdded {
-            id,
-            name: String::from(name),
-            builtin,
-            kind: String::from(kind),
-        });
+        let device_stats = ProtoDeviceStats {
+            device_id: Some(id.0),
+            kind: Some(device_info.kind).filter(|s| !s.is_empty()),
+            version: Some(device_info.version).filter(|s| !s.is_empty()),
+            sdk_version: Some(device_info.sdk_version).filter(|s| !s.is_empty()),
+            variant: Some(device_info.variant).filter(|s| !s.is_empty()),
+            build_id: Some(device_info.build_id).filter(|s| !s.is_empty()),
+            arch: Some(device_info.arch).filter(|s| !s.is_empty()),
+            ..Default::default()
+        };
+        let event =
+            Event::DeviceAdded(DeviceAdded { id, name: String::from(name), builtin, device_stats });
         events::publish(event);
         (id, String::from(name))
     }
@@ -217,6 +223,7 @@ pub fn add_chip(
     device_name: &str,
     chip_create_params: &chip::CreateParams,
     wireless_create_params: &wireless::CreateParam,
+    device_info: ProtoDeviceInfo,
 ) -> Result<AddChipResult, String> {
     let chip_kind = chip_create_params.kind;
     let manager = get_manager();
@@ -224,8 +231,7 @@ pub fn add_chip(
         Some(device_guid),
         Some(device_name),
         chip_kind == ProtoChipKind::BLUETOOTH_BEACON,
-        // TODO: add device_kind arg to add_chip and pass to get_or_create_device
-        None,
+        device_info,
     );
     get_pose_manager().add(device_id);
 
@@ -289,6 +295,12 @@ pub fn add_chip_cxx(
     chip_manufacturer: &str,
     chip_product_name: &str,
     bt_properties: &CxxVector<u8>,
+    kind: &str,
+    version: &str,
+    sdk_version: &str,
+    build_id: &str,
+    variant: &str,
+    arch: &str,
 ) -> Box<AddChipResultCxx> {
     let bt_properties_proto = Controller::parse_from_bytes(bt_properties.as_slice());
     #[cfg(not(test))]
@@ -355,7 +367,23 @@ pub fn add_chip_cxx(
         product_name: chip_product_name.to_string(),
         bt_properties: bt_properties_proto.ok(),
     };
-    match add_chip(device_guid, device_name, &chip_create_params, &wireless_create_param) {
+    let device_info = ProtoDeviceInfo {
+        kind: kind.to_string(),
+        version: version.to_string(),
+        sdk_version: sdk_version.to_string(),
+        build_id: build_id.to_string(),
+        variant: variant.to_string(),
+        arch: arch.to_string(),
+        ..Default::default()
+    };
+
+    match add_chip(
+        device_guid,
+        device_name,
+        &chip_create_params,
+        &wireless_create_param,
+        device_info,
+    ) {
         Ok(result) => Box::new(AddChipResultCxx {
             device_id: result.device_id.0,
             chip_id: result.chip_id.0,
@@ -452,8 +480,10 @@ pub fn create_device(create_device_request: &CreateDeviceRequest) -> Result<Prot
     })?;
 
     let device_name = (new_device.name != String::default()).then_some(new_device.name.as_str());
+    let device_info =
+        ProtoDeviceInfo { kind: "BLUETOOTH_BEACON".to_string(), ..Default::default() };
     let (device_id, device_name) =
-        manager.get_or_create_device(device_name, device_name, true, Some("BluetoothBeacon"));
+        manager.get_or_create_device(device_name, device_name, true, device_info.clone());
 
     new_device.chips.iter().try_for_each(|chip| {
         {
@@ -470,7 +500,14 @@ pub fn create_device(create_device_request: &CreateDeviceRequest) -> Result<Prot
                     device_name: device_name.clone(),
                     chip_proto: chip.clone(),
                 });
-            add_chip(&device_name, &device_name, &chip_create_params, &wireless_create_params)
+
+            add_chip(
+                &device_name,
+                &device_name,
+                &chip_create_params,
+                &wireless_create_params,
+                device_info.clone(),
+            )
         }
         .map(|_| ())
     })?;
@@ -925,6 +962,8 @@ mod tests {
 
     use super::*;
 
+    static TEST_DEVICE_KIND: &str = "TEST_DEVICE";
+
     // This allows Log init method to be invoked once when running all tests.
     static INIT: Once = Once::new();
 
@@ -945,7 +984,7 @@ mod tests {
         chip_name: String,
         chip_manufacturer: String,
         chip_product_name: String,
-        kind: String,
+        device_info: ProtoDeviceInfo,
     }
 
     impl TestChipParameters {
@@ -967,6 +1006,7 @@ mod tests {
                 &self.device_name,
                 &chip_create_params,
                 &wireless_create_params,
+                self.device_info.clone(),
             )
         }
 
@@ -977,7 +1017,7 @@ mod tests {
                     Some(&self.device_guid),
                     Some(&self.device_name),
                     false,
-                    Some(&self.kind),
+                    self.device_info.clone(),
                 )
                 .0
         }
@@ -1000,7 +1040,10 @@ mod tests {
             chip_name: "bt_chip_name".to_string(),
             chip_manufacturer: "netsim".to_string(),
             chip_product_name: "netsim_bt".to_string(),
-            kind: "TESTDEVICE".to_string(),
+            device_info: ProtoDeviceInfo {
+                kind: TEST_DEVICE_KIND.to_string(),
+                ..Default::default()
+            },
         }
     }
 
@@ -1012,7 +1055,10 @@ mod tests {
             chip_name: "wifi_chip_name".to_string(),
             chip_manufacturer: "netsim".to_string(),
             chip_product_name: "netsim_wifi".to_string(),
-            kind: "TESTDEVICE".to_string(),
+            device_info: ProtoDeviceInfo {
+                kind: TEST_DEVICE_KIND.to_string(),
+                ..Default::default()
+            },
         }
     }
 
@@ -1024,7 +1070,10 @@ mod tests {
             chip_name: "bt_chip_name".to_string(),
             chip_manufacturer: "netsim".to_string(),
             chip_product_name: "netsim_bt".to_string(),
-            kind: "TESTDEVICE".to_string(),
+            device_info: ProtoDeviceInfo {
+                kind: TEST_DEVICE_KIND.to_string(),
+                ..Default::default()
+            },
         }
     }
 
@@ -1230,6 +1279,7 @@ mod tests {
         let wifi_chip_params = test_chip_1_wifi();
         let device_id_2 = wifi_chip_params.get_or_create_device();
         assert_eq!(device_id_1, device_id_2);
+        assert!(get_manager().devices.read().unwrap().get(&device_id_1).is_some())
     }
 
     #[test]
@@ -1811,7 +1861,7 @@ mod tests {
                 id: DeviceIdentifier(0),
                 name: "".to_string(),
                 builtin: false,
-                kind: "TestDevice".to_string(),
+                device_stats: ProtoDeviceStats::new(),
             }),
         );
         assert_eq!(check_device_event(&events_rx, None), DeviceWaitStatus::DeviceAdded);
