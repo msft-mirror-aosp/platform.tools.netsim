@@ -56,11 +56,6 @@ pub struct NetsimdArgs {
     #[arg(short, long)]
     pub dev: bool,
 
-    /// Disable Wi-Fi peer-to-peer features.
-    /// WARNING: This flag is for development purpose.
-    #[arg(long)]
-    pub disable_wifi_p2p: bool,
-
     /// Use Rust gRPC server.
     /// WARNING: This flag is for development purpose.
     #[arg(long)]
@@ -73,7 +68,7 @@ pub struct NetsimdArgs {
 
     /// Use libslirp-rs and disable qemu slirp.
     /// WARNING: This flag is for development purpose.
-    #[arg(long)]
+    #[arg(long, default_value = "true")]
     pub rust_slirp: bool,
 
     /// Set the vsock port number to be listened by the frontend grpc server
