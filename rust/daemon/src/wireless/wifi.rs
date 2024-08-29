@@ -110,11 +110,14 @@ impl WifiManager {
                             if processor.hostapd {
                                 if rust_hostapd {
                                     let ieee80211: Bytes = processor.frame.data.clone().into();
-                                    get_wifi_manager()
+                                    if let Err(err) = get_wifi_manager()
                                         .hostapd
                                         .as_ref()
                                         .expect("hostapd initialized")
-                                        .input(ieee80211);
+                                        .input(ieee80211)
+                                    {
+                                        warn!("Failed to call hostapd input: {:?}", err);
+                                    };
                                 } else {
                                     ffi_wifi::hostapd_send(&packet.to_vec());
                                 }
@@ -233,7 +236,9 @@ impl Drop for Wifi {
 
 impl WirelessAdaptor for Wifi {
     fn handle_request(&self, packet: &Bytes) {
-        get_wifi_manager().tx_request.send((self.chip_id.0, packet.clone())).unwrap();
+        if let Err(e) = get_wifi_manager().tx_request.send((self.chip_id.0, packet.clone())) {
+            warn!("Failed wifi handle_request: {:?}", e);
+        }
     }
 
     fn reset(&self) {
