@@ -16,6 +16,8 @@ use crate::devices::chip::ChipIdentifier;
 use crate::ffi::ffi_wifi;
 use crate::wifi::hostapd;
 use crate::wifi::libslirp;
+#[cfg(not(feature = "cuttlefish"))]
+use crate::wifi::mdns_forwarder;
 use crate::wifi::medium::Medium;
 use crate::wireless::{packet::handle_response, WirelessAdaptor, WirelessAdaptorImpl};
 use anyhow;
@@ -75,11 +77,13 @@ impl WifiManager {
         rx_response: mpsc::Receiver<Bytes>,
         rx_ieee8023_response: mpsc::Receiver<Bytes>,
         rx_ieee80211_response: mpsc::Receiver<Bytes>,
+        tx_ieee8023_response: mpsc::Sender<Bytes>,
     ) -> anyhow::Result<()> {
         self.start_request_thread(rx_request)?;
         self.start_response_thread(rx_response)?;
         self.start_ieee8023_response_thread(rx_ieee8023_response)?;
         self.start_ieee80211_response_thread(rx_ieee80211_response)?;
+        self.start_mdns_forwarder_thread(tx_ieee8023_response)?;
         Ok(())
     }
 
@@ -190,6 +194,28 @@ impl WifiManager {
         })?;
         Ok(())
     }
+
+    #[cfg(feature = "cuttlefish")]
+    fn start_mdns_forwarder_thread(
+        &self,
+        _tx_ieee8023_response: mpsc::Sender<Bytes>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    #[cfg(not(feature = "cuttlefish"))]
+    fn start_mdns_forwarder_thread(
+        &self,
+        tx_ieee8023_response: mpsc::Sender<Bytes>,
+    ) -> anyhow::Result<()> {
+        info!("Start mDNS forwarder thread");
+        thread::Builder::new().name("Wi-Fi mDNS forwarder".to_string()).spawn(move || {
+            if let Err(e) = mdns_forwarder::run_mdns_forwarder(tx_ieee8023_response) {
+                warn!("Failed to start mDNS forwarder: {}", e);
+            }
+        })?;
+        Ok(())
+    }
 }
 
 // Allocator for chip identifiers.
@@ -268,12 +294,13 @@ pub fn wifi_start(config: &MessageField<WiFiConfig>, rust_slirp: bool, rust_host
     let (tx_response, rx_response) = mpsc::channel::<Bytes>();
     let (tx_ieee8023_response, rx_ieee8023_response) = mpsc::channel::<Bytes>();
     let (tx_ieee80211_response, rx_ieee80211_response) = mpsc::channel::<Bytes>();
+    let tx_ieee8023_response_clone = tx_ieee8023_response.clone();
     let mut slirp = None;
     let mut wifi_config = config.clone().unwrap_or_default();
     if rust_slirp {
         let slirp_opt = wifi_config.slirp_options.as_ref().unwrap_or_default().clone();
         slirp = Some(
-            libslirp::slirp_run(slirp_opt, tx_ieee8023_response)
+            libslirp::slirp_run(slirp_opt, tx_ieee8023_response_clone)
                 .map_err(|e| warn!("Failed to run libslirp. {e}"))
                 .unwrap(),
         );
@@ -308,6 +335,7 @@ pub fn wifi_start(config: &MessageField<WiFiConfig>, rust_slirp: bool, rust_host
         rx_response,
         rx_ieee8023_response,
         rx_ieee80211_response,
+        tx_ieee8023_response,
     ) {
         warn!("Failed to start Wi-Fi manager: {}", e);
     }
