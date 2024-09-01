@@ -291,14 +291,28 @@ impl Medium {
     /// Handle Wi-Fi Ieee802.3 frame from network.
     /// Convert to HwsimMsg and send to clients.
     pub fn process_ieee8023_response(&self, packet: &Bytes) {
-        if let Err(e) = self.send_ieee8023_response(packet) {
+        let result = Ieee80211::from_ieee8023(packet, self.hostapd_bssid)
+            .and_then(|ieee80211| self.handle_ieee80211_response(ieee80211));
+
+        if let Err(e) = result {
+            warn!("{}", e);
+        }
+    }
+
+    /// Handle Wi-Fi Ieee802.11 frame from network.
+    /// Convert to HwsimMsg and send to clients.
+    pub fn process_ieee80211_response(&self, packet: &Bytes) {
+        let result = Ieee80211::decode_full(packet)
+            .context("Ieee80211")
+            .and_then(|ieee80211| self.handle_ieee80211_response(ieee80211));
+
+        if let Err(e) = result {
             warn!("{}", e);
         }
     }
 
     /// Determine the client id based on destination and send to client.
-    fn send_ieee8023_response(&self, ieee8023: &Bytes) -> anyhow::Result<()> {
-        let ieee80211 = Ieee80211::from_ieee8023(ieee8023, self.hostapd_bssid)?;
+    fn handle_ieee80211_response(&self, ieee80211: Ieee80211) -> anyhow::Result<()> {
         let dest_addr = ieee80211.get_destination();
         if let Ok(destination) = self.get_station(&dest_addr) {
             self.send_ieee80211_response(&ieee80211, &destination)?;
@@ -367,13 +381,6 @@ impl Medium {
 
     /// Determine the client id based on Ieee80211 destination and send to client.
     fn send_response(&self, packet: &Bytes) -> anyhow::Result<()> {
-        // When Wi-Fi P2P is disabled, send all packets from WifiService to all clients.
-        if crate::config::get_disable_wifi_p2p() {
-            for client_id in self.clients.read().unwrap().keys() {
-                (self.callback)(*client_id, packet);
-            }
-            return Ok(());
-        }
         let hwsim_msg = HwsimMsg::decode_full(packet)?;
         let hwsim_cmd = hwsim_msg.hwsim_hdr.hwsim_cmd;
         match hwsim_cmd {
