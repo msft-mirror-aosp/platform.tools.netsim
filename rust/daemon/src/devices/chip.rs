@@ -34,9 +34,9 @@ use std::time::Instant;
 
 use super::device::DeviceIdentifier;
 
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct ChipIdentifier(pub u32);
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct FacadeIdentifier(pub u32);
 
 impl fmt::Display for ChipIdentifier {
@@ -45,7 +45,19 @@ impl fmt::Display for ChipIdentifier {
     }
 }
 
+impl fmt::Debug for ChipIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl fmt::Display for FacadeIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl fmt::Debug for FacadeIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -68,6 +80,7 @@ pub struct CreateParams {
     pub name: Option<String>,
     pub manufacturer: String,
     pub product_name: String,
+    #[allow(dead_code)]
     pub bt_properties: Option<ProtoController>, // TODO: move to wireless_adaptor CreateParams
 }
 
@@ -78,9 +91,11 @@ pub struct Chip {
     pub device_id: DeviceIdentifier,
     pub wireless_adaptor: WirelessAdaptorImpl,
     pub kind: ProtoChipKind,
+    #[allow(dead_code)]
     pub address: String,
     pub name: String,
     // TODO: may not be necessary
+    #[allow(dead_code)]
     pub device_name: String,
     // These are patchable
     pub manufacturer: RwLock<String>,

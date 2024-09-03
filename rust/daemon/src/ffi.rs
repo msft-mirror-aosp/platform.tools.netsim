@@ -64,7 +64,7 @@ pub mod ffi_transport {
 
         #[rust_name = handle_grpc_response]
         #[namespace = "netsim::backend"]
-        fn HandleResponseCxx(chip_id: u32, packet: &[u8], packet_type: u8);
+        fn HandleResponseCxx(chip_id: u32, packet: &Vec<u8>, packet_type: u8);
 
         include!("core/server.h");
 
@@ -166,7 +166,7 @@ pub mod ffi_bluetooth {
 
         #[rust_name = handle_bt_request]
         #[namespace = "netsim::hci"]
-        fn HandleBtRequestCxx(rootcanal_id: u32, packet_type: u8, packet: &[u8]);
+        fn HandleBtRequestCxx(rootcanal_id: u32, packet_type: u8, packet: &Vec<u8>);
 
         // Rust Bluetooth device.
         include!("hci/rust_device.h");
@@ -251,19 +251,15 @@ pub mod ffi_wifi {
 
         #[rust_name = handle_wifi_request]
         #[namespace = "netsim::wifi"]
-        fn HandleWifiRequestCxx(packet: &[u8]);
+        fn HandleWifiRequestCxx(packet: &Vec<u8>);
 
         #[rust_name = hostapd_send]
         #[namespace = "netsim::wifi"]
-        fn HostapdSendCxx(packet: &[u8]);
+        fn HostapdSendCxx(packet: &Vec<u8>);
 
         #[rust_name = libslirp_send]
         #[namespace = "netsim::wifi"]
-        fn LibslirpSendCxx(packet: &[u8]);
-
-        #[rust_name = is_eapol]
-        #[namespace = "netsim::wifi"]
-        fn IsEapolCxx(packet: &[u8]) -> bool;
+        fn LibslirpSendCxx(packet: &Vec<u8>);
 
         #[namespace = "netsim::wifi"]
         pub fn libslirp_main_loop_wait();
@@ -310,6 +306,12 @@ pub mod ffi_devices {
             chip_manufacturer: &str,
             chip_product_name: &str,
             bt_properties: &CxxVector<u8>,
+            kind: &str,
+            version: &str,
+            sdk_version: &str,
+            build_id: &str,
+            variant: &str,
+            arch: &str,
         ) -> Box<AddChipResultCxx>;
 
         #[cxx_name = RemoveChipCxx]

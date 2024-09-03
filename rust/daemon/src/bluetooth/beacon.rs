@@ -161,7 +161,6 @@ impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
             return;
         }
         let mut beacon = beacon.unwrap().lock().expect("Failed to acquire lock on BeaconChip");
-
         if let (Some(start), Some(timeout)) =
             (beacon.advertise_start, beacon.advertise_settings.timeout)
         {
@@ -191,7 +190,6 @@ impl RustBluetoothChipCallbacks for BeaconChipCallbacks {
         .build()
         .encode_to_vec()
         .unwrap();
-
         beacon.send_link_layer_le_packet(&packet, beacon.advertise_settings.tx_power_level.dbm);
     }
 
@@ -263,7 +261,6 @@ pub fn ble_beacon_add(
     let facade_id = add_rust_device_result.facade_id;
     info!("Creating HCI facade_id: {} for chip_id: {}", facade_id, chip_id);
     BT_CHIPS.write().unwrap().insert(chip_id, Mutex::new(rust_chip));
-
     Ok(FacadeIdentifier(facade_id))
 }
 

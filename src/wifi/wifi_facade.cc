@@ -113,7 +113,7 @@ void libslirp_main_loop_wait() {
 #endif
 }
 
-void HandleWifiRequestCxx(const rust::Slice<uint8_t const> packet) {
+void HandleWifiRequestCxx(const rust::Vec<uint8_t> &packet) {
 #ifdef NETSIM_ANDROID_EMULATOR
   // Send the packet to the WiFi service.
   struct iovec iov[1];
@@ -123,7 +123,7 @@ void HandleWifiRequestCxx(const rust::Slice<uint8_t const> packet) {
 #endif
 }
 
-void HostapdSendCxx(const rust::Slice<uint8_t const> packet) {
+void HostapdSendCxx(const rust::Vec<uint8_t> &packet) {
 #ifdef NETSIM_ANDROID_EMULATOR
   // Send the packet to Hostapd.
   struct iovec iov[1];
@@ -133,26 +133,13 @@ void HostapdSendCxx(const rust::Slice<uint8_t const> packet) {
 #endif
 }
 
-void LibslirpSendCxx(const rust::Slice<uint8_t const> packet) {
+void LibslirpSendCxx(const rust::Vec<uint8_t> &packet) {
 #ifdef NETSIM_ANDROID_EMULATOR
   // Send the packet to libslirp.
   struct iovec iov[1];
   iov[0].iov_base = (void *)packet.data();
   iov[0].iov_len = packet.size();
   wifi_service->libslirp_send(android::base::IOVector(iov, iov + 1));
-#endif
-}
-
-bool IsEapolCxx(const rust::Slice<uint8_t const> packet) {
-#ifdef NETSIM_ANDROID_EMULATOR
-  struct iovec iov[1];
-  iov[0].iov_base = (void *)packet.data();
-  iov[0].iov_len = packet.size();
-  return std::dynamic_pointer_cast<android::qemu2::VirtioWifiForwarder>(
-             wifi_service)
-      ->is_eapol(android::base::IOVector(iov, iov + 1));
-#else
-  return 0;
 #endif
 }
 
