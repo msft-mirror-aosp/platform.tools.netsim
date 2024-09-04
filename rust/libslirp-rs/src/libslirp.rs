@@ -380,17 +380,12 @@ macro_rules! ternary {
 
 // Loop issuing blocking poll requests, sending the results into the slirp thread
 
-#[cfg(target_os = "macos")]
-fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
-    todo!();
-}
-
 #[cfg(target_os = "windows")]
 fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
     todo!();
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
     use libc::{poll, pollfd, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI};
 
@@ -417,13 +412,17 @@ fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>
             os_poll_fds.push(pollfd { fd: fd.fd, events: to_os_events(fd.events), revents: 0 });
         }
 
+        #[cfg(target_os = "linux")]
+        let os_poll_fds_len = os_poll_fds.len() as u64;
+        #[cfg(target_os = "macos")]
+        let os_poll_fds_len = os_poll_fds.len() as u32;
         // SAFETY: we ensure that:
         //
         // `os_poll_fds` is a valid ptr to a vector of pollfd which
         // the `poll` system call can write into. Note `os_poll_fds`
         // is created and allocated above.
         let poll_result =
-            unsafe { poll(os_poll_fds.as_mut_ptr(), os_poll_fds.len() as u64, timeout as i32) };
+            unsafe { poll(os_poll_fds.as_mut_ptr(), os_poll_fds_len, timeout as i32) };
 
         let mut slirp_poll_fds: Vec<PollFd> = Vec::with_capacity(poll_fds.len());
         for &fd in &os_poll_fds {
