@@ -20,4 +20,5 @@ members = [
     "common",
     "daemon",
     "libslirp-rs",
+    "hostapd-rs",
 ]
