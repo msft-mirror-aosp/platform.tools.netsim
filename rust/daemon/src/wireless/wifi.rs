@@ -14,11 +14,16 @@
 
 use crate::devices::chip::ChipIdentifier;
 use crate::ffi::ffi_wifi;
+use crate::wifi::hostapd;
+use crate::wifi::libslirp;
+#[cfg(not(feature = "cuttlefish"))]
+use crate::wifi::mdns_forwarder;
 use crate::wifi::medium::Medium;
 use crate::wireless::{packet::handle_response, WirelessAdaptor, WirelessAdaptorImpl};
+use anyhow;
 use bytes::Bytes;
-use log::info;
-use netsim_proto::config::WiFi as WiFiConfig;
+use log::{info, warn};
+use netsim_proto::config::{HostapdOptions, SlirpOptions, WiFi as WiFiConfig};
 use netsim_proto::model::Chip as ProtoChip;
 use netsim_proto::stats::{netsim_radio_stats, NetsimRadioStats as ProtoRadioStats};
 use protobuf::{Message, MessageField};
@@ -41,30 +46,51 @@ pub struct WifiManager {
     medium: Medium,
     tx_request: mpsc::Sender<(u32, Bytes)>,
     tx_response: mpsc::Sender<Bytes>,
+    slirp: Option<libslirp::LibSlirp>,
+    hostapd: Option<hostapd::Hostapd>,
 }
 
 impl WifiManager {
     pub fn new(
         tx_request: mpsc::Sender<(u32, Bytes)>,
         tx_response: mpsc::Sender<Bytes>,
+        slirp: Option<libslirp::LibSlirp>,
+        hostapd: Option<hostapd::Hostapd>,
     ) -> WifiManager {
-        WifiManager { medium: Medium::new(medium_callback), tx_request, tx_response }
+        WifiManager {
+            medium: Medium::new(medium_callback),
+            tx_request,
+            tx_response,
+            slirp,
+            hostapd,
+        }
     }
 
-    /// Starts two background threads:
+    /// Starts background threads:
     /// * One to handle requests from medium.
     /// * One to handle responses from network.
+    /// * One to handle IEEE802.3 responses from network.
+    /// * One to handle IEEE802.11 responses from hostapd.
     pub fn start(
         &self,
         rx_request: mpsc::Receiver<(u32, Bytes)>,
         rx_response: mpsc::Receiver<Bytes>,
-    ) {
-        self.start_request_thread(rx_request);
-        self.start_response_thread(rx_response);
+        rx_ieee8023_response: mpsc::Receiver<Bytes>,
+        rx_ieee80211_response: mpsc::Receiver<Bytes>,
+        tx_ieee8023_response: mpsc::Sender<Bytes>,
+    ) -> anyhow::Result<()> {
+        self.start_request_thread(rx_request)?;
+        self.start_response_thread(rx_response)?;
+        self.start_ieee8023_response_thread(rx_ieee8023_response)?;
+        self.start_ieee80211_response_thread(rx_ieee80211_response)?;
+        self.start_mdns_forwarder_thread(tx_ieee8023_response)?;
+        Ok(())
     }
 
-    fn start_request_thread(&self, rx_request: mpsc::Receiver<(u32, Bytes)>) {
-        thread::spawn(move || {
+    fn start_request_thread(&self, rx_request: mpsc::Receiver<(u32, Bytes)>) -> anyhow::Result<()> {
+        let rust_slirp = self.slirp.is_some();
+        let rust_hostapd = self.hostapd.is_some();
+        thread::Builder::new().name("Wi-Fi HwsimMsg request".to_string()).spawn(move || {
             const POLL_INTERVAL: Duration = Duration::from_millis(1);
             let mut next_instant = Instant::now() + POLL_INTERVAL;
 
@@ -77,20 +103,38 @@ impl WifiManager {
                 };
                 match rx_request.recv_timeout(timeout) {
                     Ok((chip_id, packet)) => {
-                        // When Wi-Fi P2P is disabled, send all packets to WifiService.
-                        if crate::config::get_disable_wifi_p2p() {
-                            ffi_wifi::handle_wifi_request(&packet.to_vec());
-                            ffi_wifi::libslirp_main_loop_wait();
-                        } else if let Some(processor) =
+                        if let Some(processor) =
                             get_wifi_manager().medium.get_processor(chip_id, &packet)
                         {
                             get_wifi_manager().medium.ack_frame(chip_id, &processor.frame);
                             if processor.hostapd {
-                                ffi_wifi::hostapd_send(&packet.to_vec());
+                                if rust_hostapd {
+                                    let ieee80211: Bytes = processor.frame.data.clone().into();
+                                    get_wifi_manager()
+                                        .hostapd
+                                        .as_ref()
+                                        .expect("hostapd initialized")
+                                        .input(ieee80211);
+                                } else {
+                                    ffi_wifi::hostapd_send(&packet.to_vec());
+                                }
                             }
                             if processor.network {
-                                ffi_wifi::libslirp_send(&packet.to_vec());
-                                ffi_wifi::libslirp_main_loop_wait();
+                                if rust_slirp {
+                                    match processor.frame.ieee80211.to_ieee8023() {
+                                        Ok(ethernet_frame) => get_wifi_manager()
+                                            .slirp
+                                            .as_ref()
+                                            .expect("slirp initialized")
+                                            .input(ethernet_frame.into()),
+                                        Err(err) => {
+                                            warn!("Failed to convert 802.11 to 802.3: {}", err)
+                                        }
+                                    }
+                                } else {
+                                    ffi_wifi::libslirp_send(&packet.to_vec());
+                                    ffi_wifi::libslirp_main_loop_wait();
+                                }
                             }
                             if processor.wmedium {
                                 get_wifi_manager().medium.queue_frame(processor.frame);
@@ -98,19 +142,79 @@ impl WifiManager {
                         }
                     }
                     _ => {
-                        ffi_wifi::libslirp_main_loop_wait();
+                        if !rust_slirp {
+                            ffi_wifi::libslirp_main_loop_wait();
+                        }
                         next_instant = Instant::now() + POLL_INTERVAL;
                     }
                 };
             }
-        });
+        })?;
+        Ok(())
     }
 
-    fn start_response_thread(&self, rx_response: mpsc::Receiver<Bytes>) {
-        thread::spawn(move || loop {
-            let packet = rx_response.recv().unwrap();
-            get_wifi_manager().medium.process_response(&packet);
-        });
+    /// Starts a dedicated thread to handle WifiService responses.
+    fn start_response_thread(&self, rx_response: mpsc::Receiver<Bytes>) -> anyhow::Result<()> {
+        thread::Builder::new().name("WifiService response".to_string()).spawn(move || {
+            for packet in rx_response {
+                get_wifi_manager().medium.process_response(&packet);
+            }
+        })?;
+        Ok(())
+    }
+
+    /// Starts a dedicated thread to process IEEE 802.3 (Ethernet) responses from the network.
+    ///
+    /// This thread continuously receives IEEE 802.3 response packets from the `rx_ieee8023_response` channel
+    /// and forwards them to the Wi-Fi manager's medium.
+    fn start_ieee8023_response_thread(
+        &self,
+        rx_ieee8023_response: mpsc::Receiver<Bytes>,
+    ) -> anyhow::Result<()> {
+        thread::Builder::new().name("Wi-Fi IEEE802.3 response".to_string()).spawn(move || {
+            for packet in rx_ieee8023_response {
+                get_wifi_manager().medium.process_ieee8023_response(&packet);
+            }
+        })?;
+        Ok(())
+    }
+
+    /// Starts a dedicated thread to process IEEE 802.11 responses from hostapd.
+    ///
+    /// This thread continuously receives IEEE 802.11 response packets from the hostapd response channel
+    /// and forwards them to the Wi-Fi manager's medium.
+    fn start_ieee80211_response_thread(
+        &self,
+        rx_ieee80211_response: mpsc::Receiver<Bytes>,
+    ) -> anyhow::Result<()> {
+        thread::Builder::new().name("Wi-Fi IEEE802.11 response".to_string()).spawn(move || {
+            for packet in rx_ieee80211_response {
+                get_wifi_manager().medium.process_ieee80211_response(&packet);
+            }
+        })?;
+        Ok(())
+    }
+
+    #[cfg(feature = "cuttlefish")]
+    fn start_mdns_forwarder_thread(
+        &self,
+        _tx_ieee8023_response: mpsc::Sender<Bytes>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    #[cfg(not(feature = "cuttlefish"))]
+    fn start_mdns_forwarder_thread(
+        &self,
+        tx_ieee8023_response: mpsc::Sender<Bytes>,
+    ) -> anyhow::Result<()> {
+        info!("Start mDNS forwarder thread");
+        thread::Builder::new().name("Wi-Fi mDNS forwarder".to_string()).spawn(move || {
+            if let Err(e) = mdns_forwarder::run_mdns_forwarder(tx_ieee8023_response) {
+                warn!("Failed to start mDNS forwarder: {}", e);
+            }
+        })?;
+        Ok(())
     }
 }
 
@@ -185,18 +289,60 @@ pub fn new(_params: &CreateParams, chip_id: ChipIdentifier) -> WirelessAdaptorIm
 }
 
 /// Starts the WiFi service.
-pub fn wifi_start(config: &MessageField<WiFiConfig>) {
+pub fn wifi_start(config: &MessageField<WiFiConfig>, rust_slirp: bool, rust_hostapd: bool) {
     let (tx_request, rx_request) = mpsc::channel::<(u32, Bytes)>();
     let (tx_response, rx_response) = mpsc::channel::<Bytes>();
+    let (tx_ieee8023_response, rx_ieee8023_response) = mpsc::channel::<Bytes>();
+    let (tx_ieee80211_response, rx_ieee80211_response) = mpsc::channel::<Bytes>();
+    let tx_ieee8023_response_clone = tx_ieee8023_response.clone();
+    let mut slirp = None;
+    let mut wifi_config = config.clone().unwrap_or_default();
+    if rust_slirp {
+        let slirp_opt = wifi_config.slirp_options.as_ref().unwrap_or_default().clone();
+        slirp = Some(
+            libslirp::slirp_run(slirp_opt, tx_ieee8023_response_clone)
+                .map_err(|e| warn!("Failed to run libslirp. {e}"))
+                .unwrap(),
+        );
 
-    let _ = WIFI_MANAGER.set(WifiManager::new(tx_request, tx_response));
-    get_wifi_manager().start(rx_request, rx_response);
+        // Disable qemu slirp in WifiService
+        wifi_config.slirp_options =
+            MessageField::some(SlirpOptions { disabled: true, ..Default::default() });
+    }
 
-    let proto_bytes = config.as_ref().unwrap_or_default().write_to_bytes().unwrap();
+    let mut hostapd = None;
+    if rust_hostapd {
+        let hostapd_opt = wifi_config.hostapd_options.as_ref().unwrap_or_default().clone();
+        hostapd = Some(
+            hostapd::hostapd_run(hostapd_opt, tx_ieee80211_response)
+                .map_err(|e| warn!("Failed to run hostapd. {e}"))
+                .unwrap(),
+        );
+
+        // Disable qemu hostapd in WifiService
+        wifi_config.hostapd_options =
+            MessageField::some(HostapdOptions { disabled: Some(true), ..Default::default() });
+    }
+
+    let _ = WIFI_MANAGER.set(WifiManager::new(tx_request, tx_response, slirp, hostapd));
+
+    // WifiService
+    let proto_bytes = wifi_config.write_to_bytes().unwrap();
     ffi_wifi::wifi_start(&proto_bytes);
+
+    if let Err(e) = get_wifi_manager().start(
+        rx_request,
+        rx_response,
+        rx_ieee8023_response,
+        rx_ieee80211_response,
+        tx_ieee8023_response,
+    ) {
+        warn!("Failed to start Wi-Fi manager: {}", e);
+    }
 }
 
 /// Stops the WiFi service.
 pub fn wifi_stop() {
+    // TODO: stop hostapd
     ffi_wifi::wifi_stop();
 }
