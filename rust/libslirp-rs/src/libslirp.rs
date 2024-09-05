@@ -28,11 +28,10 @@ use crate::libslirp_config::SlirpConfigs;
 use crate::libslirp_sys;
 use bytes::Bytes;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use lazy_static::lazy_static;
 use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CStr};
-use std::sync::{mpsc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
@@ -40,18 +39,22 @@ use std::time::Instant;
 // Uses a static to hold callback state instead of the libslirp's
 // opaque parameter to limit the number of unsafe regions.
 static CONTEXT: Mutex<CallbackContext> =
-    Mutex::new(CallbackContext { tx_bytes: None, tx_cmds: None, pollFds: Vec::new() });
+    Mutex::new(CallbackContext { tx_bytes: None, tx_cmds: None, poll_fds: Vec::new() });
 
 // Timers are managed across the ffi boundary using a unique usize ID
 // (TimerOpaque) and a hashmap rather than memory pointers to reduce
 // unsafe code.
 
-lazy_static! {
-    static ref TIMERS: Mutex<TimerManager> = Mutex::new(TimerManager {
-        clock: Instant::now(),
-        map: HashMap::new(),
-        timers: AtomicUsize::new(1),
-    });
+static TIMERS: OnceLock<Mutex<TimerManager>> = OnceLock::new();
+
+fn get_timers() -> &'static Mutex<TimerManager> {
+    TIMERS.get_or_init(|| {
+        Mutex::new(TimerManager {
+            clock: Instant::now(),
+            map: HashMap::new(),
+            timers: AtomicUsize::new(1),
+        })
+    })
 }
 
 type TimerOpaque = usize;
@@ -82,7 +85,7 @@ enum SlirpCmd {
 struct CallbackContext {
     tx_bytes: Option<mpsc::Sender<Bytes>>,
     tx_cmds: Option<mpsc::Sender<SlirpCmd>>,
-    pollFds: Vec<PollFd>,
+    poll_fds: Vec<PollFd>,
 }
 
 // A poll thread request has a poll_fds and a timeout
@@ -141,24 +144,34 @@ impl LibSlirp {
 
         // Create channels for polling thread and launch
         let tx_cmds_poll = tx_cmds.clone();
-        thread::Builder::new()
+        if let Err(e) = thread::Builder::new()
             .name("slirp_poll".to_string())
-            .spawn(move || slirp_poll_thread(rx_poll, tx_cmds_poll));
+            .spawn(move || slirp_poll_thread(rx_poll, tx_cmds_poll))
+        {
+            warn!("Failed to start slirp poll thread: {}", e);
+        }
 
         // Create channels for command processor thread and launch
-        thread::Builder::new()
+        if let Err(e) = thread::Builder::new()
             .name("slirp".to_string())
-            .spawn(move || slirp_thread(config, rx_cmds, tx_poll));
+            .spawn(move || slirp_thread(config, rx_cmds, tx_poll))
+        {
+            warn!("Failed to start slirp thread: {}", e);
+        }
 
         LibSlirp { tx_cmds }
     }
 
     pub fn shutdown(self) {
-        self.tx_cmds.send(SlirpCmd::Shutdown);
+        if let Err(e) = self.tx_cmds.send(SlirpCmd::Shutdown) {
+            warn!("Failed to send Shutdown cmd: {}", e);
+        }
     }
 
     pub fn input(&self, bytes: Bytes) {
-        self.tx_cmds.send(SlirpCmd::Input(bytes));
+        if let Err(e) = self.tx_cmds.send(SlirpCmd::Input(bytes)) {
+            warn!("Failed to send Input cmd: {}", e);
+        }
     }
 }
 
@@ -201,9 +214,9 @@ fn slirp_thread(
 
     unsafe { slirp_pollfds_fill(slirp, &tx_poll) };
 
-    let min_duration = TIMERS.lock().unwrap().min_duration();
-    while let cmd = rx.recv_timeout(min_duration) {
-        match cmd {
+    let min_duration = get_timers().lock().unwrap().min_duration();
+    loop {
+        match rx.recv_timeout(min_duration) {
             Ok(SlirpCmd::PollResult(poll_fds, select_error)) => {
                 // SAFETY: we ensure that slirp is a valid state returned by `slirp_new()`
                 unsafe { slirp_pollfds_poll(slirp, select_error, poll_fds) };
@@ -225,7 +238,7 @@ fn slirp_thread(
             _ => break,
         }
         // Callback any expired timers in the slirp thread...
-        for timer in TIMERS.lock().unwrap().collect_expired() {
+        for timer in get_timers().lock().unwrap().collect_expired() {
             unsafe {
                 libslirp_sys::slirp_handle_timer(slirp, timer.id, timer.cb_opaque as *mut c_void)
             };
@@ -266,7 +279,7 @@ struct PollFd {
 // `slirp` must be a valid Slirp state returned by `slirp_new()`
 unsafe fn slirp_pollfds_fill(slirp: *mut libslirp_sys::Slirp, tx: &mpsc::Sender<PollRequest>) {
     let mut timeout: u32 = 0;
-    CONTEXT.lock().unwrap().pollFds.clear();
+    CONTEXT.lock().unwrap().poll_fds.clear();
 
     // Call libslrip "C" library to fill poll information using
     // slirp_add_poll_cb callback function.
@@ -287,9 +300,11 @@ unsafe fn slirp_pollfds_fill(slirp: *mut libslirp_sys::Slirp, tx: &mpsc::Sender<
             std::ptr::null_mut(),
         );
     }
-    let poll_fds: Vec<PollFd> = CONTEXT.lock().unwrap().pollFds.drain(..).collect();
+    let poll_fds: Vec<PollFd> = CONTEXT.lock().unwrap().poll_fds.drain(..).collect();
     debug!("got {} items", poll_fds.len());
-    tx.send((poll_fds, timeout));
+    if let Err(e) = tx.send((poll_fds, timeout)) {
+        warn!("Failed to send poll fds: {}", e);
+    }
 }
 
 // "C" library callback that is called for each file descriptor that
@@ -297,8 +312,8 @@ unsafe fn slirp_pollfds_fill(slirp: *mut libslirp_sys::Slirp, tx: &mpsc::Sender<
 
 extern "C" fn slirp_add_poll_cb(fd: c_int, events: c_int, _opaque: *mut c_void) -> c_int {
     let mut guard = CONTEXT.lock().unwrap();
-    let idx = guard.pollFds.len();
-    guard.pollFds.push(PollFd { fd, events: events as libslirp_sys::SlirpPollType, revents: 0 });
+    let idx = guard.poll_fds.len();
+    guard.poll_fds.push(PollFd { fd, events: events as libslirp_sys::SlirpPollType, revents: 0 });
     idx as i32
 }
 
@@ -323,7 +338,7 @@ unsafe fn slirp_pollfds_poll(
     select_error: c_int,
     poll_fds: Vec<PollFd>,
 ) {
-    CONTEXT.lock().unwrap().pollFds = poll_fds;
+    CONTEXT.lock().unwrap().poll_fds = poll_fds;
 
     // Call libslrip "C" library to fill poll return event information
     // using slirp_get_revents_cb callback function.
@@ -350,7 +365,7 @@ unsafe fn slirp_pollfds_poll(
 // it the index that add_poll returned.
 
 extern "C" fn slirp_get_revents_cb(idx: c_int, _opaue: *mut c_void) -> c_int {
-    if let Some(poll_fd) = CONTEXT.lock().unwrap().pollFds.get(idx as usize) {
+    if let Some(poll_fd) = CONTEXT.lock().unwrap().poll_fds.get(idx as usize) {
         return poll_fd.revents as c_int;
     }
     return 0;
@@ -368,17 +383,12 @@ macro_rules! ternary {
 
 // Loop issuing blocking poll requests, sending the results into the slirp thread
 
-#[cfg(target_os = "macos")]
-fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
-    todo!();
-}
-
 #[cfg(target_os = "windows")]
 fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
     todo!();
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
     use libc::{poll, pollfd, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI};
 
@@ -405,13 +415,17 @@ fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>
             os_poll_fds.push(pollfd { fd: fd.fd, events: to_os_events(fd.events), revents: 0 });
         }
 
+        #[cfg(target_os = "linux")]
+        let os_poll_fds_len = os_poll_fds.len() as u64;
+        #[cfg(target_os = "macos")]
+        let os_poll_fds_len = os_poll_fds.len() as u32;
         // SAFETY: we ensure that:
         //
         // `os_poll_fds` is a valid ptr to a vector of pollfd which
         // the `poll` system call can write into. Note `os_poll_fds`
         // is created and allocated above.
         let poll_result =
-            unsafe { poll(os_poll_fds.as_mut_ptr(), os_poll_fds.len() as u64, timeout as i32) };
+            unsafe { poll(os_poll_fds.as_mut_ptr(), os_poll_fds_len, timeout as i32) };
 
         let mut slirp_poll_fds: Vec<PollFd> = Vec::with_capacity(poll_fds.len());
         for &fd in &os_poll_fds {
@@ -422,7 +436,9 @@ fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>
             });
         }
         // 'select_error' should be 1 if poll() returned an error, else 0.
-        tx.send(SlirpCmd::PollResult(slirp_poll_fds, (poll_result < 0) as i32));
+        if let Err(e) = tx.send(SlirpCmd::PollResult(slirp_poll_fds, (poll_result < 0) as i32)) {
+            warn!("Failed to send slirp PollResult cmd: {}", e);
+        }
     }
 }
 
@@ -482,7 +498,7 @@ unsafe extern "C" fn guest_error_cb(msg: *const c_char, _opaque: *mut c_void) {
 }
 
 extern "C" fn clock_get_ns_cb(_opaque: *mut c_void) -> i64 {
-    TIMERS.lock().unwrap().clock.elapsed().as_nanos() as i64
+    get_timers().lock().unwrap().clock.elapsed().as_nanos() as i64
 }
 
 extern "C" fn init_completed(_slirp: *mut libslirp_sys::Slirp, _opaque: *mut c_void) {
@@ -495,7 +511,8 @@ extern "C" fn timer_new_opaque_cb(
     cb_opaque: *mut c_void,
     _opaque: *mut c_void,
 ) -> *mut c_void {
-    let mut guard = TIMERS.lock().unwrap();
+    let timers = get_timers();
+    let mut guard = get_timers().lock().unwrap();
     let timer = guard.next_timer();
     debug!("timer_new_opaque {timer}");
     guard.map.insert(timer, Timer { expire_time: u64::MAX, id, cb_opaque: cb_opaque as usize });
@@ -508,7 +525,7 @@ extern "C" fn timer_free_cb(
 ) {
     let timer = timer as TimerOpaque;
     debug!("timer_free {timer}");
-    if TIMERS.lock().unwrap().map.remove(&timer).is_none() {
+    if get_timers().lock().unwrap().map.remove(&timer).is_none() {
         warn!("Unknown timer {timer}");
     }
 }
@@ -519,8 +536,8 @@ extern "C" fn timer_mod_cb(
     _opaque: *mut ::std::os::raw::c_void,
 ) {
     let timer_key = timer as TimerOpaque;
-    let now_ms = TIMERS.lock().unwrap().clock.elapsed().as_millis() as u64;
-    if let Some(&mut ref mut timer) = TIMERS.lock().unwrap().map.get_mut(&timer_key) {
+    let now_ms = get_timers().lock().unwrap().clock.elapsed().as_millis() as u64;
+    if let Some(&mut ref mut timer) = get_timers().lock().unwrap().map.get_mut(&timer_key) {
         // expire_time is > 0
         timer.expire_time = std::cmp::max(expire_time, 0) as u64;
         debug!("timer_mod {timer_key} expire_time: {}ms", timer.expire_time.saturating_sub(now_ms));
