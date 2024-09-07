@@ -116,7 +116,6 @@ pub mod ffi_transport {
     }
 }
 
-#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim")]
 pub mod ffi_bluetooth {
@@ -282,7 +281,6 @@ pub mod ffi_wifi {
     }
 }
 
-#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim::device")]
 pub mod ffi_devices {

@@ -14,6 +14,7 @@
 
 use bytes::Bytes;
 use futures::{channel::mpsc::UnboundedSender, sink::SinkExt, StreamExt};
+use lazy_static::lazy_static;
 use pica::{Handle, Pica};
 
 use netsim_proto::model::chip::Radio as ProtoRadio;
@@ -25,34 +26,20 @@ use crate::uwb::ranging_estimator::{SharedState, UwbRangingEstimator};
 use crate::wireless::packet::handle_response;
 
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use super::{WirelessAdaptor, WirelessAdaptorImpl};
 
 // TODO(b/331267949): Construct Manager struct for each wireless_adaptor module
-static PICA_HANDLE_TO_STATE: OnceLock<SharedState> = OnceLock::new();
-
-fn get_pica_handle_to_state() -> &'static SharedState {
-    PICA_HANDLE_TO_STATE.get_or_init(SharedState::new)
-}
-
-static PICA: OnceLock<Arc<Mutex<Pica>>> = OnceLock::new();
-
-fn get_pica() -> Arc<Mutex<Pica>> {
-    PICA.get_or_init(|| {
-        Arc::new(Mutex::new(Pica::new(
-            Box::new(UwbRangingEstimator::new(get_pica_handle_to_state().clone())),
-            None,
-        )))
-    })
-    .clone()
-}
-
-static PICA_RUNTIME: OnceLock<Arc<tokio::runtime::Runtime>> = OnceLock::new();
-
-fn get_pica_runtime() -> Arc<tokio::runtime::Runtime> {
-    PICA_RUNTIME.get_or_init(|| Arc::new(tokio::runtime::Runtime::new().unwrap())).clone()
+lazy_static! {
+    static ref PICA_HANDLE_TO_STATE: SharedState = SharedState::new();
+    static ref PICA: Arc<Mutex<Pica>> = Arc::new(Mutex::new(Pica::new(
+        Box::new(UwbRangingEstimator::new(PICA_HANDLE_TO_STATE.clone())),
+        None
+    )));
+    static ref PICA_RUNTIME: Arc<tokio::runtime::Runtime> =
+        Arc::new(tokio::runtime::Runtime::new().unwrap());
 }
 
 /// Parameters for creating UWB chips
@@ -72,7 +59,7 @@ pub struct Uwb {
 
 impl Drop for Uwb {
     fn drop(&mut self) {
-        get_pica_handle_to_state().remove(&self.pica_id);
+        PICA_HANDLE_TO_STATE.remove(&self.pica_id);
     }
 }
 
@@ -129,21 +116,21 @@ pub fn uwb_start() {
     // TODO: Provide TcpStream as UWB connector
     let _ = thread::Builder::new().name("pica_service".to_string()).spawn(move || {
         log::info!("PICA STARTED");
-        let _guard = get_pica_runtime().enter();
-        futures::executor::block_on(pica::run(&get_pica()))
+        let _guard = PICA_RUNTIME.enter();
+        futures::executor::block_on(pica::run(&PICA))
     });
 }
 
 pub fn new(_create_params: &CreateParams, chip_id: ChipIdentifier) -> WirelessAdaptorImpl {
     let (uci_stream_sender, uci_stream_receiver) = futures::channel::mpsc::unbounded();
     let (uci_sink_sender, uci_sink_receiver) = futures::channel::mpsc::unbounded();
-    let _guard = get_pica_runtime().enter();
-    let pica_id = get_pica()
+    let _guard = PICA_RUNTIME.enter();
+    let pica_id = PICA
         .lock()
         .unwrap()
         .add_device(Box::pin(uci_stream_receiver), Box::pin(uci_sink_sender.sink_err_into()))
         .unwrap();
-    get_pica_handle_to_state().insert(pica_id, chip_id);
+    PICA_HANDLE_TO_STATE.insert(pica_id, chip_id);
 
     let rx_count = Arc::new(AtomicI32::new(0));
     let uwb = Uwb {
@@ -155,7 +142,7 @@ pub fn new(_create_params: &CreateParams, chip_id: ChipIdentifier) -> WirelessAd
     };
 
     // Spawn a future for obtaining packet from pica and invoking handle_response_rust
-    get_pica_runtime().spawn(async move {
+    PICA_RUNTIME.spawn(async move {
         let mut uci_sink_receiver = uci_sink_receiver;
         while let Some(packet) = uci_sink_receiver.next().await {
             handle_response(chip_id, &Bytes::from(packet));

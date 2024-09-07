@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, OnceLock, RwLock};
+use lazy_static::lazy_static;
+use std::sync::{Arc, RwLock};
 
 use crate::captures::capture::Captures;
 use crate::version::get_version;
 
-static RESOURCES: OnceLock<Resource> = OnceLock::new();
+lazy_static! {
+    static ref RESOURCES: Resource = Resource::new();
+}
 
 /// Resource struct includes all the global and possibly shared
 /// resources for netsim.  Each field within Resource should be an Arc
@@ -39,7 +42,7 @@ impl Resource {
 }
 
 pub fn clone_captures() -> Arc<RwLock<Captures>> {
-    Arc::clone(&RESOURCES.get_or_init(Resource::new).captures)
+    Arc::clone(&RESOURCES.captures)
 }
 
 #[cfg(test)]

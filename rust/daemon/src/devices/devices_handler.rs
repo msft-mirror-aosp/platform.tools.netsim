@@ -37,6 +37,7 @@ use crate::wireless;
 use cxx::{CxxString, CxxVector};
 use http::Request;
 use http::Version;
+use lazy_static::lazy_static;
 use log::{info, warn};
 use netsim_proto::common::ChipKind as ProtoChipKind;
 use netsim_proto::configuration::Controller;
@@ -128,10 +129,12 @@ impl PoseManager {
     }
 }
 
-static DEVICE_MANAGER: OnceLock<Arc<DeviceManager>> = OnceLock::new();
+lazy_static! {
+    static ref DEVICE_MANAGER: Arc<DeviceManager> = Arc::new(DeviceManager::new());
+}
 
 fn get_manager() -> Arc<DeviceManager> {
-    DEVICE_MANAGER.get_or_init(|| Arc::new(DeviceManager::new())).clone()
+    Arc::clone(&DEVICE_MANAGER)
 }
 
 // TODO: last_modified atomic

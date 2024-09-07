@@ -14,13 +14,14 @@
 
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::{OnceLock, RwLock};
+use std::sync::RwLock;
 use std::thread;
 
 use crate::captures;
 use crate::devices::{chip, chip::ChipIdentifier};
 
 use bytes::Bytes;
+use lazy_static::lazy_static;
 use log::{error, info, warn};
 use netsim_proto::hci_packet::hcipacket::PacketType;
 use protobuf::Enum;
@@ -52,20 +53,18 @@ struct PacketManager {
     transports: RwLock<HashMap<ChipIdentifier, Sender<ResponsePacket>>>,
 }
 
-static MANAGER: OnceLock<PacketManager> = OnceLock::new();
-
-fn get_manager() -> &'static PacketManager {
-    MANAGER.get_or_init(PacketManager::new)
+lazy_static! {
+    static ref MANAGER: PacketManager = PacketManager::new();
 }
 
 /// Register a chip controller instance to a transport manager.
 pub fn register_transport(chip_id: ChipIdentifier, responder: Box<dyn Response + Send>) {
-    get_manager().register_transport(chip_id, responder);
+    MANAGER.register_transport(chip_id, responder);
 }
 
 /// Unregister a chip controller instance.
 pub fn unregister_transport(chip_id: ChipIdentifier) {
-    get_manager().unregister_transport(chip_id);
+    MANAGER.unregister_transport(chip_id);
 }
 
 impl PacketManager {
@@ -110,7 +109,7 @@ pub fn handle_response_cxx(chip_id: u32, packet: &cxx::CxxVector<u8>, packet_typ
     let chip_id = ChipIdentifier(chip_id);
     captures::controller_to_host(chip_id, &packet, packet_type.into());
 
-    let result = if let Some(transport) = get_manager().transports.read().unwrap().get(&chip_id) {
+    let result = if let Some(transport) = MANAGER.transports.read().unwrap().get(&chip_id) {
         transport.send(ResponsePacket { packet, packet_type })
     } else {
         warn!("handle_response: chip {chip_id} not found");
@@ -128,7 +127,7 @@ pub fn handle_response(chip_id: ChipIdentifier, packet: &Bytes) {
     let packet_type = PacketType::HCI_PACKET_UNSPECIFIED.value() as u8;
     captures::controller_to_host(chip_id, packet, packet_type.into());
 
-    let result = if let Some(transport) = get_manager().transports.read().unwrap().get(&chip_id) {
+    let result = if let Some(transport) = MANAGER.transports.read().unwrap().get(&chip_id) {
         transport.send(ResponsePacket { packet: packet.clone(), packet_type })
     } else {
         warn!("handle_response: chip {chip_id} not found");
