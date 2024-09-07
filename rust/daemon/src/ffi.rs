@@ -116,6 +116,7 @@ pub mod ffi_transport {
     }
 }
 
+#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim")]
 pub mod ffi_bluetooth {
@@ -261,10 +262,6 @@ pub mod ffi_wifi {
         #[namespace = "netsim::wifi"]
         fn LibslirpSendCxx(packet: &Vec<u8>);
 
-        #[rust_name = is_eapol]
-        #[namespace = "netsim::wifi"]
-        fn IsEapolCxx(packet: &[u8]) -> bool;
-
         #[namespace = "netsim::wifi"]
         pub fn libslirp_main_loop_wait();
 
@@ -285,6 +282,7 @@ pub mod ffi_wifi {
     }
 }
 
+#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim::device")]
 pub mod ffi_devices {
