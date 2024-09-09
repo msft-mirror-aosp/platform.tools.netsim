@@ -31,7 +31,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CStr};
-use std::sync::{mpsc, Arc, Mutex, OnceLock};
+use std::sync::{mpsc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
@@ -118,7 +118,7 @@ impl TimerManager {
     // Return the minimum duration until the next timer
     fn min_duration(&self) -> Duration {
         match self.map.iter().min_by_key(|(_, timer)| timer.expire_time) {
-            Some((_, &ref timer)) => {
+            Some((_, timer)) => {
                 let now_ms = self.clock.elapsed().as_millis() as u64;
                 // Duration is >= 0
                 Duration::from_millis(timer.expire_time.saturating_sub(now_ms))
@@ -368,7 +368,7 @@ extern "C" fn slirp_get_revents_cb(idx: c_int, _opaue: *mut c_void) -> c_int {
     if let Some(poll_fd) = CONTEXT.lock().unwrap().poll_fds.get(idx as usize) {
         return poll_fd.revents as c_int;
     }
-    return 0;
+    0
 }
 
 macro_rules! ternary {
@@ -512,7 +512,7 @@ extern "C" fn timer_new_opaque_cb(
     _opaque: *mut c_void,
 ) -> *mut c_void {
     let timers = get_timers();
-    let mut guard = get_timers().lock().unwrap();
+    let mut guard = timers.lock().unwrap();
     let timer = guard.next_timer();
     debug!("timer_new_opaque {timer}");
     guard.map.insert(timer, Timer { expire_time: u64::MAX, id, cb_opaque: cb_opaque as usize });
