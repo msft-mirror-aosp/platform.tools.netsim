@@ -116,6 +116,7 @@ pub mod ffi_transport {
     }
 }
 
+#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim")]
 pub mod ffi_bluetooth {
@@ -281,6 +282,7 @@ pub mod ffi_wifi {
     }
 }
 
+#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim::device")]
 pub mod ffi_devices {
@@ -306,6 +308,12 @@ pub mod ffi_devices {
             chip_manufacturer: &str,
             chip_product_name: &str,
             bt_properties: &CxxVector<u8>,
+            kind: &str,
+            version: &str,
+            sdk_version: &str,
+            build_id: &str,
+            variant: &str,
+            arch: &str,
         ) -> Box<AddChipResultCxx>;
 
         #[cxx_name = RemoveChipCxx]

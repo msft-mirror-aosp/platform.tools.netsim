@@ -22,6 +22,7 @@
 #include "util/log.h"
 #include "util/string_utils.h"
 #ifdef NETSIM_ANDROID_EMULATOR
+#include "android-qemu2-glue/emulation/VirtioWifiForwarder.h"
 #include "android-qemu2-glue/emulation/WifiService.h"
 #include "android-qemu2-glue/netsim/libslirp_driver.h"
 #endif

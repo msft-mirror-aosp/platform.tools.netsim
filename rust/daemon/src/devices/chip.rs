@@ -20,7 +20,6 @@
 /// controller protocol.
 ///
 use crate::wireless::WirelessAdaptorImpl;
-use lazy_static::lazy_static;
 use netsim_proto::common::ChipKind as ProtoChipKind;
 use netsim_proto::configuration::Controller as ProtoController;
 use netsim_proto::model::Chip as ProtoChip;
@@ -29,14 +28,14 @@ use protobuf::EnumOrUnknown;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 use std::time::Instant;
 
 use super::device::DeviceIdentifier;
 
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct ChipIdentifier(pub u32);
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct FacadeIdentifier(pub u32);
 
 impl fmt::Display for ChipIdentifier {
@@ -45,7 +44,19 @@ impl fmt::Display for ChipIdentifier {
     }
 }
 
+impl fmt::Debug for ChipIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl fmt::Display for FacadeIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl fmt::Debug for FacadeIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -58,8 +69,10 @@ struct ChipManager {
     chips: RwLock<HashMap<ChipIdentifier, Arc<Chip>>>,
 }
 
-lazy_static! {
-    static ref CHIP_MANAGER: ChipManager = ChipManager::new(INITIAL_CHIP_ID);
+static CHIP_MANAGER: OnceLock<ChipManager> = OnceLock::new();
+
+fn get_chip_manager() -> &'static ChipManager {
+    CHIP_MANAGER.get_or_init(|| ChipManager::new(INITIAL_CHIP_ID))
 }
 
 pub struct CreateParams {
@@ -68,6 +81,7 @@ pub struct CreateParams {
     pub name: Option<String>,
     pub manufacturer: String,
     pub product_name: String,
+    #[allow(dead_code)]
     pub bt_properties: Option<ProtoController>, // TODO: move to wireless_adaptor CreateParams
 }
 
@@ -78,9 +92,11 @@ pub struct Chip {
     pub device_id: DeviceIdentifier,
     pub wireless_adaptor: WirelessAdaptorImpl,
     pub kind: ProtoChipKind,
+    #[allow(dead_code)]
     pub address: String,
     pub name: String,
     // TODO: may not be necessary
+    #[allow(dead_code)]
     pub device_name: String,
     // These are patchable
     pub manufacturer: RwLock<String>,
@@ -161,16 +177,16 @@ impl Chip {
 
 /// Obtains a Chip with given chip_id
 pub fn get_chip(chip_id: &ChipIdentifier) -> Option<Arc<Chip>> {
-    CHIP_MANAGER.get_chip(chip_id)
+    get_chip_manager().get_chip(chip_id)
 }
 
 /// Remove a Chip with given chip_id
 pub fn remove_chip(chip_id: &ChipIdentifier) -> Option<Arc<Chip>> {
-    CHIP_MANAGER.remove_chip(chip_id)
+    get_chip_manager().remove_chip(chip_id)
 }
 
 pub fn next_id() -> ChipIdentifier {
-    CHIP_MANAGER.next_id()
+    get_chip_manager().next_id()
 }
 
 /// Allocates a new chip.
@@ -181,7 +197,7 @@ pub fn new(
     create_params: &CreateParams,
     wireless_adaptor: WirelessAdaptorImpl,
 ) -> Result<Arc<Chip>, String> {
-    CHIP_MANAGER.new_chip(id, device_id, device_name, create_params, wireless_adaptor)
+    get_chip_manager().new_chip(id, device_id, device_name, create_params, wireless_adaptor)
 }
 
 impl ChipManager {
