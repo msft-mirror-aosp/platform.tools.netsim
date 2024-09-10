@@ -383,14 +383,21 @@ macro_rules! ternary {
 
 // Loop issuing blocking poll requests, sending the results into the slirp thread
 
-#[cfg(target_os = "windows")]
 fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
-    todo!();
-}
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>) {
-    use libc::{poll, pollfd, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI};
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    use libc::{
+        nfds_t as OsPollFdsLenType, poll, pollfd, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI,
+    };
+    #[cfg(target_os = "windows")]
+    use winapi::{
+        shared::minwindef::ULONG as OsPollFdsLenType,
+        um::winsock2::{
+            WSAPoll as poll, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, SOCKET as FdType,
+            WSAPOLLFD as pollfd,
+        },
+    };
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    type FdType = c_int;
 
     fn to_os_events(events: libslirp_sys::SlirpPollType) -> i16 {
         ternary!(events & libslirp_sys::SLIRP_POLL_IN, POLLIN)
@@ -412,25 +419,26 @@ fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>
         // Create a c format array with the same size as poll
         let mut os_poll_fds: Vec<pollfd> = Vec::with_capacity(poll_fds.len());
         for fd in &poll_fds {
-            os_poll_fds.push(pollfd { fd: fd.fd, events: to_os_events(fd.events), revents: 0 });
+            os_poll_fds.push(pollfd {
+                fd: fd.fd as FdType,
+                events: to_os_events(fd.events),
+                revents: 0,
+            });
         }
 
-        #[cfg(target_os = "linux")]
-        let os_poll_fds_len = os_poll_fds.len() as u64;
-        #[cfg(target_os = "macos")]
-        let os_poll_fds_len = os_poll_fds.len() as u32;
         // SAFETY: we ensure that:
         //
         // `os_poll_fds` is a valid ptr to a vector of pollfd which
         // the `poll` system call can write into. Note `os_poll_fds`
         // is created and allocated above.
-        let poll_result =
-            unsafe { poll(os_poll_fds.as_mut_ptr(), os_poll_fds_len, timeout as i32) };
+        let poll_result = unsafe {
+            poll(os_poll_fds.as_mut_ptr(), os_poll_fds.len() as OsPollFdsLenType, timeout as i32)
+        };
 
         let mut slirp_poll_fds: Vec<PollFd> = Vec::with_capacity(poll_fds.len());
         for &fd in &os_poll_fds {
             slirp_poll_fds.push(PollFd {
-                fd: fd.fd,
+                fd: fd.fd as c_int,
                 events: to_slirp_events(fd.events),
                 revents: to_slirp_events(fd.revents) & to_slirp_events(fd.events),
             });
