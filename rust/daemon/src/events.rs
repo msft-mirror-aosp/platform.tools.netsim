@@ -19,10 +19,11 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::devices::chip::ChipIdentifier;
 use crate::devices::device::DeviceIdentifier;
-use netsim_proto::stats::NetsimRadioStats as ProtoRadioStats;
+use netsim_proto::stats::{
+    NetsimDeviceStats as ProtoDeviceStats, NetsimRadioStats as ProtoRadioStats,
+};
 
-use lazy_static::lazy_static;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 // Publish the event to all subscribers
 pub fn publish(event: Event) {
@@ -39,6 +40,7 @@ pub struct DeviceAdded {
     pub id: DeviceIdentifier,
     pub name: String,
     pub builtin: bool,
+    pub device_stats: ProtoDeviceStats,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -88,12 +90,10 @@ pub enum Event {
     ShutDown(ShutDown),
 }
 
-lazy_static! {
-    static ref EVENTS: Arc<Mutex<Events>> = Events::new();
-}
+static EVENTS: OnceLock<Arc<Mutex<Events>>> = OnceLock::new();
 
 pub fn get_events() -> Arc<Mutex<Events>> {
-    Arc::clone(&EVENTS)
+    EVENTS.get_or_init(Events::new).clone()
 }
 
 /// A multi-producer, multi-consumer broadcast queue based on
@@ -171,9 +171,11 @@ mod tests {
         let events_clone = Arc::clone(&events);
         let rx = events_clone.lock().unwrap().subscribe();
         let handle = thread::spawn(move || match rx.recv() {
-            Ok(Event::DeviceAdded(DeviceAdded { id, name, builtin: false })) => {
+            Ok(Event::DeviceAdded(DeviceAdded { id, name, builtin, device_stats })) => {
                 assert_eq!(id.0, 123);
                 assert_eq!(name, "Device1");
+                assert!(!builtin);
+                assert_eq!(device_stats, ProtoDeviceStats::new());
             }
             _ => panic!("Unexpected event"),
         });
@@ -182,6 +184,7 @@ mod tests {
             id: DeviceIdentifier(123),
             name: "Device1".into(),
             builtin: false,
+            device_stats: ProtoDeviceStats::new(),
         }));
 
         // Wait for the other thread to process the message.
@@ -198,9 +201,11 @@ mod tests {
             let events_clone = Arc::clone(&events);
             let rx = events_clone.lock().unwrap().subscribe();
             let handle = thread::spawn(move || match rx.recv() {
-                Ok(Event::DeviceAdded(DeviceAdded { id, name, builtin: false })) => {
+                Ok(Event::DeviceAdded(DeviceAdded { id, name, builtin, device_stats })) => {
                     assert_eq!(id.0, 123);
                     assert_eq!(name, "Device1");
+                    assert!(!builtin);
+                    assert_eq!(device_stats, ProtoDeviceStats::new());
                 }
                 _ => panic!("Unexpected event"),
             });
@@ -211,6 +216,7 @@ mod tests {
             id: DeviceIdentifier(123),
             name: "Device1".into(),
             builtin: false,
+            device_stats: ProtoDeviceStats::new(),
         }));
 
         // Wait for the other threads to process the message.
@@ -232,6 +238,7 @@ mod tests {
             id: DeviceIdentifier(123),
             name: "Device1".into(),
             builtin: false,
+            device_stats: ProtoDeviceStats::new(),
         }));
         assert_eq!(events.lock().unwrap().subscribers.len(), 0);
     }
