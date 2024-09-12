@@ -68,8 +68,17 @@ pub struct NetsimdArgs {
 
     /// Use libslirp-rs and disable qemu slirp.
     /// WARNING: This flag is for development purpose.
-    #[arg(long, default_value = "true")]
+    #[arg(long)]
     pub rust_slirp: bool,
+
+    /// Enables mDNS forwarding from the host to the guest, allowing discovery of services
+    /// running on the host from the guest.
+    ///
+    /// WARNING: This flag is intended for development purposes only.
+    /// LIMITATION: mDNS forwarding currently only work with a single emulator.
+    ///     mDNS resolution may fail if multiple emulators are running.
+    #[arg(long)]
+    pub mdns_forwarder: bool,
 
     /// Set the vsock port number to be listened by the frontend grpc server
     #[arg(short, long)]
