@@ -78,13 +78,13 @@ impl WifiManager {
         rx_ieee8023_response: mpsc::Receiver<Bytes>,
         rx_ieee80211_response: mpsc::Receiver<Bytes>,
         tx_ieee8023_response: mpsc::Sender<Bytes>,
-        mdns_forwarder: bool,
+        forward_host_mdns: bool,
     ) -> anyhow::Result<()> {
         self.start_request_thread(rx_request)?;
         self.start_response_thread(rx_response)?;
         self.start_ieee8023_response_thread(rx_ieee8023_response)?;
         self.start_ieee80211_response_thread(rx_ieee80211_response)?;
-        if mdns_forwarder {
+        if forward_host_mdns {
             self.start_mdns_forwarder_thread(tx_ieee8023_response)?;
         }
         Ok(())
@@ -301,7 +301,7 @@ pub fn wifi_start(
     config: &MessageField<WiFiConfig>,
     rust_slirp: bool,
     rust_hostapd: bool,
-    mdns_forwarder: bool,
+    forward_host_mdns: bool,
 ) {
     let (tx_request, rx_request) = mpsc::channel::<(u32, Bytes)>();
     let (tx_response, rx_response) = mpsc::channel::<Bytes>();
@@ -349,7 +349,7 @@ pub fn wifi_start(
         rx_ieee8023_response,
         rx_ieee80211_response,
         tx_ieee8023_response,
-        mdns_forwarder,
+        forward_host_mdns,
     ) {
         warn!("Failed to start Wi-Fi manager: {}", e);
     }
