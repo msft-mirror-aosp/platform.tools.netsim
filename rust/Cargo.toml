@@ -19,6 +19,7 @@ members = [
     "cli",
     "common",
     "daemon",
+    "http-proxy",
     "libslirp-rs",
     "hostapd-rs",
 ]

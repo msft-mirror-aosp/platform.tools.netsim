@@ -16,25 +16,31 @@
 use bytes::Bytes;
 #[cfg(not(feature = "cuttlefish"))]
 pub use hostapd_rs::hostapd::Hostapd;
+#[cfg(not(feature = "cuttlefish"))]
+use netsim_common::util::os_utils::get_discovery_directory;
 use netsim_proto::config::HostapdOptions as ProtoHostapdOptions;
 use std::sync::mpsc;
 
 // Provides a stub implementation while the hostapd-rs crate is not integrated into the aosp-main.
 #[cfg(feature = "cuttlefish")]
 pub struct Hostapd {}
+#[cfg(feature = "cuttlefish")]
+impl Hostapd {
+    pub fn input(&self, _bytes: Bytes) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
 
 #[cfg(not(feature = "cuttlefish"))]
-pub fn hostapd_run(_opt: ProtoHostapdOptions) -> anyhow::Result<(Hostapd, mpsc::Receiver<Bytes>)> {
-    let (tx, rx) = mpsc::channel();
-    let mut hostapd = Hostapd::new(tx, true);
-    hostapd.init();
+pub fn hostapd_run(_opt: ProtoHostapdOptions, tx: mpsc::Sender<Bytes>) -> anyhow::Result<Hostapd> {
+    // Create hostapd.conf under discovery directory
+    let config_path = get_discovery_directory().join("hostapd.conf");
+    let mut hostapd = Hostapd::new(tx, true, config_path);
     hostapd.run();
-    Ok((hostapd, rx))
+    Ok(hostapd)
 }
 
 #[cfg(feature = "cuttlefish")]
-pub fn hostapd_run(_opt: ProtoHostapdOptions) -> anyhow::Result<(Hostapd, mpsc::Receiver<Bytes>)> {
-    let hostapd = Hostapd {};
-    let (_, rx) = mpsc::channel();
-    Ok((hostapd, rx))
+pub fn hostapd_run(_opt: ProtoHostapdOptions, _tx: mpsc::Sender<Bytes>) -> anyhow::Result<Hostapd> {
+    Ok(Hostapd {})
 }

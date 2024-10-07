@@ -56,11 +56,6 @@ pub struct NetsimdArgs {
     #[arg(short, long)]
     pub dev: bool,
 
-    /// Disable Wi-Fi peer-to-peer features.
-    /// WARNING: This flag is for development purpose.
-    #[arg(long)]
-    pub disable_wifi_p2p: bool,
-
     /// Use Rust gRPC server.
     /// WARNING: This flag is for development purpose.
     #[arg(long)]
@@ -75,6 +70,14 @@ pub struct NetsimdArgs {
     /// WARNING: This flag is for development purpose.
     #[arg(long)]
     pub rust_slirp: bool,
+
+    /// Forwards mDNS from the host to the guest, allowing emulator to discover mDNS services running on the host.
+    ///
+    /// # Limitations
+    /// * Currently only supports a single emulator.
+    /// * May impact Wi-Fi connectivity between emulators.
+    #[arg(long, verbatim_doc_comment)]
+    pub forward_host_mdns: bool,
 
     /// Set the vsock port number to be listened by the frontend grpc server
     #[arg(short, long)]

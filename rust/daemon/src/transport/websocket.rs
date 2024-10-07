@@ -19,6 +19,7 @@ use bytes::Bytes;
 use http::Request;
 use log::{error, info, warn};
 use netsim_proto::common::ChipKind;
+use netsim_proto::startup::DeviceInfo as ProtoDeviceInfo;
 use tungstenite::{protocol::Role, Message, WebSocket};
 
 use crate::devices::chip;
@@ -95,7 +96,6 @@ pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) 
         name: Some(format!("websocket-{}", stream.peer_addr().unwrap())),
         manufacturer: "Google".to_string(),
         product_name: "Google".to_string(),
-        bt_properties: None,
     };
     #[cfg(not(test))]
     let wireless_create_params =
@@ -107,6 +107,7 @@ pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) 
     let wireless_create_params = wireless::CreateParam::Mock(wireless::mocked::CreateParams {
         chip_kind: ChipKind::BLUETOOTH,
     });
+    let device_info = ProtoDeviceInfo { kind: "WEBSOCKET".to_string(), ..Default::default() };
     // Add Chip
     let result = match add_chip(
         &stream.peer_addr().unwrap().port().to_string(),
@@ -115,6 +116,7 @@ pub fn run_websocket_transport(stream: TcpStream, queries: HashMap<&str, &str>) 
             .unwrap_or(&format!("websocket-device-{}", stream.peer_addr().unwrap()).as_str()),
         &chip_create_params,
         &wireless_create_params,
+        device_info,
     ) {
         Ok(chip_result) => chip_result,
         Err(err) => {

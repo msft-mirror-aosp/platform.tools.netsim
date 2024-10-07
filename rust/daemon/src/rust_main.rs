@@ -262,7 +262,6 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
         hci_port,
         instance_num,
         args.dev,
-        args.disable_wifi_p2p,
         args.vsock.unwrap_or_default(),
         args.rust_grpc,
     );
@@ -291,7 +290,12 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
 
     // Start radio facades
     wireless::bluetooth::bluetooth_start(&config.bluetooth, instance_num);
-    wireless::wifi::wifi_start(&config.wifi, args.rust_slirp, args.rust_hostapd);
+    wireless::wifi::wifi_start(
+        &config.wifi,
+        args.rust_slirp,
+        args.rust_hostapd,
+        args.forward_host_mdns,
+    );
     wireless::uwb::uwb_start();
 
     // Create test beacons if required
