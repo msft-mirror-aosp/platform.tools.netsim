@@ -326,7 +326,8 @@ struct PollFd {
 //
 // `slirp` must be a valid Slirp state returned by `slirp_new()`
 unsafe fn slirp_pollfds_fill(slirp: *mut libslirp_sys::Slirp, tx: &mpsc::Sender<PollRequest>) {
-    let mut timeout: u32 = 0;
+    // Timeout will be updated by slirp_pollfds_fill.
+    let mut timeout: u32 = u32::MAX;
     CONTEXT.with_borrow_mut(|c| c.as_mut().expect("cb").poll_fds.clear());
 
     // Call libslrip "C" library to fill poll information using
