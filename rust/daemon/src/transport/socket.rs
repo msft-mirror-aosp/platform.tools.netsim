@@ -62,7 +62,7 @@ pub fn run_socket_transport(hci_port: u16) {
 }
 
 fn accept_incoming(hci_port: u16) -> std::io::Result<()> {
-    let hci_socket = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, hci_port);
+    let hci_socket = SocketAddrV4::new(Ipv4Addr::LOCALHOST, hci_port);
     let listener = TcpListener::bind(hci_socket)?;
     info!("Hci socket server is listening on: {}", hci_port);
 
@@ -88,7 +88,6 @@ fn handle_hci_client(stream: TcpStream) {
         name: Some(format!("socket-{}", stream.peer_addr().unwrap())),
         manufacturer: "Google".to_string(),
         product_name: "Google".to_string(),
-        bt_properties: None,
     };
     #[cfg(not(test))]
     let wireless_create_params =
