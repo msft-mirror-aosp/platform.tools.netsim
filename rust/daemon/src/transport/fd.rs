@@ -153,7 +153,7 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
                 ChipKind::BLUETOOTH => {
                     wireless::CreateParam::Bluetooth(wireless::bluetooth::CreateParams {
                         address: chip.address.clone(),
-                        bt_properties: None,
+                        bt_properties: Some(chip.bt_properties.clone()),
                     })
                 }
                 ChipKind::WIFI => wireless::CreateParam::Wifi(wireless::wifi::CreateParams {}),
@@ -174,7 +174,6 @@ pub unsafe fn run_fd_transport(startup_json: &String) {
                 name: Some(chip.id.clone()),
                 manufacturer: chip.manufacturer.clone(),
                 product_name: chip.product_name.clone(),
-                bt_properties: None,
             };
             let result = match add_chip(
                 &format!("fd-device-{}", &device.name.clone()),
@@ -376,6 +375,7 @@ pub fn run_fd_connector(startup_json: &String, server: &str) -> Result<(), Strin
             initial_request.set_initial_info(ChipInfoProto {
                 name: device.name.clone(),
                 chip: MessageField::some(chip.clone()),
+                device_info: device.device_info.clone(),
                 ..Default::default()
             });
             ffi_transport::write_packet_request(
