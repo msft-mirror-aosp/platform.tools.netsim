@@ -14,35 +14,16 @@
 
 /// LibSlirp Interface for Network Simulation
 use bytes::Bytes;
-#[cfg(not(feature = "cuttlefish"))]
 pub use libslirp_rs::libslirp::LibSlirp;
-#[cfg(not(feature = "cuttlefish"))]
 use libslirp_rs::libslirp_config::SlirpConfig;
 use netsim_proto::config::SlirpOptions as ProtoSlirpOptions;
 use std::sync::mpsc;
 
-// Provides a stub implementation while the libslirp-rs crate is not integrated into the aosp-main.
-#[cfg(feature = "cuttlefish")]
-pub struct LibSlirp {}
-#[cfg(feature = "cuttlefish")]
-impl LibSlirp {
-    pub fn input(&self, _bytes: Bytes) {}
-}
-
-#[cfg(not(feature = "cuttlefish"))]
 pub fn slirp_run(
     _opt: ProtoSlirpOptions,
     tx_bytes: mpsc::Sender<Bytes>,
 ) -> anyhow::Result<LibSlirp> {
     // TODO: Convert ProtoSlirpOptions to SlirpConfig.
     let config = SlirpConfig { ..Default::default() };
-    Ok(LibSlirp::new(config, tx_bytes))
-}
-
-#[cfg(feature = "cuttlefish")]
-pub fn slirp_run(
-    _opt: ProtoSlirpOptions,
-    _tx_bytes: mpsc::Sender<Bytes>,
-) -> anyhow::Result<LibSlirp> {
-    Ok(LibSlirp {})
+    Ok(LibSlirp::new(config, tx_bytes, None))
 }
