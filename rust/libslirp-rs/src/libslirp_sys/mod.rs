@@ -158,13 +158,41 @@ impl Into<u32> for in_addr {
     }
 }
 
+mod net {
+    /// Converts a value from host byte order to network byte order.
+    #[inline]
+    pub fn htonl(hostlong: u32) -> u32 {
+        hostlong.to_be()
+    }
+
+    /// Converts a value from network byte order to host byte order.
+    #[inline]
+    pub fn ntohl(netlong: u32) -> u32 {
+        u32::from_be(netlong)
+    }
+
+    /// Converts a value from host byte order to network byte order.
+    #[inline]
+    pub fn htons(hostshort: u16) -> u16 {
+        hostshort.to_be()
+    }
+
+    /// Converts a value from network byte order to host byte order.
+    #[inline]
+    pub fn ntohs(netshort: u16) -> u16 {
+        u16::from_be(netshort)
+    }
+}
+
 impl From<Ipv4Addr> for in_addr {
     fn from(item: Ipv4Addr) -> Self {
         #[cfg(target_os = "windows")]
-        return in_addr { S_un: in_addr__bindgen_ty_1 { S_addr: item.into() } };
+        return in_addr {
+            S_un: in_addr__bindgen_ty_1 { S_addr: std::os::raw::c_ulong::to_be(item.into()) },
+        };
 
         #[cfg(any(target_os = "macos", target_os = "linux"))]
-        return in_addr { s_addr: item.into() };
+        return in_addr { s_addr: net::htonl(item.into()) };
     }
 }
 
@@ -212,7 +240,7 @@ impl From<SocketAddrV4> for sockaddr_in {
         return sockaddr_in {
             sin_len: 16u8,
             sin_family: AF_INET as u8,
-            sin_port: item.port(),
+            sin_port: net::htons(item.port()),
             sin_addr: (*item.ip()).into(),
             sin_zero: [0; 8],
         };
@@ -220,7 +248,7 @@ impl From<SocketAddrV4> for sockaddr_in {
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         return sockaddr_in {
             sin_family: AF_INET as u16,
-            sin_port: item.port(),
+            sin_port: net::htons(item.port()),
             sin_addr: (*item.ip()).into(),
             sin_zero: [0; 8],
         };
@@ -229,7 +257,10 @@ impl From<SocketAddrV4> for sockaddr_in {
 
 impl From<sockaddr_in> for SocketAddrV4 {
     fn from(item: sockaddr_in) -> Self {
-        SocketAddrV4::new(Ipv4Addr::from(Into::<u32>::into(item.sin_addr)), item.sin_port)
+        SocketAddrV4::new(
+            Ipv4Addr::from(net::ntohl(item.sin_addr.into())),
+            net::ntohs(item.sin_port),
+        )
     }
 }
 
@@ -238,16 +269,16 @@ impl From<sockaddr_in6> for SocketAddrV6 {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         return SocketAddrV6::new(
             Ipv6Addr::from(item.sin6_addr),
-            item.sin6_port,
-            item.sin6_flowinfo,
+            net::ntohs(item.sin6_port),
+            net::ntohl(item.sin6_flowinfo),
             item.sin6_scope_id,
         );
 
         #[cfg(target_os = "windows")]
         return SocketAddrV6::new(
             Ipv6Addr::from(item.sin6_addr),
-            item.sin6_port,
-            item.sin6_flowinfo,
+            net::ntohs(item.sin6_port),
+            net::ntohl(item.sin6_flowinfo),
             // SAFETY: This is safe because we are accessing a union
             // field where all fields have the same size.
             unsafe { item.__bindgen_anon_1.sin6_scope_id },
@@ -261,8 +292,8 @@ impl From<SocketAddrV6> for sockaddr_in6 {
         return sockaddr_in6 {
             sin6_addr: (*item.ip()).into(),
             sin6_family: AF_INET6 as u16,
-            sin6_port: item.port(),
-            sin6_flowinfo: item.flowinfo(),
+            sin6_port: net::htons(item.port()),
+            sin6_flowinfo: net::htonl(item.flowinfo()),
             __bindgen_anon_1: sockaddr_in6__bindgen_ty_1 { sin6_scope_id: item.scope_id() },
         };
 
@@ -270,8 +301,8 @@ impl From<SocketAddrV6> for sockaddr_in6 {
         return sockaddr_in6 {
             sin6_addr: (*item.ip()).into(),
             sin6_family: AF_INET6 as u8,
-            sin6_port: item.port(),
-            sin6_flowinfo: item.flowinfo(),
+            sin6_port: net::htons(item.port()),
+            sin6_flowinfo: net::htonl(item.flowinfo()),
             sin6_scope_id: item.scope_id(),
             sin6_len: 16,
         };
@@ -280,8 +311,8 @@ impl From<SocketAddrV6> for sockaddr_in6 {
         return sockaddr_in6 {
             sin6_addr: (*item.ip()).into(),
             sin6_family: AF_INET6 as u16,
-            sin6_port: item.port(),
-            sin6_flowinfo: item.flowinfo(),
+            sin6_port: net::htons(item.port()),
+            sin6_flowinfo: net::htonl(item.flowinfo()),
             sin6_scope_id: item.scope_id(),
         };
     }
@@ -290,6 +321,7 @@ impl From<SocketAddrV6> for sockaddr_in6 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem;
 
     // This tests a bidirectional conversion between sockaddr_storage
     // and SocketAddr
@@ -311,5 +343,59 @@ mod tests {
         let sockaddr_from_storage: SocketAddr = storage.into();
 
         assert_eq!(sockaddr, sockaddr_from_storage);
+    }
+
+    #[test]
+    fn test_sockaddr_v6() {
+        let sockaddr = SocketAddrV6::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8).into(), 8080, 1, 2);
+        let in_v6: sockaddr_in6 = sockaddr.into();
+
+        // Pointer to the sockaddr_in6 ip address raw octets
+        // SAFETY: this is safe because `sin6_addr` is type `in6_addr.`
+        let in_v6_ip_octets = unsafe {
+            std::slice::from_raw_parts(
+                &in_v6.sin6_addr as *const _ as *const u8,
+                mem::size_of::<in6_addr>(),
+            )
+        };
+        // Host order port and flowinfo
+        let in_v6_port = net::ntohs(in_v6.sin6_port);
+        let in_v6_flowinfo = net::ntohl(in_v6.sin6_flowinfo);
+
+        // Compare ip, port, flowinfo after conversion from SocketAddrV6 -> sockaddr_in6
+        assert_eq!(sockaddr.port(), in_v6_port);
+        assert_eq!(sockaddr.ip().octets(), in_v6_ip_octets);
+        assert_eq!(sockaddr.flowinfo(), in_v6_flowinfo);
+
+        // Effectively compares ip, port, flowinfo after conversion
+        // from sockaddr_in6 -> SocketAddrV6
+        let sockaddr_from: SocketAddrV6 = in_v6.into();
+        assert_eq!(sockaddr, sockaddr_from);
+    }
+
+    #[test]
+    fn test_sockaddr_v4() {
+        let sockaddr = SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8080);
+        let in_v4: sockaddr_in = sockaddr.into();
+
+        // Pointer to the sockaddr_in ip address raw octets
+        // SAFETY: this is safe because `sin_addr` is type `in_addr.`
+        let in_v4_ip_octets = unsafe {
+            std::slice::from_raw_parts(
+                &in_v4.sin_addr as *const _ as *const u8,
+                mem::size_of::<in_addr>(),
+            )
+        };
+        // Host order port
+        let in_v4_port = net::ntohs(in_v4.sin_port);
+
+        // Compare ip and port after conversion from SocketAddrV4 -> sockaddr_in
+        assert_eq!(sockaddr.port(), in_v4_port);
+        assert_eq!(sockaddr.ip().octets(), in_v4_ip_octets);
+
+        // Effectively compares ip and port after conversion from
+        // sockaddr_in -> SocketAddrV4
+        let sockaddr_from: SocketAddrV4 = in_v4.into();
+        assert_eq!(sockaddr, sockaddr_from);
     }
 }
