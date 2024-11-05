@@ -62,23 +62,21 @@ pub struct NetsimdArgs {
     pub rust_grpc: bool,
 
     /// Use hostapd-rs and disable c++ hostapd.
-    /// WARNING: This flag is for development purpose.
-    #[arg(long)]
+    #[arg(long, default_value = "true")]
     pub rust_hostapd: bool,
 
     /// Use libslirp-rs and disable qemu slirp.
     /// WARNING: This flag is for development purpose.
-    #[arg(long)]
+    #[arg(long, default_value = "true")]
     pub rust_slirp: bool,
 
-    /// Enables mDNS forwarding from the host to the guest, allowing discovery of services
-    /// running on the host from the guest.
+    /// Forwards mDNS from the host to the guest, allowing emulator to discover mDNS services running on the host.
     ///
-    /// WARNING: This flag is intended for development purposes only.
-    /// LIMITATION: mDNS forwarding currently only work with a single emulator.
-    ///     mDNS resolution may fail if multiple emulators are running.
-    #[arg(long)]
-    pub mdns_forwarder: bool,
+    /// # Limitations
+    /// * Currently only supports a single emulator.
+    /// * May impact Wi-Fi connectivity between emulators.
+    #[arg(long, verbatim_doc_comment)]
+    pub forward_host_mdns: bool,
 
     /// Set the vsock port number to be listened by the frontend grpc server
     #[arg(short, long)]

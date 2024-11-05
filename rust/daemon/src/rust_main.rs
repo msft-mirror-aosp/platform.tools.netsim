@@ -254,6 +254,11 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
             host_dns;
     }
 
+    if let Some(http_proxy) = args.http_proxy {
+        config.wifi.mut_or_insert_default().slirp_options.mut_or_insert_default().http_proxy =
+            http_proxy;
+    }
+
     let service_params = ServiceParams::new(
         fd_startup_str,
         args.no_cli_ui,
@@ -294,7 +299,7 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
         &config.wifi,
         args.rust_slirp,
         args.rust_hostapd,
-        args.mdns_forwarder,
+        args.forward_host_mdns,
     );
     wireless::uwb::uwb_start();
 
