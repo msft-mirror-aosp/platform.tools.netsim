@@ -14,35 +14,34 @@
 
 /// LibSlirp Interface for Network Simulation
 use bytes::Bytes;
-#[cfg(not(feature = "cuttlefish"))]
+use http_proxy::{Manager, ProxyConfig};
 pub use libslirp_rs::libslirp::LibSlirp;
-#[cfg(not(feature = "cuttlefish"))]
-use libslirp_rs::libslirp_config::SlirpConfig;
+use libslirp_rs::libslirp::ProxyManager;
+use libslirp_rs::libslirp_config::{lookup_host_dns, SlirpConfig};
 use netsim_proto::config::SlirpOptions as ProtoSlirpOptions;
 use std::sync::mpsc;
+use tokio::runtime::Runtime;
 
-// Provides a stub implementation while the libslirp-rs crate is not integrated into the aosp-main.
-#[cfg(feature = "cuttlefish")]
-pub struct LibSlirp {}
-#[cfg(feature = "cuttlefish")]
-impl LibSlirp {
-    pub fn input(&self, _bytes: Bytes) {}
-}
-
-#[cfg(not(feature = "cuttlefish"))]
 pub fn slirp_run(
-    _opt: ProtoSlirpOptions,
+    opt: ProtoSlirpOptions,
     tx_bytes: mpsc::Sender<Bytes>,
 ) -> anyhow::Result<LibSlirp> {
     // TODO: Convert ProtoSlirpOptions to SlirpConfig.
-    let config = SlirpConfig { ..Default::default() };
-    Ok(LibSlirp::new(config, tx_bytes))
-}
+    let http_proxy = Some(opt.http_proxy).filter(|s| !s.is_empty());
+    let http_proxy_on = http_proxy.is_some();
+    let proxy_manager = if let Some(addr) = http_proxy {
+        let config = ProxyConfig::from_string(&addr)?;
+        Some(Box::new(Manager::new(config)) as Box<dyn ProxyManager + 'static>)
+    } else {
+        None
+    };
 
-#[cfg(feature = "cuttlefish")]
-pub fn slirp_run(
-    _opt: ProtoSlirpOptions,
-    _tx_bytes: mpsc::Sender<Bytes>,
-) -> anyhow::Result<LibSlirp> {
-    Ok(LibSlirp {})
+    let mut config = SlirpConfig { http_proxy_on, ..Default::default() };
+
+    if !opt.host_dns.is_empty() {
+        let rt = Runtime::new().unwrap();
+        config.host_dns = rt.block_on(lookup_host_dns(&opt.host_dns))?;
+    }
+
+    Ok(LibSlirp::new(config, tx_bytes, proxy_manager))
 }
