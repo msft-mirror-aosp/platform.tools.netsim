@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// # Http Proxy Rewriter
+
 #[cfg(test)]
 mod tests {
     use httparse::Header;

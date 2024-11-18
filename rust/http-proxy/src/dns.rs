@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module parses DNS response records and extracts fully
-//! qualified domain names (FQDNs) along with their corresponding
-//! Socket Addresses (SockAddr).
-//!
-//! **Note:** This is not a general-purpose DNS response parser. It is
-//! designed to handle specific record types and response formats.
+// This module parses DNS response records and extracts fully
+// qualified domain names (FQDNs) along with their corresponding
+// Socket Addresses (SockAddr).
+//
+// **Note:** This is not a general-purpose DNS response parser. It is
+// designed to handle specific record types and response formats.
 
 use std::convert::TryFrom;
 use std::fmt;
