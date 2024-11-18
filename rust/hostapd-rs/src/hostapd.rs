@@ -302,7 +302,7 @@ impl Hostapd {
                 panic!("CString::new error on config file path: {}", config_path)
             }),
         );
-        let mut argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
+        let argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
         let argc = argv.len() as c_int;
         // Safety: we ensure that argc is length of argv and argv.as_ptr() is a valid pointer of hostapd args
         unsafe { run_hostapd_main(argc, argv.as_ptr()) };
