@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use httparse;
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use httparse::Header;
 
     #[test]
