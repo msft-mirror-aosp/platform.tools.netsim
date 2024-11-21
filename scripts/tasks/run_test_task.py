@@ -44,6 +44,6 @@ class RunTestTask(Task):
         "netsim-common",
         "netsim-packets",
     ]:
-      cmd = [script, package, str(self.out), rust_version(), clang_version()]
+      cmd = [script, package, str(self.out), rust_version()]
       run(cmd, self.env, f"{package}_unit_tests")
     return True
