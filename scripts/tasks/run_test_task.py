@@ -31,6 +31,31 @@ class RunTestTask(Task):
     self.env = env
 
   def do_run(self):
+    # TODO(b/379745416): Support clippy for Mac and Windows
+    if platform.system() == "Linux":
+      # Set Clippy flags
+      clippy_flags = [
+          "-A clippy::disallowed_names",
+          "-A clippy::type-complexity",
+          "-A clippy::unnecessary-wraps",
+          "-A clippy::unusual-byte-groupings",
+          "-A clippy::upper-case-acronyms",
+          "-W clippy::undocumented_unsafe_blocks",
+          "-W clippy::cognitive-complexity",
+      ]
+      # Run cargo clippy
+      run(
+          [
+              AOSP_ROOT / "tools" / "netsim" / "scripts" / "cargo_clippy.sh",
+              str(self.out),
+              rust_version(),
+              " ".join(clippy_flags),
+          ],
+          self.env,
+          "clippy",
+      )
+
+    # Set script for cargo Test
     if platform.system() == "Windows":
       script = AOSP_ROOT / "tools" / "netsim" / "scripts" / "cargo_test.cmd"
     else:
