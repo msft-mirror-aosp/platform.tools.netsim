@@ -14,12 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 from pathlib import Path
 import platform
 
 from tasks.task import Task
-from utils import (AOSP_ROOT, clang_version, run, rust_version)
+from utils import (AOSP_ROOT, run, rust_version)
 
 
 class RunTestTask(Task):
