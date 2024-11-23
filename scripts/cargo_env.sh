@@ -33,6 +33,7 @@ OS=$(uname | tr '[:upper:]' '[:lower:]')
 # Set environment variables
 export CARGO_HOME=$OUT_PATH/rust/.cargo
 export OBJS_PATH=$OUT_PATH
+export GRPCIO_SYS_GRPC_INCLUDE_PATH=$REPO/external/grpc/include
 
 # Paths to pdl generated packets files
 ROOTCANAL_PDL_PATH=$OUT_PATH/rootcanal/pdl_gen
