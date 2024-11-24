@@ -43,6 +43,7 @@ class RunTestTask(Task):
         "http-proxy",
         "netsim-common",
         "netsim-packets",
+        "capture",
     ]:
       cmd = [script, package, str(self.out), rust_version(), clang_version()]
       run(cmd, self.env, f"{package}_unit_tests")
