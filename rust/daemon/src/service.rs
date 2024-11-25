@@ -102,7 +102,11 @@ impl Service {
             env::var("NETSIM_GRPC_PORT").map(|val| val.parse::<u32>().unwrap_or(0)).unwrap_or(0);
         if self.service_params.rust_grpc {
             // Run netsim gRPC server
-            let (server, port) = crate::grpc_server::server::start(netsim_grpc_port)?;
+            let (server, port) = crate::grpc_server::server::start(
+                netsim_grpc_port,
+                self.service_params.no_cli_ui,
+                self.service_params.vsock,
+            )?;
             self.rust_grpc_server = Some(server);
             netsim_grpc_port = port.into();
         } else {

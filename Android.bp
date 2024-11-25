@@ -70,6 +70,7 @@ rust_defaults {
         "libfutures_util",
         "libglam",
         "libgrpcio",
+        "liblibc",
         "libnetsim_proto",
         "libhttp",
         "libnetsim_common",
