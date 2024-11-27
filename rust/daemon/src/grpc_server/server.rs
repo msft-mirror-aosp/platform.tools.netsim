@@ -22,7 +22,7 @@ use netsim_proto::frontend_grpc::create_frontend_service;
 use netsim_proto::packet_streamer_grpc::create_packet_streamer;
 use std::sync::Arc;
 
-pub fn start(port: u32, no_cli_ui: bool, vsock: u16) -> anyhow::Result<(Server, u16)> {
+pub fn start(port: u32, no_cli_ui: bool, _vsock: u16) -> anyhow::Result<(Server, u16)> {
     let env = Arc::new(Environment::new(1));
     let backend_service = create_packet_streamer(PacketStreamerService);
     let frontend_service = create_frontend_service(FrontendClient);
@@ -45,8 +45,8 @@ pub fn start(port: u32, no_cli_ui: bool, vsock: u16) -> anyhow::Result<(Server, 
     })?;
 
     #[cfg(feature = "cuttlefish")]
-    if vsock != 0 {
-        let vsock_uri = format!("vsock:{}:{}", libc::VMADDR_CID_ANY, vsock);
+    if _vsock != 0 {
+        let vsock_uri = format!("vsock:{}:{}", libc::VMADDR_CID_ANY, _vsock);
         info!("vsock_uri: {}", vsock_uri);
         server.add_listening_port(vsock_uri, ServerCredentials::insecure())?;
     }
