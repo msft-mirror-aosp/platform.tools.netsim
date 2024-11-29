@@ -68,6 +68,7 @@ class RunTestTask(Task):
         "netsim-common",
         "netsim-daemon",
         "netsim-packets",
+        "capture",
     ]:
       # TODO(b/379708365): Resolve netsim-daemon test for Mac & Windows
       if package == "netsim-daemon" and platform.system() != "Linux":
