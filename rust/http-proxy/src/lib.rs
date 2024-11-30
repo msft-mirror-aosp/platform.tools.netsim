@@ -53,6 +53,7 @@ mod connector;
 mod dns;
 mod error;
 mod manager;
+mod pattern_vec;
 mod rewriter;
 mod util;
 
