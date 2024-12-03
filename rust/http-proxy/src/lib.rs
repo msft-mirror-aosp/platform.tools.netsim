@@ -54,6 +54,7 @@ mod dns;
 mod dns_manager;
 mod error;
 mod manager;
+mod pattern_vec;
 mod rewriter;
 mod util;
 
