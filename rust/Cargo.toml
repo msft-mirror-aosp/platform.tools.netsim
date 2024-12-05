@@ -22,5 +22,6 @@ members = [
     "libslirp-rs",
     "hostapd-rs",
     "packets",
+    "capture",
 ]
 resolver = "2"
