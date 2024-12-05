@@ -30,7 +30,6 @@ use crate::devices::devices_handler::{
 use crate::ranging::*;
 use crate::transport::grpc::{register_grpc_transport, unregister_grpc_transport};
 use crate::version::*;
-use crate::wireless::wifi::handle_wifi_response;
 use crate::wireless::{
     bluetooth::report_invalid_packet_cxx, handle_request_cxx, handle_response_cxx,
 };
@@ -65,26 +64,6 @@ pub mod ffi_transport {
         #[rust_name = handle_grpc_response]
         #[namespace = "netsim::backend"]
         fn HandleResponseCxx(chip_id: u32, packet: &Vec<u8>, packet_type: u8);
-
-        include!("core/server.h");
-
-        #[namespace = "netsim::server"]
-        type GrpcServer;
-        #[rust_name = shut_down]
-        #[namespace = "netsim::server"]
-        fn Shutdown(self: &GrpcServer);
-
-        #[rust_name = get_grpc_port]
-        #[namespace = "netsim::server"]
-        fn GetGrpcPort(self: &GrpcServer) -> u32;
-
-        #[rust_name = run_grpc_server_cxx]
-        #[namespace = "netsim::server"]
-        pub fn RunGrpcServerCxx(
-            netsim_grpc_port: u32,
-            no_cli_ui: bool,
-            vsock: u16,
-        ) -> UniquePtr<GrpcServer>;
 
         // Grpc client.
         // Expose functions in Cuttlefish only, because it's only used by CVDs and it's
@@ -243,45 +222,6 @@ pub mod ffi_bluetooth {
     }
 }
 
-#[cxx::bridge(namespace = "netsim::wifi::facade")]
-pub mod ffi_wifi {
-    #[allow(dead_code)]
-    unsafe extern "C++" {
-        // WiFi facade.
-        include!("wifi/wifi_packet_hub.h");
-
-        #[rust_name = handle_wifi_request]
-        #[namespace = "netsim::wifi"]
-        fn HandleWifiRequestCxx(packet: &Vec<u8>);
-
-        #[rust_name = hostapd_send]
-        #[namespace = "netsim::wifi"]
-        fn HostapdSendCxx(packet: &Vec<u8>);
-
-        #[rust_name = libslirp_send]
-        #[namespace = "netsim::wifi"]
-        fn LibslirpSendCxx(packet: &Vec<u8>);
-
-        #[namespace = "netsim::wifi"]
-        pub fn libslirp_main_loop_wait();
-
-        include!("wifi/wifi_facade.h");
-
-        #[rust_name = wifi_start]
-        pub fn Start(proto_bytes: &[u8]);
-
-        #[rust_name = wifi_stop]
-        pub fn Stop();
-
-    }
-
-    #[allow(unsafe_op_in_unsafe_fn)]
-    extern "Rust" {
-        #[cxx_name = HandleWiFiResponse]
-        fn handle_wifi_response(packet: &[u8]);
-    }
-}
-
 #[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim::device")]
@@ -392,14 +332,6 @@ pub mod ffi_util {
         #[rust_name = set_up_crash_report]
         #[namespace = "netsim"]
         pub fn SetUpCrashReport();
-
-        // Frontend client.
-        include!("frontend/frontend_client_stub.h");
-
-        #[rust_name = is_netsimd_alive]
-        #[namespace = "netsim::frontend"]
-        pub fn IsNetsimdAlive(instance_num: u16) -> bool;
-
     }
 }
 
