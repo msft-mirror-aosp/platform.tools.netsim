@@ -22,15 +22,15 @@ use std::net::SocketAddr;
 #[derive(Debug)]
 pub enum Error {
     IoError(io::Error),
-    ConnectionError(SocketAddr),
+    ConnectionError(SocketAddr, String),
+    MalformedConfigString,
+    InvalidPortNumber,
+    InvalidHost,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::IoError(err) => write!(f, "I/O error: {}", err),
-            Error::ConnectionError(addr) => write!(f, "Failed to connect to {}", addr),
-        }
+        write!(f, "ProxyError: {self:?}")
     }
 }
 
