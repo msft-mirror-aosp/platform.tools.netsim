@@ -332,14 +332,6 @@ pub mod ffi_util {
         #[rust_name = set_up_crash_report]
         #[namespace = "netsim"]
         pub fn SetUpCrashReport();
-
-        // Frontend client.
-        include!("frontend/frontend_client_stub.h");
-
-        #[rust_name = is_netsimd_alive]
-        #[namespace = "netsim::frontend"]
-        pub fn IsNetsimdAlive(instance_num: u16) -> bool;
-
     }
 }
 
