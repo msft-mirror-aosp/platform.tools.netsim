@@ -17,25 +17,17 @@
 REPO=$(dirname "$0")/../../..
 
 # Get the Rust version, package, and objs path from arguments
-RUST_VERSION="$1"
-RUST_PKG="$2"
-OUT_PATH="$3"
+RUST_PKG="$1"
+OUT_PATH="$2"
+RUST_VERSION="$3"
 
 # The possible values are "linux" and "darwin".
 OS=$(uname | tr '[:upper:]' '[:lower:]')
 
-# Set environment variables
-export CARGO_HOME=$OUT_PATH/rust/.cargo
-export OBJS_PATH=$OUT_PATH
+source $REPO/tools/netsim/scripts/cargo_env.sh $OUT_PATH
 
 # Build the package
 ninja -C $OUT_PATH $RUST_PKG
-
-if [[ "$OS" == "darwin" ]]; then
-  export DYLD_FALLBACK_LIBRARY_PATH=$OUT_PATH/lib64
-else
-  export LD_LIBRARY_PATH=$OUT_PATH/lib64
-fi
 
 # Run the cargo command
 # TODO(360874898): prebuilt rust toolchain for darwin-aarch64 is supported from 1.77.1

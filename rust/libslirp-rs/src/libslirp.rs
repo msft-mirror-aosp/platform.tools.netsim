@@ -12,27 +12,93 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! # This module provides a safe Rust wrapper for the libslirp library.
+
+//! It allows to embed a virtual network stack within your Rust applications.
+//!
+//! ## Features
+//!
+//! * **Safe API:**  Wraps the libslirp C API in a safe and idiomatic Rust interface.
+//! * **Networking:**  Provides functionality for virtual networking, including TCP/IP, UDP, and ICMP.
+//! * **Proxy Support:**  Allows integration with proxy managers for handling external connections.
+//! * **Threading:**  Handles communication between the Rust application and the libslirp event loop.
+//!
+//! ## Usage
+//!
+//! ```
+//! use bytes::Bytes;
+//! use libslirp_rs::libslirp_config::SlirpConfig;
+//! use libslirp_rs::libslirp::LibSlirp;
+//! use std::net::Ipv4Addr;
+//! use std::sync::mpsc;
+//!
+//! let (tx_cmds, _) = mpsc::channel();
+//! // Create a LibSlirp instance with default configuration
+//! let libslirp = LibSlirp::new(
+//!     SlirpConfig::default(),
+//!     tx_cmds,
+//!     None
+//! );
+//!
+//! let data = vec![0x01, 0x02, 0x03];
+//! // Input network data into libslirp
+//! libslirp.input(Bytes::from(data));
+//!
+//! // ... other operations ...
+//!
+//! // Shutdown libslirp
+//! libslirp.shutdown();
+//! ```
+//!
+//! ## Example with Proxy
+//!
+//! ```
+//! use libslirp_rs::libslirp::LibSlirp;
+//! use libslirp_rs::libslirp_config::SlirpConfig;
+//! use libslirp_rs::libslirp::{ProxyManager, ProxyConnect};
+//! use std::sync::mpsc;
+//! use std::net::SocketAddr;
+//! // Implement the ProxyManager trait for your proxy logic
+//! struct MyProxyManager;
+//!
+//! impl ProxyManager for MyProxyManager {
+//!     // ... implementation ...
+//!     fn try_connect(
+//!         &self,
+//!         sockaddr: SocketAddr,
+//!         connect_id: usize,
+//!         connect_func: Box<dyn ProxyConnect + Send>,
+//!     ) -> bool {
+//!         todo!()
+//!     }
+//!     fn remove(&self, connect_id: usize) {
+//!         todo!()
+//!     }
+//! }
+//! let (tx_cmds, _) = mpsc::channel();
+//! // Create a LibSlirp instance with a proxy manager
+//! let libslirp = LibSlirp::new(
+//!     SlirpConfig::default(),
+//!     tx_cmds,
+//!     Some(Box::new(MyProxyManager)),
+//! );
+//!
+//! // ...
+//! ```
+//!
+//! This module abstracts away the complexities of interacting with the libslirp C library,
+//! providing a more convenient and reliable way to use it in your Rust projects.
+
 use crate::libslirp_config;
 use crate::libslirp_config::SlirpConfigs;
 use crate::libslirp_sys;
-///
-/// This crate is a wrapper for libslirp C library.
-///
-/// All calls into libslirp are routed to and handled by a dedicated
-/// thread.
-///
-/// Rust struct LibslirpConfig for conversion between Rust and C types
-/// (IpV4Addr, SocketAddrV4, etc.).
-///
-/// Callbacks for libslirp send_packet are delivered on Channel.
-///
+
 use bytes::Bytes;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use log::{debug, info, warn};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CStr};
-use std::io;
 use std::mem::ManuallyDrop;
 use std::net::SocketAddr;
 use std::rc::Rc;
@@ -42,6 +108,8 @@ use std::time::Duration;
 use std::time::Instant;
 
 type TimerOpaque = usize;
+
+const TIMEOUT_SECS: u64 = 1;
 
 struct TimerManager {
     clock: RefCell<Instant>,
@@ -57,35 +125,41 @@ struct Timer {
 }
 
 // The operations performed on the slirp thread
-
+#[derive(Debug)]
 enum SlirpCmd {
     Input(Bytes),
     PollResult(Vec<PollFd>, c_int),
     TimerModified,
     Shutdown,
-    ProxyConnect(libslirp_sys::SlirpProxyConnectFunc, usize, c_int, c_int),
+    ProxyConnect(libslirp_sys::SlirpProxyConnectFunc, usize, i32, i32),
 }
 
 /// Alias for io::fd::RawFd on Unix or RawSocket on Windows (converted to i32)
 pub type RawFd = i32;
 
-// HTTP Proxy callback trait
-pub trait ProxyConnector: Send {
-    fn connect(&self, sockaddr: SocketAddr) -> Result<RawFd, io::Error>;
+/// HTTP Proxy callback trait
+pub trait ProxyManager: Send {
+    fn try_connect(
+        &self,
+        sockaddr: SocketAddr,
+        connect_id: usize,
+        connect_func: Box<dyn ProxyConnect + Send>,
+    ) -> bool;
+    fn remove(&self, connect_id: usize);
 }
 
 struct CallbackContext {
     tx_bytes: mpsc::Sender<Bytes>,
     tx_cmds: mpsc::Sender<SlirpCmd>,
     poll_fds: Rc<RefCell<Vec<PollFd>>>,
-    proxy_connector: Option<Box<dyn ProxyConnector>>,
+    proxy_manager: Option<Box<dyn ProxyManager>>,
     timer_manager: Rc<TimerManager>,
 }
 
 // A poll thread request has a poll_fds and a timeout
 type PollRequest = (Vec<PollFd>, u32);
 
-// API to LibSlirp
+/// API to LibSlirp
 
 pub struct LibSlirp {
     tx_cmds: mpsc::Sender<SlirpCmd>,
@@ -148,7 +222,7 @@ impl LibSlirp {
     pub fn new(
         config: libslirp_config::SlirpConfig,
         tx_bytes: mpsc::Sender<Bytes>,
-        proxy_connector: Option<Box<dyn ProxyConnector>>,
+        proxy_manager: Option<Box<dyn ProxyManager>>,
     ) -> LibSlirp {
         let (tx_cmds, rx_cmds) = mpsc::channel::<SlirpCmd>();
         let (tx_poll, rx_poll) = mpsc::channel::<PollRequest>();
@@ -165,7 +239,7 @@ impl LibSlirp {
         let tx_cmds_slirp = tx_cmds.clone();
         // Create channels for command processor thread and launch
         if let Err(e) = thread::Builder::new().name("slirp".to_string()).spawn(move || {
-            slirp_thread(config, tx_bytes, tx_cmds_slirp, rx_cmds, tx_poll, proxy_connector)
+            slirp_thread(config, tx_bytes, tx_cmds_slirp, rx_cmds, tx_poll, proxy_manager)
         }) {
             warn!("Failed to start slirp thread: {}", e);
         }
@@ -183,6 +257,37 @@ impl LibSlirp {
         if let Err(e) = self.tx_cmds.send(SlirpCmd::Input(bytes)) {
             warn!("Failed to send Input cmd: {}", e);
         }
+    }
+}
+
+struct ConnectRequest {
+    tx_cmds: mpsc::Sender<SlirpCmd>,
+    connect_func: libslirp_sys::SlirpProxyConnectFunc,
+    connect_id: usize,
+    af: i32,
+    start: Instant,
+}
+
+pub trait ProxyConnect: Send {
+    fn proxy_connect(&self, fd: i32, addr: SocketAddr);
+}
+
+impl ProxyConnect for ConnectRequest {
+    fn proxy_connect(&self, fd: i32, addr: SocketAddr) {
+        // Send it to Slirp after try_connect() completed
+        let duration = self.start.elapsed().as_secs();
+        if duration > TIMEOUT_SECS {
+            warn!(
+                "ConnectRequest for connection ID {} to {} took too long: {:?}",
+                self.connect_id, addr, duration
+            );
+        }
+        let _ = self.tx_cmds.send(SlirpCmd::ProxyConnect(
+            self.connect_func,
+            self.connect_id,
+            fd,
+            self.af,
+        ));
     }
 }
 
@@ -227,9 +332,9 @@ impl Slirp {
             unregister_poll_fd: Some(unregister_poll_fd_cb),
             notify: Some(notify_cb),
             init_completed: Some(init_completed_cb),
-            remove: None,
             timer_new_opaque: Some(timer_new_opaque_cb),
             try_connect: Some(try_connect_cb),
+            remove: Some(remove_cb),
         });
         let configs = Box::new(SlirpConfigs::new(&config));
 
@@ -292,7 +397,7 @@ fn slirp_thread(
     tx_cmds: mpsc::Sender<SlirpCmd>,
     rx: mpsc::Receiver<SlirpCmd>,
     tx_poll: mpsc::Sender<PollRequest>,
-    proxy_connector: Option<Box<dyn ProxyConnector>>,
+    proxy_manager: Option<Box<dyn ProxyManager>>,
 ) {
     // Data structures wrapped in an RC are referenced through the
     // libslirp callbacks and this code (both in the same thread).
@@ -309,7 +414,7 @@ fn slirp_thread(
         tx_bytes,
         tx_cmds,
         poll_fds: poll_fds.clone(),
-        proxy_connector,
+        proxy_manager,
         timer_manager: timer_manager.clone(),
     });
 
@@ -319,7 +424,11 @@ fn slirp_thread(
 
     let min_duration = timer_manager.min_duration();
     loop {
-        match rx.recv_timeout(min_duration) {
+        let command = rx.recv_timeout(min_duration);
+        let start = Instant::now();
+
+        let cmd_str = format!("{:?}", command);
+        match command {
             // The dance to tell libslirp which FDs have IO ready
             // starts with a response from a worker thread sending a
             // PollResult, followed by pollfds_poll forwarding the FDs
@@ -345,8 +454,8 @@ fn slirp_thread(
             // Parameter `fd` will be >= 0 and the descriptor for the
             // active socket to use, `af` will be either AF_INET or
             // AF_INET6. On failure `fd` will be negative.
-            Ok(SlirpCmd::ProxyConnect(func, connect_opaque, fd, af)) => match func {
-                Some(func) => unsafe { func(connect_opaque as *mut c_void, fd, af) },
+            Ok(SlirpCmd::ProxyConnect(func, connect_id, fd, af)) => match func {
+                Some(func) => unsafe { func(connect_id as *mut c_void, fd as c_int, af as c_int) },
                 None => warn!("Proxy connect function not found"),
             },
 
@@ -362,6 +471,10 @@ fn slirp_thread(
         // Handle any expired timers' callback in the slirp thread
         for timer in timers {
             slirp.handle_timer(timer);
+        }
+        let duration = start.elapsed().as_secs();
+        if duration > TIMEOUT_SECS {
+            warn!("libslirp command '{cmd_str}' took too long to complete: {duration:?}");
         }
     }
     // Shuts down the instance of a slirp stack and release slirp storage. No callbacks
@@ -595,14 +708,44 @@ fn slirp_poll_thread(rx: mpsc::Receiver<PollRequest>, tx: mpsc::Sender<SlirpCmd>
             });
         }
 
-        // SAFETY: we ensure that:
-        //
-        // `os_poll_fds` is a valid ptr to a vector of pollfd which
-        // the `poll` system call can write into. Note `os_poll_fds`
-        // is created and allocated above.
-        let poll_result = unsafe {
-            poll(os_poll_fds.as_mut_ptr(), os_poll_fds.len() as OsPollFdsLenType, timeout as i32)
-        };
+        let mut poll_result = 0;
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        {
+            // SAFETY: we ensure that:
+            //
+            // `os_poll_fds` is a valid ptr to a vector of pollfd which
+            // the `poll` system call can write into. Note `os_poll_fds`
+            // is created and allocated above.
+            poll_result = unsafe {
+                poll(
+                    os_poll_fds.as_mut_ptr(),
+                    os_poll_fds.len() as OsPollFdsLenType,
+                    timeout as i32,
+                )
+            };
+        }
+        // WSAPoll requires an array of one or more POLLFD structures.
+        // When nfds == 0, WSAPoll returns immediately with result -1, ignoring the timeout.
+        // This is different from poll on Linux/macOS, which will wait for the timeout.
+        // Therefore, on Windows, we don't call WSAPoll when nfds == 0, and instead explicitly sleep for the timeout.
+        #[cfg(target_os = "windows")]
+        if os_poll_fds.is_empty() {
+            // If there are no FDs to poll, sleep for the specified timeout.
+            thread::sleep(Duration::from_millis(timeout as u64));
+        } else {
+            // SAFETY: we ensure that:
+            //
+            // `os_poll_fds` is a valid ptr to a vector of pollfd which
+            // the `poll` system call can write into. Note `os_poll_fds`
+            // is created and allocated above.
+            poll_result = unsafe {
+                poll(
+                    os_poll_fds.as_mut_ptr(),
+                    os_poll_fds.len() as OsPollFdsLenType,
+                    timeout as i32,
+                )
+            };
+        }
 
         let mut slirp_poll_fds: Vec<PollFd> = Vec::with_capacity(poll_fds.len());
         #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -809,30 +952,53 @@ extern "C" fn notify_cb(_opaque: *mut c_void) {
 unsafe extern "C" fn try_connect_cb(
     addr: *const libslirp_sys::sockaddr_storage,
     connect_func: libslirp_sys::SlirpProxyConnectFunc,
+    connect_opaque: *mut c_void,
     opaque: *mut c_void,
 ) -> bool {
-    unsafe { callback_context_from_raw(opaque) }.try_connect(addr, connect_func)
+    unsafe { callback_context_from_raw(opaque) }.try_connect(
+        addr,
+        connect_func,
+        connect_opaque as usize,
+    )
 }
 
 impl CallbackContext {
     fn try_connect(
         &self,
-        _addr: *const libslirp_sys::sockaddr_storage,
-        _connect_func: libslirp_sys::SlirpProxyConnectFunc,
+        addr: *const libslirp_sys::sockaddr_storage,
+        connect_func: libslirp_sys::SlirpProxyConnectFunc,
+        connect_id: usize,
     ) -> bool {
-        if let Some(_proxy_connector) = &self.proxy_connector {
-            // TODO: once sockaddr_storage.into() is available
-            // let addr = *addr;
-            // if let Ok(fd) = proxy_connector.connect(addr.into()) {
-            //   self.tx_cmds.send(SlirpCmd::ProxyConnect(
-            //     func,
-            //     connect_opaque as usize,
-            //     fd,
-            //     af);
-            // }
-            true
+        if let Some(proxy_manager) = &self.proxy_manager {
+            // SAFETY: We ensure that addr is valid when `try_connect` is called from libslirp
+            let storage = unsafe { *addr };
+            let af = storage.ss_family as i32;
+            let socket_addr: SocketAddr = storage.into();
+            proxy_manager.try_connect(
+                socket_addr,
+                connect_id,
+                Box::new(ConnectRequest {
+                    tx_cmds: self.tx_cmds.clone(),
+                    connect_func,
+                    connect_id,
+                    af,
+                    start: Instant::now(),
+                }),
+            )
         } else {
             false
+        }
+    }
+}
+
+unsafe extern "C" fn remove_cb(connect_opaque: *mut c_void, opaque: *mut c_void) {
+    unsafe { callback_context_from_raw(opaque) }.remove(connect_opaque as usize);
+}
+
+impl CallbackContext {
+    fn remove(&self, connect_id: usize) {
+        if let Some(proxy_connector) = &self.proxy_manager {
+            proxy_connector.remove(connect_id);
         }
     }
 }

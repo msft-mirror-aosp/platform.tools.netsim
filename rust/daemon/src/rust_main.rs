@@ -13,13 +13,16 @@
 // limitations under the License.
 
 use clap::Parser;
+use grpcio::{ChannelBuilder, Deadline, EnvBuilder};
 use log::warn;
 use log::{error, info};
 use netsim_common::system::netsimd_temp_dir;
 use netsim_common::util::os_utils::{
-    get_hci_port, get_instance, get_instance_name, redirect_std_stream, remove_netsim_ini,
+    get_hci_port, get_instance, get_instance_name, get_server_address, redirect_std_stream,
+    remove_netsim_ini,
 };
 use netsim_common::util::zip_artifact::zip_artifacts;
+use netsim_proto::frontend_grpc::FrontendServiceClient;
 
 use crate::captures::capture::spawn_capture_event_subscriber;
 use crate::config_file;
@@ -34,8 +37,6 @@ use netsim_common::util::netsim_logger;
 use crate::args::NetsimdArgs;
 use crate::ffi::ffi_util;
 use crate::service::{new_test_beacon, Service, ServiceParams};
-#[cfg(feature = "cuttlefish")]
-use netsim_common::util::os_utils::get_server_address;
 use netsim_proto::config::{Bluetooth as BluetoothConfig, Capture, Config};
 use std::env;
 use std::ffi::{c_char, c_int};
@@ -226,7 +227,7 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
         warn!("Warning: netsimd startup flag -s is empty, waiting for gRPC connections.");
     }
 
-    if ffi_util::is_netsimd_alive(instance_num) {
+    if is_netsimd_alive(instance_num) {
         warn!("Failed to start netsim daemon because a netsim daemon is already running");
         return;
     }
@@ -254,16 +255,19 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
             host_dns;
     }
 
+    if let Some(http_proxy) = args.http_proxy {
+        config.wifi.mut_or_insert_default().slirp_options.mut_or_insert_default().http_proxy =
+            http_proxy;
+    }
+
     let service_params = ServiceParams::new(
         fd_startup_str,
         args.no_cli_ui,
         args.no_web_ui,
-        config.capture.enabled.unwrap_or_default(),
         hci_port,
         instance_num,
         args.dev,
         args.vsock.unwrap_or_default(),
-        args.rust_grpc,
     );
 
     // SAFETY: The caller guaranteed that the file descriptors in `fd_startup_str` would remain
@@ -282,7 +286,8 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
     session.start(session_events_rx);
 
     // Pass all event receivers to each modules
-    spawn_capture_event_subscriber(capture_events_rx);
+    let capture = config.capture.enabled.unwrap_or_default();
+    spawn_capture_event_subscriber(capture_events_rx, capture);
 
     if !args.no_shutdown {
         spawn_shutdown_publisher(device_events_rx);
@@ -290,12 +295,7 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
 
     // Start radio facades
     wireless::bluetooth::bluetooth_start(&config.bluetooth, instance_num);
-    wireless::wifi::wifi_start(
-        &config.wifi,
-        args.rust_slirp,
-        args.rust_hostapd,
-        args.forward_host_mdns,
-    );
+    wireless::wifi::wifi_start(&config.wifi, args.forward_host_mdns);
     wireless::uwb::uwb_start();
 
     // Create test beacons if required
@@ -323,4 +323,18 @@ fn run_netsimd_primary(mut args: NetsimdArgs) {
 
     // Once shutdown is complete, delete the netsim ini file
     remove_netsim_ini(instance_num);
+}
+
+fn is_netsimd_alive(instance_num: u16) -> bool {
+    match get_server_address(instance_num) {
+        Some(address) => {
+            // Check if grpc server has started
+            let channel = ChannelBuilder::new(std::sync::Arc::new(EnvBuilder::new().build()))
+                .connect(&address);
+            let client = FrontendServiceClient::new(channel);
+            let deadline = Deadline::from(std::time::Duration::from_secs(1));
+            futures::executor::block_on(client.client.channel().wait_for_connected(deadline))
+        }
+        None => false,
+    }
 }
