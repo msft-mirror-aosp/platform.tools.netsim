@@ -14,23 +14,15 @@
 
 //! Netsim daemon cxx libraries.
 
-use std::pin::Pin;
-
 use crate::bluetooth::chip::{
     create_add_rust_device_result, AddRustDeviceResult, RustBluetoothChipCallbacks,
 };
-use crate::http_server::server_response::ServerResponseWritable;
-use crate::http_server::server_response::StrHeaders;
-use cxx::let_cxx_string;
 
-use crate::captures::captures_handler::handle_capture_cxx;
 use crate::devices::devices_handler::{
-    add_chip_cxx, get_distance_cxx, handle_device_cxx, remove_chip_cxx, AddChipResultCxx,
+    add_chip_cxx, get_distance_cxx, remove_chip_cxx, AddChipResultCxx,
 };
 use crate::ranging::*;
-use crate::transport::grpc::{register_grpc_transport, unregister_grpc_transport};
 use crate::version::*;
-use crate::wireless::wifi::handle_wifi_response;
 use crate::wireless::{
     bluetooth::report_invalid_packet_cxx, handle_request_cxx, handle_response_cxx,
 };
@@ -50,42 +42,7 @@ pub mod ffi_wireless {
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim::transport")]
 pub mod ffi_transport {
-    extern "Rust" {
-        #[cxx_name = RegisterGrpcTransport]
-        fn register_grpc_transport(chip_id: u32);
-
-        #[cxx_name = UnregisterGrpcTransport]
-        fn unregister_grpc_transport(chip_id: u32);
-    }
-
     unsafe extern "C++" {
-        // Grpc server.
-        include!("backend/backend_packet_hub.h");
-
-        #[rust_name = handle_grpc_response]
-        #[namespace = "netsim::backend"]
-        fn HandleResponseCxx(chip_id: u32, packet: &Vec<u8>, packet_type: u8);
-
-        include!("core/server.h");
-
-        #[namespace = "netsim::server"]
-        type GrpcServer;
-        #[rust_name = shut_down]
-        #[namespace = "netsim::server"]
-        fn Shutdown(self: &GrpcServer);
-
-        #[rust_name = get_grpc_port]
-        #[namespace = "netsim::server"]
-        fn GetGrpcPort(self: &GrpcServer) -> u32;
-
-        #[rust_name = run_grpc_server_cxx]
-        #[namespace = "netsim::server"]
-        pub fn RunGrpcServerCxx(
-            netsim_grpc_port: u32,
-            no_cli_ui: bool,
-            vsock: u16,
-        ) -> UniquePtr<GrpcServer>;
-
         // Grpc client.
         // Expose functions in Cuttlefish only, because it's only used by CVDs and it's
         // unable to pass function pointers on Windows.
@@ -116,6 +73,7 @@ pub mod ffi_transport {
     }
 }
 
+#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim")]
 pub mod ffi_bluetooth {
@@ -242,49 +200,7 @@ pub mod ffi_bluetooth {
     }
 }
 
-#[cxx::bridge(namespace = "netsim::wifi::facade")]
-pub mod ffi_wifi {
-    #[allow(dead_code)]
-    unsafe extern "C++" {
-        // WiFi facade.
-        include!("wifi/wifi_packet_hub.h");
-
-        #[rust_name = handle_wifi_request]
-        #[namespace = "netsim::wifi"]
-        fn HandleWifiRequestCxx(packet: &Vec<u8>);
-
-        #[rust_name = hostapd_send]
-        #[namespace = "netsim::wifi"]
-        fn HostapdSendCxx(packet: &Vec<u8>);
-
-        #[rust_name = libslirp_send]
-        #[namespace = "netsim::wifi"]
-        fn LibslirpSendCxx(packet: &Vec<u8>);
-
-        #[rust_name = is_eapol]
-        #[namespace = "netsim::wifi"]
-        fn IsEapolCxx(packet: &[u8]) -> bool;
-
-        #[namespace = "netsim::wifi"]
-        pub fn libslirp_main_loop_wait();
-
-        include!("wifi/wifi_facade.h");
-
-        #[rust_name = wifi_start]
-        pub fn Start(proto_bytes: &[u8]);
-
-        #[rust_name = wifi_stop]
-        pub fn Stop();
-
-    }
-
-    #[allow(unsafe_op_in_unsafe_fn)]
-    extern "Rust" {
-        #[cxx_name = HandleWiFiResponse]
-        fn handle_wifi_response(packet: &[u8]);
-    }
-}
-
+#[allow(clippy::needless_maybe_sized)]
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim::device")]
 pub mod ffi_devices {
@@ -328,50 +244,6 @@ pub mod ffi_devices {
 
 #[allow(unsafe_op_in_unsafe_fn)]
 #[cxx::bridge(namespace = "netsim")]
-pub mod ffi_response_writable {
-    extern "Rust" {
-        // handlers for gRPC server's invocation of API calls
-
-        #[cxx_name = "HandleCaptureCxx"]
-        fn handle_capture_cxx(
-            responder: Pin<&mut CxxServerResponseWriter>,
-            method: String,
-            param: String,
-            body: String,
-        );
-
-        #[cxx_name = "HandleDeviceCxx"]
-        fn handle_device_cxx(
-            responder: Pin<&mut CxxServerResponseWriter>,
-            method: String,
-            param: String,
-            body: String,
-        );
-    }
-    unsafe extern "C++" {
-        /// A C++ class which can be used to respond to a request.
-        include!("frontend/server_response_writable.h");
-
-        #[namespace = "netsim::frontend"]
-        type CxxServerResponseWriter;
-
-        #[namespace = "netsim::frontend"]
-        fn put_ok_with_length(self: &CxxServerResponseWriter, mime_type: &CxxString, length: usize);
-
-        #[namespace = "netsim::frontend"]
-        fn put_chunk(self: &CxxServerResponseWriter, chunk: &[u8]);
-
-        #[namespace = "netsim::frontend"]
-        fn put_ok(self: &CxxServerResponseWriter, mime_type: &CxxString, body: &CxxString);
-
-        #[namespace = "netsim::frontend"]
-        fn put_error(self: &CxxServerResponseWriter, error_code: u32, error_message: &CxxString);
-
-    }
-}
-
-#[allow(unsafe_op_in_unsafe_fn)]
-#[cxx::bridge(namespace = "netsim")]
 pub mod ffi_util {
     extern "Rust" {
         // Ranging
@@ -394,14 +266,6 @@ pub mod ffi_util {
         #[rust_name = set_up_crash_report]
         #[namespace = "netsim"]
         pub fn SetUpCrashReport();
-
-        // Frontend client.
-        include!("frontend/frontend_client_stub.h");
-
-        #[rust_name = is_netsimd_alive]
-        #[namespace = "netsim::frontend"]
-        pub fn IsNetsimdAlive(instance_num: u16) -> bool;
-
     }
 }
 
@@ -429,36 +293,4 @@ fn receive_link_layer_packet(
         packet_type,
         packet,
     );
-}
-
-/// CxxServerResponseWriter is defined in server_response_writable.h
-/// Wrapper struct allows the impl to discover the respective C++ methods
-pub struct CxxServerResponseWriterWrapper<'a> {
-    pub writer: Pin<&'a mut ffi_response_writable::CxxServerResponseWriter>,
-}
-
-impl ServerResponseWritable for CxxServerResponseWriterWrapper<'_> {
-    fn put_ok_with_length(&mut self, mime_type: &str, length: usize, _headers: StrHeaders) {
-        let_cxx_string!(mime_type = mime_type);
-        self.writer.put_ok_with_length(&mime_type, length);
-    }
-    fn put_chunk(&mut self, chunk: &[u8]) {
-        self.writer.put_chunk(chunk);
-    }
-    fn put_ok(&mut self, mime_type: &str, body: &str, _headers: StrHeaders) {
-        let_cxx_string!(mime_type = mime_type);
-        let_cxx_string!(body = body);
-        self.writer.put_ok(&mime_type, &body);
-    }
-    fn put_error(&mut self, error_code: u16, error_message: &str) {
-        let_cxx_string!(error_message = error_message);
-        self.writer.put_error(error_code.into(), &error_message);
-    }
-
-    fn put_ok_with_vec(&mut self, _mime_type: &str, _body: Vec<u8>, _headers: StrHeaders) {
-        todo!()
-    }
-    fn put_ok_switch_protocol(&mut self, _connection: &str, _headers: StrHeaders) {
-        todo!()
-    }
 }

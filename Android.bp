@@ -70,9 +70,11 @@ rust_defaults {
         "libfutures_util",
         "libglam",
         "libgrpcio",
+        "liblibc",
         "libnetsim_proto",
         "libhttp",
         "libnetsim_common",
+        "libnetsim_packets",
         "libpdl_runtime",
         "libpica",
         "libprotobuf",
@@ -83,18 +85,12 @@ rust_defaults {
         "libtokio",
         "libtokio_stream",
         "libtungstenite",
-        "liblazy_static",
         "liblog_rust",
         "libopenssl",
     ],
     static_libs: ["libgrpc_wrap"],
     srcs: [
         "rust/daemon/src/lib.rs",
-        ":netsim_netlink_rust_gen",
-        ":netsim_mac80211_hwsim_rust_gen",
-        ":netsim_ieee80211_rust_gen",
-        ":netsim_llc_rust_gen",
-        ":rootcanal_link_layer_packets_rust_gen",
     ],
 }
 
@@ -127,22 +123,6 @@ genrule {
 }
 
 genrule {
-    name: "netsim_cli_cc",
-    tools: ["cxxbridge"],
-    cmd: "$(location cxxbridge) $(in) >> $(out)",
-    srcs: ["rust/cli/src/ffi.rs"],
-    out: ["netsim-cli/src/ffi.rs.cc"],
-}
-
-genrule {
-    name: "netsim_cli_h",
-    tools: ["cxxbridge"],
-    cmd: "$(location cxxbridge) $(in) --header >> $(out)",
-    srcs: ["rust/cli/src/ffi.rs"],
-    out: ["netsim-cli/src/ffi.rs.h"],
-}
-
-genrule {
     name: "netsim_netlink_rust_gen",
     defaults: ["pdl_rust_generator_defaults"],
     srcs: ["pdl/netlink.pdl"],
@@ -170,14 +150,17 @@ genrule {
     out: ["llc_packets.rs"],
 }
 
+genrule {
+    name: "netsim_arp_rust_gen",
+    defaults: ["pdl_rust_generator_defaults"],
+    srcs: ["pdl/arp.pdl"],
+    out: ["arp_packets.rs"],
+}
+
 cc_library_host_static {
     name: "lib-netsim",
     defaults: ["netsim_defaults"],
     srcs: [
-        "src/core/server.cc",
-        "src/frontend/frontend_client_stub.cc",
-        "src/frontend/frontend_server.cc",
-        "src/backend/grpc_server.cc",
         "src/backend/grpc_client.cc",
         "src/hci/bluetooth_facade.cc",
         "src/hci/hci_packet_transport.cc",
@@ -187,7 +170,6 @@ cc_library_host_static {
         "src/util/log.cc",
         "src/util/os_utils.cc",
         "src/util/string_utils.cc",
-        "src/wifi/wifi_facade.cc",
     ],
     generated_headers: [
         "cxx-bridge-header",
@@ -346,54 +328,49 @@ rust_library_host {
     defaults: ["libnetsim_common_defaults"],
 }
 
+rust_defaults {
+    name: "libnetsim_packets_defaults",
+    srcs: [
+        "rust/packets/src/lib.rs",
+        ":netsim_netlink_rust_gen",
+        ":netsim_mac80211_hwsim_rust_gen",
+        ":netsim_ieee80211_rust_gen",
+        ":netsim_llc_rust_gen",
+        ":netsim_arp_rust_gen",
+        ":rootcanal_link_layer_packets_rust_gen",
+    ],
+    rustlibs: [
+        "libanyhow",
+        "libbytes",
+        "libpdl_runtime",
+    ],
+}
+
+rust_library_host {
+    name: "libnetsim_packets",
+    crate_name: "netsim_packets",
+    defaults: ["libnetsim_packets_defaults"],
+}
+
 rust_test_host {
     name: "libnetsim_common_inline_tests",
     defaults: ["libnetsim_common_defaults"],
     test_suites: ["general_tests"],
 }
 
-cc_library_host_static {
-    name: "lib-netsim-frontend-client",
-    defaults: ["netsim_defaults"],
-    srcs: [
-        "src/frontend/frontend_client.cc",
-        "src/util/ini_file.cc",
-        "src/util/log.cc",
-        "src/util/os_utils.cc",
-        "src/util/string_utils.cc",
-    ],
-    generated_headers: [
-        "cxx-bridge-header",
-        "netsim_cli_h",
-    ],
-    shared_libs: ["libgrpc++"],
-    generated_sources: ["netsim_cli_cc"],
-    static_libs: [
-        "libprotobuf-cpp-full",
-        "lib-netsim-frontend-proto",
-    ],
-}
-
 rust_defaults {
     name: "netsim_cli_defaults",
     rustlibs: [
+        "libanyhow",
         "libclap",
-        "libcxx",
+        "libfutures",
+        "libfutures_util",
+        "libgrpcio",
         "libhex",
         "libnetsim_common",
         "libnetsim_proto",
         "libprotobuf",
         "libtracing",
-    ],
-}
-
-rust_defaults {
-    name: "netsim_cli_cc_defaults",
-    shared_libs: ["libgrpc++"],
-    static_libs: [
-        "lib-netsim-frontend-client",
-        "lib-netsim-frontend-proto",
-        "libprotobuf-cpp-full",
     ],
 }
 
@@ -410,7 +387,6 @@ rust_library_host {
     srcs: ["rust/cli/src/lib.rs"],
     defaults: [
         "netsim_cli_defaults",
-        "netsim_cli_cc_defaults",
     ],
 }
 
@@ -419,28 +395,5 @@ rust_binary_host {
     srcs: ["rust/cli/bin/netsim.rs"],
     rustlibs: [
         "libnetsim_cli",
-    ],
-}
-
-rust_binary_host {
-    name: "netsim_test_client",
-    srcs: ["rust/frontend/src/netsim_test_client.rs"],
-    rustlibs: [
-        "libgrpcio",
-        "libnetsim_proto",
-        "libprotobuf",
-        "libnetsim_common",
-    ],
-}
-
-rust_binary_host {
-    name: "netsim_test_server",
-    srcs: ["rust/frontend/src/netsim_test_server.rs"],
-    rustlibs: [
-        "libgrpcio",
-        "libnetsim_proto",
-        "libprotobuf",
-        "libnetsim_common",
-        "libfutures",
     ],
 }

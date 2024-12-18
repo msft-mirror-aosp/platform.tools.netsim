@@ -13,12 +13,15 @@
 # limitations under the License.
 
 [workspace]
-edition = "2021"
 members = [
     "proto",
     "cli",
     "common",
     "daemon",
+    "http-proxy",
     "libslirp-rs",
     "hostapd-rs",
+    "packets",
+    "capture",
 ]
+resolver = "2"
