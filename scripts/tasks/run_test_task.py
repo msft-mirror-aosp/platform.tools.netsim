@@ -20,7 +20,6 @@ import platform
 from tasks.task import Task
 from utils import (AOSP_ROOT, run, rust_version)
 
-PLATFORM_SYSTEM = platform.system()
 
 class RunTestTask(Task):
 
@@ -32,7 +31,7 @@ class RunTestTask(Task):
 
   def do_run(self):
     # TODO(b/379745416): Support clippy for Mac and Windows
-    if PLATFORM_SYSTEM == "Linux":
+    if platform.system() == "Linux":
       # Set Clippy flags
       clippy_flags = [
           "-A clippy::disallowed_names",
@@ -56,7 +55,7 @@ class RunTestTask(Task):
       )
 
     # Set script for cargo Test
-    if PLATFORM_SYSTEM == "Windows":
+    if platform.system() == "Windows":
       script = AOSP_ROOT / "tools" / "netsim" / "scripts" / "cargo_test.cmd"
     else:
       script = AOSP_ROOT / "tools" / "netsim" / "scripts" / "cargo_test.sh"
@@ -66,17 +65,13 @@ class RunTestTask(Task):
         "hostapd-rs",
         "libslirp-rs",
         "http-proxy",
-        "netsim-cli",
         "netsim-common",
         "netsim-daemon",
         "netsim-packets",
         "capture",
     ]:
       # TODO(b/379708365): Resolve netsim-daemon test for Mac & Windows
-      if package == "netsim-daemon" and PLATFORM_SYSTEM != "Linux":
-        continue
-      # TODO(b/384572135): Resolve netsim-cli test for Windows
-      if package == "netsim-cli" and PLATFORM_SYSTEM == "Windows":
+      if package == "netsim-daemon" and platform.system() != "Linux":
         continue
       cmd = [script, package, str(self.out), rust_version()]
       run(cmd, self.env, f"{package}_unit_tests")
