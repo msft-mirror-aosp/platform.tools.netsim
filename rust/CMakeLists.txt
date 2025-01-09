@@ -10,6 +10,7 @@ corrosion_import_crate(MANIFEST_PATH Cargo.toml FLAGS --offline --verbose)
 corrosion_set_env_vars(netsim-common CARGO_HOME=${Rust_CARGO_HOME})
 corrosion_set_env_vars(http-proxy CARGO_HOME=${Rust_CARGO_HOME})
 corrosion_set_env_vars(libslirp-rs CARGO_HOME=${Rust_CARGO_HOME})
+corrosion_set_env_vars(capture CARGO_HOME=${Rust_CARGO_HOME})
 
 function(set_prebuilt_packets_env_vars target)
   corrosion_set_env_vars(
@@ -42,6 +43,8 @@ corrosion_set_env_vars(
   GRPCIO_SYS_GRPC_INCLUDE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../../../external/grpc/include"
 )
 
+set_prebuilt_packets_env_vars(netsim-daemon)
+
 add_custom_target(
   netsim_rust_packets
   DEPENDS pdl_gen-RootCanalGeneratedPackets_rs pdl_gen-NetlinkPackets_rs
@@ -65,7 +68,6 @@ if(WIN32)
   # 4. This isn't needed in mac and Linux because corrosion doesn't pass
   #    -fno-exception flag.
   set(CXXFLAGS "${CMAKE_CXX_FLAGS} /DRUST_CXX_NO_EXCEPTIONS")
-  corrosion_set_env_vars(netsim-cli CXXFLAGS=${CXXFLAGS})
   corrosion_set_env_vars(netsim-daemon CXXFLAGS=${CXXFLAGS})
 endif()
 
