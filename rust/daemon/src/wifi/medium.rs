@@ -264,7 +264,13 @@ impl Medium {
             } else if ieee80211.is_to_ap() {
                 // Don't forward Null Data frames to slirp because they are used to maintain an active connection and carry no user data.
                 if ieee80211.stype() != DataSubType::Nodata.into() {
-                    processor.network = true;
+                    processor.network = if self.enabled(client_id).unwrap() {
+                        true
+                    } else {
+                        // If the client is disabled, block all packets to the internet so it can connect to the AP but has no internet access.
+                        let destination = ieee80211.get_destination();
+                        destination.is_multicast() || destination == self.hostapd.get_bssid()
+                    };
                 }
             }
         } else {
