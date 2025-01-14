@@ -701,7 +701,7 @@ mod tests {
 
         let hostapd_options = netsim_proto::config::HostapdOptions::new();
         let (tx, _rx) = std::sync::mpsc::channel();
-        let hostapd = Arc::new(hostapd::hostapd_run(hostapd_options, tx).unwrap());
+        let hostapd = Arc::new(hostapd::hostapd_run(hostapd_options, tx, None).unwrap());
 
         // Create a test Medium object
         let callback: HwsimCmdCallback = |_, _| {};
